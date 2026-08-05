@@ -1,0 +1,140 @@
+// ---------------------------------------------------------------------------
+// createMasterDataRouter — โรงงานสร้าง Router มาตรฐานสำหรับ "master data"
+//
+// Category / Location / Department / Vendor มีพฤติกรรมเหมือนกันทุกอย่าง:
+//   - ต้องล็อกอินก่อนถึงจะใช้ได้ (ทุกคนที่ล็อกอินจัดการได้ — ระบบนี้ยังไม่มีระดับสิทธิ์ผู้ดูแล)
+//   - ชื่อ (name) ห้ามซ้ำ ไม่สนตัวพิมพ์เล็ก/ใหญ่ (บังคับจริงด้วย partial unique index ที่ชั้นฐานข้อมูลด้วย)
+//   - รองรับ pagination + search + sort เหมือน asset
+//   - รองรับ filter ?isActive=true/false (ใช้ตอน asset form ดึงเฉพาะตัวเลือกที่ยัง active)
+//   - ลบแบบ soft delete (ตั้ง deletedAt แทนการลบแถวจริง)
+//
+// เขียนไว้ที่เดียว แล้วให้ routes/categories.js, locations.js, departments.js, vendors.js
+// เรียกใช้แค่ระบุ schema/label ของตัวเอง กันไม่ให้ต้องก็อปโค้ด CRUD ซ้ำ 4 รอบ
+// ---------------------------------------------------------------------------
+import { Router } from 'express'
+import { requireAuth } from '../middleware/auth.js'
+import { ok, fail, fromZodError } from './response.js'
+import { asyncHandler } from './asyncHandler.js'
+import { parsePagination, parseSort, buildPageMeta } from './queryParams.js'
+
+/**
+ * @param {object} opts
+ * @param {object} opts.model - prisma delegate เช่น prisma.category
+ * @param {string} opts.entityLabel - ชื่อเรียกภาษาไทยไว้ใช้ในข้อความ error เช่น "หมวดหมู่"
+ * @param {import('zod').ZodSchema} opts.createSchema - zod schema ตอนสร้างใหม่ (ต้องมี name)
+ * @param {import('zod').ZodSchema} opts.updateSchema - zod schema ตอนแก้ไข (ทุกฟิลด์ optional)
+ * @param {string[]} [opts.searchableFields] - ฟิลด์อื่นนอกจาก name ที่ค้นหาได้ (เช่น vendor: contactName, email)
+ * @param {string[]} [opts.sortableFields] - ฟิลด์ที่ sort ได้
+ */
+export function createMasterDataRouter({
+  model,
+  entityLabel,
+  createSchema,
+  updateSchema,
+  searchableFields = [],
+  sortableFields = ['name', 'createdAt'],
+}) {
+  const router = Router()
+  router.use(requireAuth)
+
+  const NOT_FOUND_MESSAGE = `ไม่พบข้อมูล${entityLabel}นี้`
+
+  // เช็กชื่อซ้ำ (ไม่สนตัวพิมพ์เล็ก/ใหญ่) เฉพาะในแถวที่ยังไม่ถูกลบ — เผื่อให้ตั้งชื่อซ้ำกับของที่ถูกลบไปแล้วได้
+  async function nameExists(name, excludeId) {
+    if (!name) return false
+    const dup = await model.findFirst({
+      where: {
+        deletedAt: null,
+        name: { equals: name, mode: 'insensitive' },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    })
+    return Boolean(dup)
+  }
+
+  function duplicateNameError() {
+    const msg = `ชื่อ${entityLabel}นี้ถูกใช้ไปแล้ว`
+    return { message: msg, errors: [{ field: 'name', message: msg }] }
+  }
+
+  // ---- READ: รายการ (แบ่งหน้า + เรียงลำดับ + ค้นหา + filter isActive) ----
+  router.get('/', asyncHandler(async (req, res) => {
+    const pagination = parsePagination(req.query)
+    const orderBy = parseSort(req.query, sortableFields, 'name')
+
+    const where = { deletedAt: null }
+
+    if (req.query.isActive === 'true') where.isActive = true
+    if (req.query.isActive === 'false') where.isActive = false
+
+    const search = (req.query.search || '').trim()
+    if (search) {
+      const fields = ['name', ...searchableFields]
+      where.OR = fields.map((field) => ({ [field]: { contains: search, mode: 'insensitive' } }))
+    }
+
+    const [items, totalItems] = await Promise.all([
+      model.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take }),
+      model.count({ where }),
+    ])
+
+    ok(res, { items, ...buildPageMeta(pagination, totalItems) })
+  }))
+
+  // ---- READ: รายการเดียว ----
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const item = await model.findFirst({ where: { id: req.params.id, deletedAt: null } })
+    if (!item) return fail(res, 404, NOT_FOUND_MESSAGE)
+    ok(res, item)
+  }))
+
+  // ---- CREATE ----
+  router.post('/', asyncHandler(async (req, res) => {
+    const parsed = createSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
+    }
+
+    if (await nameExists(parsed.data.name)) {
+      const { message, errors } = duplicateNameError()
+      return fail(res, 409, message, errors)
+    }
+
+    const item = await model.create({ data: parsed.data })
+    ok(res, item, 201)
+  }))
+
+  // ---- UPDATE (แก้ไม่ได้ถ้าถูกลบไปแล้ว) ----
+  router.put('/:id', asyncHandler(async (req, res) => {
+    const parsed = updateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
+    }
+
+    if (parsed.data.name && await nameExists(parsed.data.name, req.params.id)) {
+      const { message, errors } = duplicateNameError()
+      return fail(res, 409, message, errors)
+    }
+
+    const result = await model.updateMany({
+      where: { id: req.params.id, deletedAt: null },
+      data: parsed.data,
+    })
+    if (result.count === 0) return fail(res, 404, NOT_FOUND_MESSAGE)
+
+    const item = await model.findUnique({ where: { id: req.params.id } })
+    ok(res, item)
+  }))
+
+  // ---- DELETE (soft) ----
+  router.delete('/:id', asyncHandler(async (req, res) => {
+    const result = await model.updateMany({
+      where: { id: req.params.id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    })
+    if (result.count === 0) return fail(res, 404, NOT_FOUND_MESSAGE)
+    ok(res, { id: req.params.id })
+  }))
+
+  return router
+}

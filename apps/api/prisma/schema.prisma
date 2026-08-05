@@ -1,0 +1,131 @@
+// ---------------------------------------------------------------------------
+// Prisma schema — คำอธิบายโครงสร้างฐานข้อมูล
+// เปลี่ยนไฟล์นี้แล้วรัน  npm run migrate:dev  เพื่อสร้าง/อัปเดตตารางจริง
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ตารางผู้ใช้ (สำหรับ Register / Login)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique                 // อีเมลห้ามซ้ำ
+  password  String                            // เก็บเป็น "hash" เท่านั้น ไม่เก็บรหัสจริง
+  name      String?                           // ? = ใส่หรือไม่ใส่ก็ได้
+  createdAt DateTime @default(now())
+  assets    Asset[]                          // ผู้ใช้ 1 คน เป็นเจ้าของได้หลาย asset
+}
+
+// สถานะของ asset — ใช้ enum เพื่อจำกัดค่าที่เป็นไปได้ให้ชัดเจน
+enum AssetStatus {
+  AVAILABLE // พร้อมใช้งาน / อยู่ในคลัง
+  IN_USE    // กำลังถูกใช้งานอยู่
+  REPAIR    // อยู่ระหว่างซ่อม
+  DISPOSED  // เลิกใช้งาน / ตัดจำหน่ายแล้ว
+}
+
+// ---------------------------------------------------------------------------
+// Master Data — ข้อมูลอ้างอิงกลาง ใช้ร่วมกันทุก user ในระบบ (ไม่มี ownerId)
+// ทุกตารางมีโครงคล้ายกัน: ชื่อห้ามซ้ำ (ไม่สนตัวพิมพ์เล็ก/ใหญ่ — บังคับจริงด้วย partial unique
+// index ใน migration.sql), isActive ไว้ "ปิดใช้งานชั่วคราว" โดยไม่ต้องลบ, และ deletedAt ไว้ soft delete
+// ---------------------------------------------------------------------------
+
+// หมวดหมู่ครุภัณฑ์ เช่น Notebook, Desktop, Monitor, Printer
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  assets      Asset[]
+
+  @@index([deletedAt])
+}
+
+// สถานที่ตั้งครุภัณฑ์ เช่น Head Office, Warehouse, Server Room
+model Location {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  assets      Asset[]
+
+  @@index([deletedAt])
+}
+
+// แผนกที่ครอบครอง/ดูแลครุภัณฑ์ เช่น IT, HR, Finance
+model Department {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  assets      Asset[]
+
+  @@index([deletedAt])
+}
+
+// ผู้ขาย/ผู้ผลิตครุภัณฑ์ เช่น Dell, HP, Lenovo
+model Vendor {
+  id          String    @id @default(uuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  website     String?
+  address     String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  assets      Asset[]
+
+  @@index([deletedAt])
+}
+
+// ตาราง Asset — ครุภัณฑ์/อุปกรณ์ IT ของผู้ใช้แต่ละคน
+model Asset {
+  id           String      @id @default(uuid())
+  assetTag     String      @unique                 // เลขทะเบียนครุภัณฑ์ ห้ามซ้ำ
+  name         String                              // ชื่ออุปกรณ์ เช่น "โน้ตบุ๊ค Dev Team"
+  brand        String                              // ยี่ห้อ เช่น Dell, HP, Apple (ยังเป็น text — ไม่ใช่ master data)
+  model        String                              // รุ่น เช่น "XPS 13" (ยังเป็น text — ไม่ใช่ master data)
+  serialNumber String?     @unique                 // เลข serial จากผู้ผลิต (อาจไม่มี)
+  status       AssetStatus @default(AVAILABLE)      // สถานะปัจจุบัน
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt              // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
+  deletedAt    DateTime?                           // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
+
+  // ความสัมพันธ์กับ master data — categoryId บังคับ (แทนที่ text field เดิม)
+  // location/department/vendor เป็นทางเลือก เพราะ asset ที่มีอยู่ก่อนหน้ายังไม่มีข้อมูลนี้
+  categoryId   String
+  category     Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  locationId   String?
+  location     Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  vendorId     String?
+  vendor       Vendor?     @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // query หลักของ list/get ทุกอันกรองด้วย ownerId + deletedAt เสมอ — index ผสมนี้ช่วยให้ query เร็วขึ้น
+  @@index([ownerId, deletedAt])
+  @@index([categoryId])
+  @@index([locationId])
+  @@index([departmentId])
+  @@index([vendorId])
+}

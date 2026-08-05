@@ -1,0 +1,217 @@
+// ---------------------------------------------------------------------------
+// Route: /api/assets  — จัดการครุภัณฑ์ IT (Create / Read / Update / Delete)
+// ทุก endpoint ต้องล็อกอินก่อน และเห็น/แก้ไข/ลบได้เฉพาะ asset ของตัวเองเท่านั้น
+//
+// การลบเป็น "soft delete" — ตั้งค่า deletedAt แทนการลบแถวออกจริง
+// endpoint READ/UPDATE ทุกอันจึงต้องกรอง deletedAt: null เสมอ เพื่อไม่ให้เห็น/แก้ของที่ถูกลบไปแล้ว
+//
+// ตั้งแต่ Milestone 2: category/location/department/vendor เป็นความสัมพันธ์กับตาราง master data
+// แล้ว (ไม่ใช่ text อีกต่อไป ยกเว้น category ที่เดิมเป็น text) — categoryId บังคับ, ที่เหลือไม่บังคับ
+// ---------------------------------------------------------------------------
+import { Router } from 'express'
+import { z } from 'zod'
+import { prisma } from '../db.js'
+import { requireAuth } from '../middleware/auth.js'
+import { ok, fail, fromZodError } from '../utils/response.js'
+import { asyncHandler } from '../utils/asyncHandler.js'
+import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
+
+const router = Router()
+
+// requireAuth ครอบทุก route ในไฟล์นี้
+router.use(requireAuth)
+
+// สถานะที่อนุญาต — ต้องตรงกับ enum AssetStatus ใน schema.prisma
+const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
+
+// ฟิลด์ที่ยอมให้ sort ได้ (ต้องตรงกับที่ระบุใน spec: Asset Tag, Name, Created Date, Status)
+const SORTABLE_FIELDS = ['assetTag', 'name', 'createdAt', 'status']
+
+// ฟิลด์ที่ค้นหาได้ — ค้นหาแบบ "มีคำนี้อยู่ที่ไหนก็ได้" (contains) และไม่สนตัวพิมพ์เล็ก/ใหญ่
+const SEARCHABLE_FIELDS = ['assetTag', 'name', 'brand', 'model', 'serialNumber']
+
+// แนบข้อมูล master data ที่เกี่ยวข้องมาด้วยทุกครั้งที่อ่าน asset — frontend จะได้มีชื่อไปแสดงผล
+// ไม่ต้องยิง request แยกทีละตัว (แม้ master data นั้นจะถูก soft delete ไปแล้วก็ยังแนบมา ตาม
+// requirement ที่ต้องการให้ asset เก่าที่อ้างถึง master data ที่ถูกลบ ยังแสดงผลได้ถูกต้อง)
+const WITH_RELATIONS = {
+  include: { category: true, location: true, department: true, vendor: true },
+}
+
+// เงื่อนไขพื้นฐานที่ทุก READ/UPDATE ต้องมี: เป็นของฉัน และยังไม่ถูกลบ
+function scopeToOwner(ownerId) {
+  return { ownerId, deletedAt: null }
+}
+
+// ข้อความ error กลาง ๆ เมื่อไม่พบ asset — ใช้ข้อความเดียวกันไม่ว่าจะเพราะ "ไม่มีจริง" หรือ "มีแต่ไม่ใช่ของเรา"
+// (ตั้งใจไม่แยกข้อความ เพื่อไม่ให้คนอื่นเดาได้ว่า asset ID นี้มีอยู่จริงในระบบหรือไม่)
+const NOT_FOUND_MESSAGE = 'ไม่พบครุภัณฑ์นี้ หรือคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้'
+
+// master data 4 ตัวที่ asset อ้างอิงได้ — ใช้ตอนตรวจว่า id ที่ส่งมามีอยู่จริงและยัง active อยู่ไหม
+const MASTER_DATA_REFS = [
+  { field: 'categoryId', model: prisma.category, label: 'หมวดหมู่' },
+  { field: 'locationId', model: prisma.location, label: 'สถานที่' },
+  { field: 'departmentId', model: prisma.department, label: 'แผนก' },
+  { field: 'vendorId', model: prisma.vendor, label: 'ผู้ขาย/ผู้ผลิต' },
+]
+
+// ตรวจว่า categoryId/locationId/departmentId/vendorId ที่ส่งมา (ถ้ามี) ชี้ไปยัง master data
+// ที่มีอยู่จริงและยังไม่ถูกลบ (deletedAt: null) — กันไม่ให้ผูก asset ใหม่กับของที่ถูกลบไปแล้ว
+async function findInvalidMasterDataRef(data) {
+  for (const ref of MASTER_DATA_REFS) {
+    const id = data[ref.field]
+    if (!id) continue // ไม่ได้ส่งมา หรือส่ง null (unset) — ข้ามได้ ไม่บังคับ
+    const found = await ref.model.findFirst({ where: { id, deletedAt: null } })
+    if (!found) {
+      const message = `${ref.label}ที่เลือกไม่ถูกต้อง หรือถูกลบไปแล้ว กรุณาเลือกใหม่`
+      return { field: ref.field, message }
+    }
+  }
+  return null
+}
+
+// ---- READ: ดึง asset ของฉัน (แบ่งหน้า + เรียงลำดับ + ค้นหา) ----
+router.get('/', asyncHandler(async (req, res) => {
+  const pagination = parsePagination(req.query)
+  const orderBy = parseSort(req.query, SORTABLE_FIELDS, 'createdAt')
+
+  const where = { ...scopeToOwner(req.user.id) }
+
+  const search = (req.query.search || '').trim()
+  if (search) {
+    where.OR = SEARCHABLE_FIELDS.map((field) => ({
+      [field]: { contains: search, mode: 'insensitive' },
+    }))
+  }
+
+  const [items, totalItems] = await Promise.all([
+    prisma.asset.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...WITH_RELATIONS }),
+    prisma.asset.count({ where }),
+  ])
+
+  ok(res, { items, ...buildPageMeta(pagination, totalItems) })
+}))
+
+// ---- READ: ดึง asset ชิ้นเดียวของฉัน ----
+router.get('/:id', asyncHandler(async (req, res) => {
+  const asset = await prisma.asset.findFirst({
+    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    ...WITH_RELATIONS,
+  })
+  if (!asset) {
+    return fail(res, 404, NOT_FOUND_MESSAGE)
+  }
+  ok(res, asset)
+}))
+
+// ---- CREATE: เพิ่ม asset ใหม่ ----
+// .trim() ตัดช่องว่างหัว-ท้ายอัตโนมัติ แล้ว min(1) กันไม่ให้ผ่านด้วยสตริงว่าง/ช่องว่างล้วน
+const createSchema = z.object({
+  assetTag: z.string().trim().min(1, 'กรุณาใส่เลขทะเบียนครุภัณฑ์ (Asset Tag)'),
+  name: z.string().trim().min(1, 'กรุณาใส่ชื่ออุปกรณ์'),
+  brand: z.string().trim().min(1, 'กรุณาใส่ยี่ห้อ'),
+  model: z.string().trim().min(1, 'กรุณาใส่รุ่น'),
+  serialNumber: z.string().trim().min(1).optional().nullable(),
+  status: z.enum(ASSET_STATUSES, { errorMap: () => ({ message: 'สถานะไม่ถูกต้อง' }) }).optional(),
+  categoryId: z.string().trim().min(1, 'กรุณาเลือกหมวดหมู่'),
+  locationId: z.string().trim().min(1).optional().nullable(),
+  departmentId: z.string().trim().min(1).optional().nullable(),
+  vendorId: z.string().trim().min(1).optional().nullable(),
+})
+
+// ตรวจว่า assetTag / serialNumber ชนกับของที่มีอยู่แล้วหรือไม่ (แยกเช็กทีละฟิลด์ เพื่อบอกได้ชัดว่าฟิลด์ไหนซ้ำ)
+// excludeId = ตอนแก้ไข ไม่ต้องเทียบกับตัวเอง
+async function findDuplicateField({ assetTag, serialNumber }, excludeId) {
+  if (assetTag) {
+    const dup = await prisma.asset.findFirst({
+      where: { assetTag, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    })
+    if (dup) return { field: 'assetTag', message: 'เลข Asset Tag นี้ถูกใช้ไปแล้ว' }
+  }
+  if (serialNumber) {
+    const dup = await prisma.asset.findFirst({
+      where: { serialNumber, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    })
+    if (dup) return { field: 'serialNumber', message: 'เลข Serial Number นี้ถูกใช้ไปแล้ว' }
+  }
+  return null
+}
+
+router.post('/', asyncHandler(async (req, res) => {
+  const parsed = createSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
+  }
+
+  const duplicate = await findDuplicateField(parsed.data)
+  if (duplicate) {
+    return fail(res, 409, duplicate.message, [duplicate])
+  }
+
+  const invalidRef = await findInvalidMasterDataRef(parsed.data)
+  if (invalidRef) {
+    return fail(res, 400, invalidRef.message, [invalidRef])
+  }
+
+  const asset = await prisma.asset.create({
+    data: { ...parsed.data, ownerId: req.user.id },
+    ...WITH_RELATIONS,
+  })
+  ok(res, asset, 201)
+}))
+
+// ---- UPDATE: แก้ไขข้อมูล asset (แก้ไม่ได้ถ้าถูกลบไปแล้ว) ----
+const updateSchema = z.object({
+  assetTag: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  brand: z.string().trim().min(1).optional(),
+  model: z.string().trim().min(1).optional(),
+  serialNumber: z.string().trim().min(1).optional().nullable(),
+  status: z.enum(ASSET_STATUSES, { errorMap: () => ({ message: 'สถานะไม่ถูกต้อง' }) }).optional(),
+  categoryId: z.string().trim().min(1).optional(),
+  locationId: z.string().trim().min(1).optional().nullable(),
+  departmentId: z.string().trim().min(1).optional().nullable(),
+  vendorId: z.string().trim().min(1).optional().nullable(),
+})
+
+router.put('/:id', asyncHandler(async (req, res) => {
+  const parsed = updateSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
+  }
+
+  const duplicate = await findDuplicateField(parsed.data, req.params.id)
+  if (duplicate) {
+    return fail(res, 409, duplicate.message, [duplicate])
+  }
+
+  const invalidRef = await findInvalidMasterDataRef(parsed.data)
+  if (invalidRef) {
+    return fail(res, 400, invalidRef.message, [invalidRef])
+  }
+
+  // updateMany + เงื่อนไข ownerId/deletedAt = ป้องกันไม่ให้แก้ของคนอื่น หรือแก้ของที่ถูกลบไปแล้ว
+  const result = await prisma.asset.updateMany({
+    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    data: parsed.data,
+  })
+  if (result.count === 0) {
+    return fail(res, 404, NOT_FOUND_MESSAGE)
+  }
+
+  const asset = await prisma.asset.findUnique({ where: { id: req.params.id }, ...WITH_RELATIONS })
+  ok(res, asset)
+}))
+
+// ---- DELETE (soft): ตั้งค่า deletedAt แทนการลบแถวจริง ----
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const result = await prisma.asset.updateMany({
+    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    data: { deletedAt: new Date() },
+  })
+  if (result.count === 0) {
+    return fail(res, 404, NOT_FOUND_MESSAGE)
+  }
+  ok(res, { id: req.params.id })
+}))
+
+export default router
