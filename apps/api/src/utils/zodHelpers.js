@@ -5,48 +5,56 @@ import { z } from 'zod'
 
 // ฟิลด์ text ที่ไม่บังคับ — ตัดช่องว่างหัว-ท้าย แล้วถ้าเหลือว่างให้กลายเป็น null
 // (กันกรณี frontend ส่งสตริงว่างมาแทนที่จะเป็น null)
+//
+// หมายเหตุสำคัญ: .optional() ต้องอยู่ "ท้ายสุด" ของ chain เสมอ — ถ้าอยู่ก่อน .transform()/.refine()
+// จะทำให้ field ที่ "ไม่ได้ส่งมาเลย" (undefined จาก partial update) โดน transform เป็น null ไปด้วย
+// (แทนที่จะข้ามไปเฉยๆ) ทำให้ PUT บางส่วน (ส่งมาไม่กี่ฟิลด์) ไปเคลียร์ฟิลด์อื่นที่ไม่ได้ส่งมาโดยไม่ตั้งใจ
 export function optionalText() {
-  return z.string().trim().optional().nullable().transform((v) => (v ? v : null))
+  return z.string().trim().nullable().transform((v) => (v ? v : null)).optional()
 }
 
 // ฟิลด์อีเมลที่ไม่บังคับ — ถ้ามีค่าต้องเป็นอีเมลที่ถูกต้อง ถ้าว่างให้กลายเป็น null
 export function optionalEmail() {
   return z.union([z.string().trim().email('อีเมลไม่ถูกต้อง'), z.literal('')])
-    .optional()
     .nullable()
     .transform((v) => (v ? v : null))
+    .optional()
 }
 
 // ฟิลด์วันที่ที่ไม่บังคับ (จาก <input type="date">) — ว่าง/ไม่ส่งมา -> null, มีค่าต้อง parse เป็นวันที่ได้จริง
 export function optionalDate(message = 'วันที่ไม่ถูกต้อง') {
-  return z.string().trim().optional().nullable()
+  return z.string().trim().nullable()
     .transform((v) => (v ? v : null))
     .refine((v) => v === null || !Number.isNaN(Date.parse(v)), { message })
     .transform((v) => (v === null ? null : new Date(v)))
+    .optional()
 }
 
 // IPv4 ที่ไม่บังคับ — ว่าง -> null, มีค่าต้องเป็น IPv4 รูปแบบถูกต้อง (0-255 ทั้ง 4 ช่อง)
 const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/
 export function optionalIPv4(message = 'IP Address ไม่ถูกต้อง (ต้องเป็นรูปแบบ IPv4)') {
-  return z.string().trim().optional().nullable()
+  return z.string().trim().nullable()
     .transform((v) => (v ? v : null))
     .refine((v) => v === null || IPV4_RE.test(v), { message })
+    .optional()
 }
 
 // MAC address ที่ไม่บังคับ — ว่าง -> null, มีค่าต้องเป็นรูปแบบ XX:XX:XX:XX:XX:XX (คั่นด้วย : หรือ -)
 const MAC_RE = /^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$/
 export function optionalMac(message = 'MAC Address ไม่ถูกต้อง (ต้องเป็นรูปแบบ XX:XX:XX:XX:XX:XX)') {
-  return z.string().trim().optional().nullable()
+  return z.string().trim().nullable()
     .transform((v) => (v ? v : null))
     .refine((v) => v === null || MAC_RE.test(v), { message })
+    .optional()
 }
 
 // รหัสสกุลเงิน (ISO 4217) ที่ไม่บังคับ — ว่าง -> null, มีค่าต้องเป็นตัวอักษร 3 ตัว (แปลงเป็นตัวใหญ่ให้อัตโนมัติ)
 const CURRENCY_RE = /^[A-Za-z]{3}$/
 export function optionalCurrency(message = 'รหัสสกุลเงินไม่ถูกต้อง (ต้องเป็นตัวอักษร 3 ตัว เช่น THB, USD)') {
-  return z.string().trim().optional().nullable()
+  return z.string().trim().nullable()
     .transform((v) => (v ? v.toUpperCase() : null))
     .refine((v) => v === null || CURRENCY_RE.test(v), { message })
+    .optional()
 }
 
 // ตัวเลข >= 0 ที่ไม่บังคับ (เช่น ราคาซื้อ) — ค่าว่าง/ไม่ส่งมา -> null

@@ -14,6 +14,8 @@ const router = Router()
 
 // กติกาการตรวจข้อมูลที่ส่งเข้ามา (validation) ด้วย zod
 // .trim() ตัดช่องว่างหัว-ท้ายก่อนตรวจ กันไม่ให้ผ่านด้วยค่าที่เป็นช่องว่างล้วน
+// ตั้งใจไม่รับ role จากผู้ใช้ที่สมัคร (Milestone 4) — สมัครใหม่เป็น EMPLOYEE เสมอ (ค่า default ใน schema)
+// กันการยกระดับสิทธิ์ตัวเอง แม้ client จะยัด { role: "ADMIN" } มาใน body ก็ถูกตัดทิ้งโดย zod อัตโนมัติ
 const registerSchema = z.object({
   email: z.string().trim().email('อีเมลไม่ถูกต้อง'),
   password: z.string().min(6, 'รหัสผ่านอย่างน้อย 6 ตัวอักษร'),
@@ -26,9 +28,11 @@ const loginSchema = z.object({
 })
 
 // สร้าง JWT ที่หมดอายุใน 7 วัน
+// แนบ role มาด้วย (Milestone 4) — requireAuth/requireRole ใช้ตรวจสิทธิ์จากค่านี้โดยไม่ต้อง query DB ซ้ำทุก request
+// หมายเหตุ: ถ้า role ถูกเปลี่ยนภายหลัง ผู้ใช้ต้องล็อกอินใหม่ token เก่าจะยังพก role เดิมไปจนกว่าจะหมดอายุ (เหมือน email/name)
 function signToken(user) {
   return jwt.sign(
-    { sub: user.id, email: user.email },
+    { sub: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   )
@@ -55,7 +59,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   })
 
   const token = signToken(user)
-  ok(res, { token, user: { id: user.id, email: user.email, name: user.name } }, 201)
+  ok(res, { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } }, 201)
 }))
 
 // ---- เข้าสู่ระบบ ----
@@ -73,14 +77,14 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user)
-  ok(res, { token, user: { id: user.id, email: user.email, name: user.name } })
+  ok(res, { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } })
 }))
 
 // ---- ดูข้อมูลตัวเอง (ต้องล็อกอิน) ----
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, email: true, name: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, createdAt: true },
   })
   ok(res, { user })
 }))

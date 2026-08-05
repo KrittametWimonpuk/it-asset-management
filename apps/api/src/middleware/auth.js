@@ -21,9 +21,26 @@ export function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = { id: payload.sub, email: payload.email }
+    req.user = { id: payload.sub, email: payload.email, role: payload.role }
     next()
   } catch (err) {
     return fail(res, 401, 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Middleware ตรวจสอบสิทธิ์ (RBAC) — Milestone 4
+// ใช้ต่อจาก requireAuth เสมอ (พึ่งพา req.user.role ที่ requireAuth แนบไว้จาก JWT)
+//
+// ตัวอย่าง:
+//   router.post('/', requireRole('ADMIN', 'IT_STAFF'), ...)
+//   router.delete('/:id', requireRole('ADMIN'), ...)
+// ---------------------------------------------------------------------------
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return fail(res, 403, 'คุณไม่มีสิทธิ์ทำรายการนี้')
+    }
+    next()
   }
 }

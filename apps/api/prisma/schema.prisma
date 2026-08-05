@@ -18,8 +18,17 @@ model User {
   email     String   @unique // อีเมลห้ามซ้ำ
   password  String // เก็บเป็น "hash" เท่านั้น ไม่เก็บรหัสจริง
   name      String? // ? = ใส่หรือไม่ใส่ก็ได้
+  role      UserRole @default(EMPLOYEE) // Milestone 4: สิทธิ์การใช้งาน — สมัครใหม่เป็น EMPLOYEE เสมอ (เปลี่ยนได้เฉพาะ ADMIN ในอนาคต)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   assets    Asset[] // ผู้ใช้ 1 คน เป็นเจ้าของได้หลาย asset
+}
+
+// สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
+enum UserRole {
+  ADMIN // สิทธิ์เต็ม จัดการได้ทุกอย่างรวมถึงผู้ใช้
+  IT_STAFF // จัดการ asset และ master data ได้ แต่จัดการผู้ใช้ไม่ได้
+  EMPLOYEE // ดูได้เฉพาะ asset ของตัวเอง แก้ไข/ลบไม่ได้
 }
 
 // สถานะของ asset — ใช้ enum เพื่อจำกัดค่าที่เป็นไปได้ให้ชัดเจน

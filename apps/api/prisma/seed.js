@@ -59,18 +59,18 @@ async function main() {
     vendors[v.name] = await upsertByName(prisma.vendor, v.name, { website: v.website })
   }
 
-  // ---- ผู้ใช้ตัวอย่าง + asset ตัวอย่างที่ผูกกับ master data จริง ----
-  const email = 'demo@example.com'
+  // ---- ผู้ใช้ตัวอย่าง (Milestone 4: RBAC) — หนึ่งบัญชีต่อ role ให้ทดสอบสิทธิ์ได้ครบ ----
   const password = await bcrypt.hash('password123', 10)
 
   // upsert = ถ้ามีอยู่แล้วให้ข้าม, ถ้ายังไม่มีให้สร้าง
-  const user = await prisma.user.upsert({
-    where: { email },
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
     update: {},
     create: {
-      email,
+      email: 'admin@example.com',
       password,
-      name: 'Demo User',
+      name: 'Admin User',
+      role: 'ADMIN',
       assets: {
         create: [
           {
@@ -141,6 +141,21 @@ async function main() {
             domainName: 'corp.example.com',
             receivedDate: addDays(-1195),
           },
+        ],
+      },
+    },
+  })
+
+  const itStaff = await prisma.user.upsert({
+    where: { email: 'itstaff@example.com' },
+    update: {},
+    create: {
+      email: 'itstaff@example.com',
+      password,
+      name: 'IT Staff',
+      role: 'IT_STAFF',
+      assets: {
+        create: [
           {
             // ยังไม่ใกล้หมดประกัน -> ไม่มี badge
             assetTag: 'IT-0003',
@@ -181,8 +196,48 @@ async function main() {
     },
   })
 
+  // EMPLOYEE เห็นเฉพาะ asset ของตัวเอง — asset นี้ไว้ทดสอบขอบเขตการมองเห็นตาม role
+  const employee = await prisma.user.upsert({
+    where: { email: 'employee@example.com' },
+    update: {},
+    create: {
+      email: 'employee@example.com',
+      password,
+      name: 'Employee User',
+      role: 'EMPLOYEE',
+      assets: {
+        create: [
+          {
+            assetTag: 'IT-0004',
+            name: 'โทรศัพท์มือถือบริษัท',
+            brand: 'Apple',
+            model: 'iPhone 13',
+            serialNumber: 'SN-APL-IP13-004',
+            status: 'IN_USE',
+            categoryId: categories['Mobile Device'].id,
+            locationId: locations['Head Office'].id,
+            departmentId: departments['Finance'].id,
+            description: 'โทรศัพท์มือถือประจำตำแหน่ง',
+            assetCondition: 'GOOD',
+            purchaseDate: addDays(-200),
+            purchasePrice: 25900,
+            currency: 'THB',
+            supplierReference: 'PO-2025-0912',
+            invoiceNumber: 'INV-APL-30044',
+            warrantyExpiry: addDays(165),
+            operatingSystem: 'iOS',
+            osVersion: '18',
+            storage: '128GB',
+            receivedDate: addDays(-198),
+            installedDate: addDays(-198),
+          },
+        ],
+      },
+    },
+  })
+
   console.log(`Seeded master data: ${categoryNames.length} categories, ${locationNames.length} locations, ${departmentNames.length} departments, ${vendorSeed.length} vendors`)
-  console.log(`Seeded user: ${user.email} (รหัสผ่าน: password123)`)
+  console.log(`Seeded users: ${admin.email} (ADMIN), ${itStaff.email} (IT_STAFF), ${employee.email} (EMPLOYEE) — รหัสผ่านทุกบัญชี: password123`)
 }
 
 main()

@@ -61,7 +61,7 @@ cd apps/api
 cp ../../.env.example .env      # แล้วแก้ค่าใน .env ถ้าต้องการ
 npm install
 npm run migrate:dev             # สร้างตารางในฐานข้อมูล
-npm run seed                    # (ไม่บังคับ) ใส่ผู้ใช้ตัวอย่าง demo@example.com / password123
+npm run seed                    # (ไม่บังคับ) ใส่ผู้ใช้ตัวอย่าง 3 role — admin/itstaff/employee@example.com / password123
 npm run dev
 
 # เทอร์มินัล 3 — Frontend

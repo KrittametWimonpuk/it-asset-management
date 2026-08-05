@@ -23,6 +23,13 @@ const MASTER_TABS = {
   vendors: { label: 'ผู้ขาย/ผู้ผลิต', config: vendorConfig },
 }
 
+// ป้ายชื่อ role ภาษาไทย ไว้โชว์ในหัวเว็บ (Milestone 4: RBAC)
+const ROLE_LABELS = {
+  ADMIN: 'ผู้ดูแลระบบ',
+  IT_STAFF: 'เจ้าหน้าที่ไอที',
+  EMPLOYEE: 'พนักงาน',
+}
+
 export default function App() {
   const [user, setUser] = useState(null)      // ข้อมูลผู้ใช้ที่ล็อกอินอยู่
   const [view, setView] = useState('login')   // 'login' | 'register'
@@ -61,7 +68,9 @@ export default function App() {
       : <Register onAuthed={handleAuthed} goLogin={() => setView('login')} />
   }
 
-  const activeMaster = MASTER_TABS[tab]
+  // EMPLOYEE จัดการ master data ไม่ได้ (Milestone 4) — ซ่อนแท็บทั้งหมดไปเลย ไม่ใช่แค่ปุ่มข้างใน
+  const canManageMasterData = user.role !== 'EMPLOYEE'
+  const activeMaster = canManageMasterData ? MASTER_TABS[tab] : null
 
   return (
     <div className="container wide">
@@ -70,17 +79,17 @@ export default function App() {
           <h1>ระบบจัดการครุภัณฑ์ IT</h1>
           <button className="secondary" onClick={handleLogout}>ออกจากระบบ</button>
         </div>
-        <p className="muted">สวัสดี {user.name || user.email}</p>
+        <p className="muted">สวัสดี {user.name || user.email} • {ROLE_LABELS[user.role] || user.role}</p>
 
         <nav className="tabs mt">
           <button className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => setTab('assets')}>ครุภัณฑ์</button>
-          {Object.entries(MASTER_TABS).map(([key, { label }]) => (
+          {canManageMasterData && Object.entries(MASTER_TABS).map(([key, { label }]) => (
             <button key={key} className={`tab${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}>{label}</button>
           ))}
         </nav>
 
         <div className="mt">
-          {tab === 'assets' && <Assets onNavigateToMaster={(target) => setTab(target)} />}
+          {tab === 'assets' && <Assets role={user.role} onNavigateToMaster={(target) => setTab(target)} />}
           {activeMaster && <MasterDataPage {...activeMaster.config} />}
         </div>
       </div>

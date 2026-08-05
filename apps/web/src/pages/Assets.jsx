@@ -38,8 +38,11 @@ function warrantyBadge(warrantyExpiry) {
   return null
 }
 
+// role: ADMIN/IT_STAFF จัดการ asset ได้เต็มที่ (เพิ่ม/แก้/ลบ ของใครก็ได้)
+// EMPLOYEE เห็นได้อย่างเดียว (backend คืนเฉพาะ asset ของตัวเองมาให้แล้ว) — Milestone 4
 // onNavigateToMaster(tabKey) — ให้ AssetForm พาไปหน้า master data ที่เกี่ยวข้องได้ เมื่อ dropdown ว่าง
-export default function Assets({ onNavigateToMaster }) {
+export default function Assets({ role, onNavigateToMaster }) {
+  const canManage = role === 'ADMIN' || role === 'IT_STAFF'
   const [assets, setAssets] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
   const [error, setError] = useState('')
@@ -154,7 +157,7 @@ export default function Assets({ onNavigateToMaster }) {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
-        <button onClick={openCreate}>+ เพิ่มครุภัณฑ์ใหม่</button>
+        {canManage && <button onClick={openCreate}>+ เพิ่มครุภัณฑ์ใหม่</button>}
       </div>
 
       {error && <p className="error mt">{error}</p>}
@@ -171,8 +174,10 @@ export default function Assets({ onNavigateToMaster }) {
         ) : (
           <div className="empty-state mt">
             <h3>ยังไม่มีครุภัณฑ์</h3>
-            <p className="muted">เริ่มต้นจัดการครุภัณฑ์ IT ของคุณด้วยการเพิ่มรายการแรก</p>
-            <button onClick={openCreate}>+ เพิ่มครุภัณฑ์ใหม่</button>
+            <p className="muted">
+              {canManage ? 'เริ่มต้นจัดการครุภัณฑ์ IT ของคุณด้วยการเพิ่มรายการแรก' : 'ยังไม่มีครุภัณฑ์ที่มอบหมายให้คุณ'}
+            </p>
+            {canManage && <button onClick={openCreate}>+ เพิ่มครุภัณฑ์ใหม่</button>}
           </div>
         )
       ) : (
@@ -194,7 +199,7 @@ export default function Assets({ onNavigateToMaster }) {
                   <th>IP Address</th>
                   <th>วันหมดประกัน</th>
                   <th>สภาพ</th>
-                  <th>จัดการ</th>
+                  {canManage && <th>จัดการ</th>}
                 </tr>
               </thead>
               <tbody>
@@ -216,12 +221,14 @@ export default function Assets({ onNavigateToMaster }) {
                         {badge && <span className={`badge ${badge.className}`}> {badge.label}</span>}
                       </td>
                       <td>{conditionLabel(asset.assetCondition)}</td>
-                      <td>
-                        <div className="row">
-                          <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>
-                          <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>
-                        </div>
-                      </td>
+                      {canManage && (
+                        <td>
+                          <div className="row">
+                            <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>
+                            <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

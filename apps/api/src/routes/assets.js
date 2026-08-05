@@ -1,17 +1,22 @@
 // ---------------------------------------------------------------------------
 // Route: /api/assets  — จัดการครุภัณฑ์ IT (Create / Read / Update / Delete)
-// ทุก endpoint ต้องล็อกอินก่อน และเห็น/แก้ไข/ลบได้เฉพาะ asset ของตัวเองเท่านั้น
+// ทุก endpoint ต้องล็อกอินก่อน
 //
 // การลบเป็น "soft delete" — ตั้งค่า deletedAt แทนการลบแถวออกจริง
 // endpoint READ/UPDATE ทุกอันจึงต้องกรอง deletedAt: null เสมอ เพื่อไม่ให้เห็น/แก้ของที่ถูกลบไปแล้ว
 //
 // ตั้งแต่ Milestone 2: category/location/department/vendor เป็นความสัมพันธ์กับตาราง master data
 // แล้ว (ไม่ใช่ text อีกต่อไป ยกเว้น category ที่เดิมเป็น text) — categoryId บังคับ, ที่เหลือไม่บังคับ
+//
+// ตั้งแต่ Milestone 4 (RBAC):
+//   - READ (GET): ทุก role เข้าได้ แต่ EMPLOYEE เห็นเฉพาะ asset ของตัวเอง ส่วน ADMIN/IT_STAFF เห็นทุก asset
+//   - CREATE/UPDATE/DELETE: เฉพาะ ADMIN, IT_STAFF (และไม่จำกัดแค่ asset ของตัวเอง — แก้/ลบของคนอื่นได้)
+//   - EMPLOYEE ไม่มีสิทธิ์ CREATE/UPDATE/DELETE เลย (ถูกกันด้วย requireRole ก่อนถึง handler)
 // ---------------------------------------------------------------------------
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db.js'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireRole } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
@@ -22,8 +27,11 @@ import {
 
 const router = Router()
 
-// requireAuth ครอบทุก route ในไฟล์นี้
+// requireAuth ครอบทุก route ในไฟล์นี้ — CREATE/UPDATE/DELETE ยังต้องผ่าน manageAssets เพิ่มอีกชั้น
 router.use(requireAuth)
+
+// เฉพาะ ADMIN/IT_STAFF ที่สร้าง/แก้/ลบ asset ได้ — ใช้ซ้ำทั้ง 3 endpoint กันไม่ให้เขียนเงื่อนไขซ้ำ
+const manageAssets = requireRole('ADMIN', 'IT_STAFF')
 
 // สถานะที่อนุญาต — ต้องตรงกับ enum AssetStatus ใน schema.prisma
 const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
@@ -80,10 +88,16 @@ const WITH_RELATIONS = {
   include: { category: true, location: true, department: true, vendor: true },
 }
 
-// เงื่อนไขพื้นฐานที่ทุก READ/UPDATE ต้องมี: เป็นของฉัน และยังไม่ถูกลบ
-function scopeToOwner(ownerId) {
-  return { ownerId, deletedAt: null }
+// เงื่อนไขพื้นฐานที่ READ ทุกอันต้องมี: ยังไม่ถูกลบ + ตาม role (EMPLOYEE เห็นเฉพาะของตัวเอง)
+function scopeForRead(user) {
+  const where = { deletedAt: null }
+  if (user.role === 'EMPLOYEE') where.ownerId = user.id
+  return where
 }
+
+// เงื่อนไขของ UPDATE/DELETE — ผ่าน manageAssets มาแล้ว (ADMIN/IT_STAFF เท่านั้น) จึงแก้/ลบ asset ของใครก็ได้
+// เหลือแค่กันไม่ให้แก้/ลบของที่ถูกลบไปแล้วซ้ำ
+const NOT_DELETED = { deletedAt: null }
 
 // ข้อความ error กลาง ๆ เมื่อไม่พบ asset — ใช้ข้อความเดียวกันไม่ว่าจะเพราะ "ไม่มีจริง" หรือ "มีแต่ไม่ใช่ของเรา"
 // (ตั้งใจไม่แยกข้อความ เพื่อไม่ให้คนอื่นเดาได้ว่า asset ID นี้มีอยู่จริงในระบบหรือไม่)
@@ -112,12 +126,12 @@ async function findInvalidMasterDataRef(data) {
   return null
 }
 
-// ---- READ: ดึง asset ของฉัน (แบ่งหน้า + เรียงลำดับ + ค้นหา) ----
+// ---- READ: ดึงรายการ asset (แบ่งหน้า + เรียงลำดับ + ค้นหา) — ขอบเขตขึ้นกับ role ----
 router.get('/', asyncHandler(async (req, res) => {
   const pagination = parsePagination(req.query)
   const orderBy = parseSort(req.query, SORTABLE_FIELDS, 'createdAt')
 
-  const where = { ...scopeToOwner(req.user.id) }
+  const where = { ...scopeForRead(req.user) }
 
   const search = (req.query.search || '').trim()
   if (search) {
@@ -134,10 +148,10 @@ router.get('/', asyncHandler(async (req, res) => {
   ok(res, { items, ...buildPageMeta(pagination, totalItems) })
 }))
 
-// ---- READ: ดึง asset ชิ้นเดียวของฉัน ----
+// ---- READ: ดึง asset ชิ้นเดียว — ขอบเขตขึ้นกับ role ----
 router.get('/:id', asyncHandler(async (req, res) => {
   const asset = await prisma.asset.findFirst({
-    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    where: { id: req.params.id, ...scopeForRead(req.user) },
     ...WITH_RELATIONS,
   })
   if (!asset) {
@@ -180,7 +194,7 @@ async function findDuplicateField({ assetTag, serialNumber }, excludeId) {
   return null
 }
 
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', manageAssets, asyncHandler(async (req, res) => {
   const parsed = createSchema.safeParse(req.body)
   if (!parsed.success) {
     return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
@@ -218,7 +232,7 @@ const updateSchema = z.object({
   ...detailFields,
 })
 
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
   const parsed = updateSchema.safeParse(req.body)
   if (!parsed.success) {
     return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
@@ -234,9 +248,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return fail(res, 400, invalidRef.message, [invalidRef])
   }
 
-  // updateMany + เงื่อนไข ownerId/deletedAt = ป้องกันไม่ให้แก้ของคนอื่น หรือแก้ของที่ถูกลบไปแล้ว
+  // updateMany + เงื่อนไข deletedAt = ป้องกันไม่ให้แก้ของที่ถูกลบไปแล้ว (ownership ไม่จำกัด — ผ่าน manageAssets มาแล้ว)
   const result = await prisma.asset.updateMany({
-    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    where: { id: req.params.id, ...NOT_DELETED },
     data: parsed.data,
   })
   if (result.count === 0) {
@@ -248,9 +262,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }))
 
 // ---- DELETE (soft): ตั้งค่า deletedAt แทนการลบแถวจริง ----
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', manageAssets, asyncHandler(async (req, res) => {
   const result = await prisma.asset.updateMany({
-    where: { id: req.params.id, ...scopeToOwner(req.user.id) },
+    where: { id: req.params.id, ...NOT_DELETED },
     data: { deletedAt: new Date() },
   })
   if (result.count === 0) {

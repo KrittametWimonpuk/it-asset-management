@@ -2,17 +2,18 @@
 // createMasterDataRouter — โรงงานสร้าง Router มาตรฐานสำหรับ "master data"
 //
 // Category / Location / Department / Vendor มีพฤติกรรมเหมือนกันทุกอย่าง:
-//   - ต้องล็อกอินก่อนถึงจะใช้ได้ (ทุกคนที่ล็อกอินจัดการได้ — ระบบนี้ยังไม่มีระดับสิทธิ์ผู้ดูแล)
+//   - ต้องล็อกอินก่อนถึงจะใช้ได้ — ดู (GET) ได้ทุก role, จัดการ (POST/PUT/DELETE) ได้เฉพาะ
+//     ADMIN/IT_STAFF เท่านั้น (Milestone 4 RBAC — ดู manageRoles ด้านล่าง)
 //   - ชื่อ (name) ห้ามซ้ำ ไม่สนตัวพิมพ์เล็ก/ใหญ่ (บังคับจริงด้วย partial unique index ที่ชั้นฐานข้อมูลด้วย)
 //   - รองรับ pagination + search + sort เหมือน asset
 //   - รองรับ filter ?isActive=true/false (ใช้ตอน asset form ดึงเฉพาะตัวเลือกที่ยัง active)
 //   - ลบแบบ soft delete (ตั้ง deletedAt แทนการลบแถวจริง)
 //
 // เขียนไว้ที่เดียว แล้วให้ routes/categories.js, locations.js, departments.js, vendors.js
-// เรียกใช้แค่ระบุ schema/label ของตัวเอง กันไม่ให้ต้องก็อปโค้ด CRUD ซ้ำ 4 รอบ
+// เรียกใช้แค่ระบุ schema/label ของตัวเอง กันไม่ให้ต้องก็อปโค้ด CRUD (และ authorization) ซ้ำ 4 รอบ
 // ---------------------------------------------------------------------------
 import { Router } from 'express'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireRole } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from './response.js'
 import { asyncHandler } from './asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from './queryParams.js'
@@ -25,6 +26,7 @@ import { parsePagination, parseSort, buildPageMeta } from './queryParams.js'
  * @param {import('zod').ZodSchema} opts.updateSchema - zod schema ตอนแก้ไข (ทุกฟิลด์ optional)
  * @param {string[]} [opts.searchableFields] - ฟิลด์อื่นนอกจาก name ที่ค้นหาได้ (เช่น vendor: contactName, email)
  * @param {string[]} [opts.sortableFields] - ฟิลด์ที่ sort ได้
+ * @param {string[]} [opts.manageRoles] - role ที่ POST/PUT/DELETE ได้ (ดูอย่างเดียวเปิดให้ทุก role ที่ล็อกอินเสมอ)
  */
 export function createMasterDataRouter({
   model,
@@ -33,9 +35,11 @@ export function createMasterDataRouter({
   updateSchema,
   searchableFields = [],
   sortableFields = ['name', 'createdAt'],
+  manageRoles = ['ADMIN', 'IT_STAFF'],
 }) {
   const router = Router()
   router.use(requireAuth)
+  const canManage = requireRole(...manageRoles)
 
   const NOT_FOUND_MESSAGE = `ไม่พบข้อมูล${entityLabel}นี้`
 
@@ -89,7 +93,7 @@ export function createMasterDataRouter({
   }))
 
   // ---- CREATE ----
-  router.post('/', asyncHandler(async (req, res) => {
+  router.post('/', canManage, asyncHandler(async (req, res) => {
     const parsed = createSchema.safeParse(req.body)
     if (!parsed.success) {
       return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
@@ -105,7 +109,7 @@ export function createMasterDataRouter({
   }))
 
   // ---- UPDATE (แก้ไม่ได้ถ้าถูกลบไปแล้ว) ----
-  router.put('/:id', asyncHandler(async (req, res) => {
+  router.put('/:id', canManage, asyncHandler(async (req, res) => {
     const parsed = updateSchema.safeParse(req.body)
     if (!parsed.success) {
       return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
@@ -127,7 +131,7 @@ export function createMasterDataRouter({
   }))
 
   // ---- DELETE (soft) ----
-  router.delete('/:id', asyncHandler(async (req, res) => {
+  router.delete('/:id', canManage, asyncHandler(async (req, res) => {
     const result = await model.updateMany({
       where: { id: req.params.id, deletedAt: null },
       data: { deletedAt: new Date() },
