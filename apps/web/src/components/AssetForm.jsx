@@ -6,7 +6,7 @@
 // (หมวดหมู่บังคับเลือก ที่เหลือเลือกหรือไม่ก็ได้)
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
-import { api } from '../api.js'
+import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
 
 export const STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'พร้อมใช้งาน' },
@@ -25,12 +25,13 @@ export const CONDITION_OPTIONS = [
 ]
 
 // dropdown master data ทั้ง 4 ตัว — key ต้องตรงกับ field ใน Asset (categoryId, locationId, ...)
+// (ตัวเลือกจริงโหลดผ่าน useMasterDataOptions hook — ที่นี่เก็บแค่ metadata สำหรับ render)
 // navTarget = ชื่อแท็บใน App.jsx ที่จะพาไปสร้างข้อมูลใหม่ ถ้ายังไม่มีตัวเลือกเลย
 const MASTER_DATA_FIELDS = [
-  { key: 'categoryId', entityApi: api.categories, label: 'หมวดหมู่', required: true, navTarget: 'categories' },
-  { key: 'locationId', entityApi: api.locations, label: 'สถานที่ตั้ง', required: false, navTarget: 'locations' },
-  { key: 'departmentId', entityApi: api.departments, label: 'แผนก', required: false, navTarget: 'departments' },
-  { key: 'vendorId', entityApi: api.vendors, label: 'ผู้ขาย/ผู้ผลิต', required: false, navTarget: 'vendors' },
+  { key: 'categoryId', label: 'หมวดหมู่', required: true, navTarget: 'categories' },
+  { key: 'locationId', label: 'สถานที่ตั้ง', required: false, navTarget: 'locations' },
+  { key: 'departmentId', label: 'แผนก', required: false, navTarget: 'departments' },
+  { key: 'vendorId', label: 'ผู้ขาย/ผู้ผลิต', required: false, navTarget: 'vendors' },
 ]
 
 // ฟิลด์ text ธรรมดาของฟอร์ม (ใช้ตอน trim ก่อนส่ง) — ไม่รวม dropdown/select/วันที่/ตัวเลข
@@ -113,25 +114,7 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
   const firstInputRef = useRef(null)
 
   // ตัวเลือก dropdown ของแต่ละ master data — โหลดจาก API ตอนเปิดฟอร์ม (เอาเฉพาะที่ isActive)
-  const [options, setOptions] = useState(null)          // null = กำลังโหลด, ไม่งั้นเป็น { categoryId: [...], ... }
-  const [optionsError, setOptionsError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    Promise.all(
-      MASTER_DATA_FIELDS.map((f) =>
-        f.entityApi.list({ isActive: true, pageSize: 100, sortBy: 'name', sortOrder: 'asc' })
-      )
-    )
-      .then((results) => {
-        if (cancelled) return
-        const next = {}
-        MASTER_DATA_FIELDS.forEach((f, i) => { next[f.key] = results[i].items })
-        setOptions(next)
-      })
-      .catch((err) => { if (!cancelled) setOptionsError(err.message) })
-    return () => { cancelled = true }
-  }, [])
+  const { options, error: optionsError } = useMasterDataOptions()
 
   // auto-focus ช่องแรกทันทีที่เปิดฟอร์ม ให้พิมพ์ต่อได้เลยโดยไม่ต้องคลิก
   useEffect(() => {

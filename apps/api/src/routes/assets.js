@@ -12,6 +12,9 @@
 //   - READ (GET): ทุก role เข้าได้ แต่ EMPLOYEE เห็นเฉพาะ asset ของตัวเอง ส่วน ADMIN/IT_STAFF เห็นทุก asset
 //   - CREATE/UPDATE/DELETE: เฉพาะ ADMIN, IT_STAFF (และไม่จำกัดแค่ asset ของตัวเอง — แก้/ลบของคนอื่นได้)
 //   - EMPLOYEE ไม่มีสิทธิ์ CREATE/UPDATE/DELETE เลย (ถูกกันด้วย requireRole ก่อนถึง handler)
+//
+// ตั้งแต่ Milestone 4.1: GET / รองรับ query filter เพิ่ม (categoryId/status/locationId/
+// departmentId/vendorId) ทำงานร่วมกับ search ได้ — ใช้กับ filter bar ฝั่ง frontend
 // ---------------------------------------------------------------------------
 import { Router } from 'express'
 import { z } from 'zod'
@@ -126,7 +129,7 @@ async function findInvalidMasterDataRef(data) {
   return null
 }
 
-// ---- READ: ดึงรายการ asset (แบ่งหน้า + เรียงลำดับ + ค้นหา) — ขอบเขตขึ้นกับ role ----
+// ---- READ: ดึงรายการ asset (แบ่งหน้า + เรียงลำดับ + ค้นหา + กรอง) — ขอบเขตขึ้นกับ role ----
 router.get('/', asyncHandler(async (req, res) => {
   const pagination = parsePagination(req.query)
   const orderBy = parseSort(req.query, SORTABLE_FIELDS, 'createdAt')
@@ -139,6 +142,14 @@ router.get('/', asyncHandler(async (req, res) => {
       [field]: { contains: search, mode: 'insensitive' },
     }))
   }
+
+  // ---- Milestone 4.1: ตัวกรองฝั่ง server (ทำงานร่วมกับ search/pagination ด้านบนได้ปกติ) ----
+  // ไอดี master data ที่ไม่มีจริงแค่ทำให้ผลลัพธ์ว่างเปล่า ไม่ต้อง validate เพิ่ม (ต่างจากตอน create/update)
+  if (req.query.categoryId) where.categoryId = req.query.categoryId
+  if (req.query.locationId) where.locationId = req.query.locationId
+  if (req.query.departmentId) where.departmentId = req.query.departmentId
+  if (req.query.vendorId) where.vendorId = req.query.vendorId
+  if (ASSET_STATUSES.includes(req.query.status)) where.status = req.query.status
 
   const [items, totalItems] = await Promise.all([
     prisma.asset.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...WITH_RELATIONS }),

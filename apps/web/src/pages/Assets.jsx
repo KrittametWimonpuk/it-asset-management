@@ -1,9 +1,11 @@
-// หน้ารายการครุภัณฑ์ IT — list + search + sort + pagination + create + edit + delete
+// หน้ารายการครุภัณฑ์ IT — list + search + filter + sort + pagination + create + edit + delete
 // (header/logout ย้ายไปอยู่ที่ App.jsx แล้ว เพราะใช้ shell ร่วมกับแท็บ master data)
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 import AssetForm, { STATUS_OPTIONS, CONDITION_OPTIONS } from '../components/AssetForm.jsx'
+import AssetFilterBar from '../components/AssetFilterBar.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
 
 const PAGE_SIZE = 20
 
@@ -16,6 +18,35 @@ const SORT_COLUMNS = [
 ]
 
 const WARRANTY_WARNING_DAYS = 30
+
+// ---- Milestone 4.1: ตัวกรองว่าง = ไม่กรอง (ใช้ทั้งสร้าง state เริ่มต้นและตอน reset) ----
+const EMPTY_FILTERS = { categoryId: '', status: '', locationId: '', departmentId: '', vendorId: '' }
+
+// ---- Milestone 4.1: คอลัมน์ที่ผู้ใช้เลือกซ่อน/แสดงได้ — จำค่าไว้ใน localStorage ----
+const OPTIONAL_COLUMNS = [
+  { key: 'brand', label: 'ยี่ห้อ' },
+  { key: 'model', label: 'รุ่น' },
+  { key: 'hostname', label: 'Hostname' },
+  { key: 'ipAddress', label: 'IP Address' },
+  { key: 'warrantyExpiry', label: 'วันหมดประกัน' },
+]
+const COLUMNS_STORAGE_KEY = 'assetVisibleColumns'
+
+function defaultColumnPrefs() {
+  return Object.fromEntries(OPTIONAL_COLUMNS.map((c) => [c.key, true]))
+}
+
+// อ่านค่าที่จำไว้จาก localStorage — ถ้าไม่มี/parse ไม่ได้/โครงสร้างไม่ตรง (เช่นเวอร์ชันเก่า) ใช้ค่า default แทน
+function loadColumnPrefs() {
+  try {
+    const raw = localStorage.getItem(COLUMNS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return OPTIONAL_COLUMNS.every((c) => typeof parsed[c.key] === 'boolean') ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 function statusLabel(status) {
   return STATUS_OPTIONS.find((s) => s.value === status)?.label || status
@@ -55,11 +86,22 @@ export default function Assets({ role, onNavigateToMaster }) {
   const [sortOrder, setSortOrder] = useState('desc')
   const [searchInput, setSearchInput] = useState('')  // ค่าที่พิมพ์ในกล่องค้นหาสด ๆ
   const [search, setSearch] = useState('')            // ค่าที่ debounce แล้ว ใช้ยิง request จริง
+  const [filters, setFilters] = useState(EMPTY_FILTERS) // Milestone 4.1: categoryId/status/locationId/departmentId/vendorId
 
   const [formOpen, setFormOpen] = useState(false)     // เปิดฟอร์ม เพิ่ม/แก้ไข
   const [editingAsset, setEditingAsset] = useState(null) // null = โหมดเพิ่มใหม่, object = โหมดแก้ไข
   const [deleteTarget, setDeleteTarget] = useState(null) // asset ที่กำลังจะลบ (รอยืนยัน)
   const [deleting, setDeleting] = useState(false)
+
+  // Milestone 4.1: ตัวเลือก dropdown ของตัวกรอง (category/location/department/vendor) — โหลดครั้งเดียว ใช้ร่วมกับ AssetForm ได้
+  const { options: filterOptions, error: filterOptionsError } = useMasterDataOptions()
+
+  // Milestone 4.1: คอลัมน์ที่ผู้ใช้เลือกโชว์/ซ่อน — จำไว้ใน localStorage ให้คงอยู่ข้ามการรีเฟรช
+  const [visibleColumns, setVisibleColumns] = useState(() => loadColumnPrefs() || defaultColumnPrefs())
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  useEffect(() => {
+    localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns))
+  }, [visibleColumns])
 
   // debounce กล่องค้นหา — รอผู้ใช้หยุดพิมพ์ 400ms ก่อนค่อยยิง request จริง กันยิงถี่เกินไป
   useEffect(() => {
@@ -67,18 +109,18 @@ export default function Assets({ role, onNavigateToMaster }) {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  // เปลี่ยนคำค้นหาหรือการเรียงลำดับ -> กลับไปหน้า 1 เสมอ (ผลลัพธ์ชุดใหม่ไม่ควรค้างอยู่หน้ากลาง ๆ)
+  // เปลี่ยนคำค้นหา/ตัวกรอง/การเรียงลำดับ -> กลับไปหน้า 1 เสมอ (ผลลัพธ์ชุดใหม่ไม่ควรค้างอยู่หน้ากลาง ๆ)
   useEffect(() => {
     setPage(1)
-  }, [search, sortBy, sortOrder])
+  }, [search, sortBy, sortOrder, filters])
 
-  // โหลดข้อมูลทุกครั้งที่หน้า/การเรียง/คำค้นหาเปลี่ยน
-  useEffect(() => { load() }, [page, sortBy, sortOrder, search])
+  // โหลดข้อมูลทุกครั้งที่หน้า/การเรียง/คำค้นหา/ตัวกรองเปลี่ยน
+  useEffect(() => { load() }, [page, sortBy, sortOrder, search, filters])
 
   async function load() {
     setRefreshing(true)
     try {
-      const res = await api.listAssets({ page, pageSize: PAGE_SIZE, sortBy, sortOrder, search })
+      const res = await api.listAssets({ page, pageSize: PAGE_SIZE, sortBy, sortOrder, search, ...filters })
       setAssets(res.items)
       setMeta(res)
       setError('')
@@ -88,6 +130,20 @@ export default function Assets({ role, onNavigateToMaster }) {
       setLoading(false)
       setRefreshing(false)
     }
+  }
+
+  function updateFilter(key, value) {
+    setFilters((f) => ({ ...f, [key]: value }))
+  }
+
+  function resetFilters() {
+    setSearchInput('')
+    setSearch('')
+    setFilters(EMPTY_FILTERS)
+  }
+
+  function toggleColumn(key) {
+    setVisibleColumns((v) => ({ ...v, [key]: !v[key] }))
   }
 
   function toggleSort(field) {
@@ -141,7 +197,9 @@ export default function Assets({ role, onNavigateToMaster }) {
   }
 
   const hasSearch = search.length > 0
+  const hasActiveFilters = hasSearch || Object.values(filters).some(Boolean)
   const isEmpty = !loading && assets.length === 0
+  const columnsForPicker = OPTIONAL_COLUMNS.map((c) => ({ ...c, visible: visibleColumns[c.key] }))
 
   return (
     <div>
@@ -149,27 +207,34 @@ export default function Assets({ role, onNavigateToMaster }) {
         <h2 className="section-title">ครุภัณฑ์ทั้งหมด</h2>
       </div>
 
-      <div className="toolbar mt">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="ค้นหา Asset Tag, ชื่อ, ยี่ห้อ, รุ่น, Serial Number, Hostname, IP, MAC, OS..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        {canManage && <button onClick={openCreate}>+ เพิ่มครุภัณฑ์ใหม่</button>}
-      </div>
+      <AssetFilterBar
+        searchInput={searchInput}
+        onSearchChange={setSearchInput}
+        filters={filters}
+        onFilterChange={updateFilter}
+        onReset={resetFilters}
+        options={filterOptions}
+        optionsError={filterOptionsError}
+        canManage={canManage}
+        onAddAsset={openCreate}
+        columns={columnsForPicker}
+        onToggleColumn={toggleColumn}
+        columnsOpen={columnsOpen}
+        onToggleColumnsPanel={() => setColumnsOpen((v) => !v)}
+      />
+
+      {!loading && <p className="muted mt">แสดง {assets.length} จาก {meta.totalItems} รายการ</p>}
 
       {error && <p className="error mt">{error}</p>}
 
       {loading ? (
         <p className="muted mt">กำลังโหลด...</p>
       ) : isEmpty ? (
-        hasSearch ? (
+        hasActiveFilters ? (
           <div className="empty-state mt">
             <h3>ไม่พบผลลัพธ์</h3>
-            <p className="muted">ไม่พบครุภัณฑ์ที่ตรงกับคำค้นหา "{search}"</p>
-            <button className="secondary" onClick={() => setSearchInput('')}>ล้างการค้นหา</button>
+            <p className="muted">ไม่พบครุภัณฑ์ที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือรีเซ็ตตัวกรอง</p>
+            <button className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
           </div>
         ) : (
           <div className="empty-state mt">
@@ -193,11 +258,11 @@ export default function Assets({ role, onNavigateToMaster }) {
                     </th>
                   ))}
                   <th>หมวดหมู่</th>
-                  <th>ยี่ห้อ</th>
-                  <th>รุ่น</th>
-                  <th>Hostname</th>
-                  <th>IP Address</th>
-                  <th>วันหมดประกัน</th>
+                  {visibleColumns.brand && <th>ยี่ห้อ</th>}
+                  {visibleColumns.model && <th>รุ่น</th>}
+                  {visibleColumns.hostname && <th>Hostname</th>}
+                  {visibleColumns.ipAddress && <th>IP Address</th>}
+                  {visibleColumns.warrantyExpiry && <th>วันหมดประกัน</th>}
                   <th>สภาพ</th>
                   {canManage && <th>จัดการ</th>}
                 </tr>
@@ -212,14 +277,16 @@ export default function Assets({ role, onNavigateToMaster }) {
                       <td><span className={`badge badge-${asset.status.toLowerCase()}`}>{statusLabel(asset.status)}</span></td>
                       <td>{formatDate(asset.createdAt)}</td>
                       <td>{asset.category?.name || '-'}</td>
-                      <td>{asset.brand}</td>
-                      <td>{asset.model}</td>
-                      <td>{asset.hostname || '-'}</td>
-                      <td>{asset.ipAddress || '-'}</td>
-                      <td>
-                        {asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}
-                        {badge && <span className={`badge ${badge.className}`}> {badge.label}</span>}
-                      </td>
+                      {visibleColumns.brand && <td>{asset.brand}</td>}
+                      {visibleColumns.model && <td>{asset.model}</td>}
+                      {visibleColumns.hostname && <td>{asset.hostname || '-'}</td>}
+                      {visibleColumns.ipAddress && <td>{asset.ipAddress || '-'}</td>}
+                      {visibleColumns.warrantyExpiry && (
+                        <td>
+                          {asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}
+                          {badge && <span className={`badge ${badge.className}`}> {badge.label}</span>}
+                        </td>
+                      )}
                       <td>{conditionLabel(asset.assetCondition)}</td>
                       {canManage && (
                         <td>
