@@ -2,7 +2,7 @@
 // (header/logout ย้ายไปอยู่ที่ App.jsx แล้ว เพราะใช้ shell ร่วมกับแท็บ master data)
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
-import AssetForm, { STATUS_OPTIONS } from '../components/AssetForm.jsx'
+import AssetForm, { STATUS_OPTIONS, CONDITION_OPTIONS } from '../components/AssetForm.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 
 const PAGE_SIZE = 20
@@ -15,12 +15,27 @@ const SORT_COLUMNS = [
   { field: 'createdAt', label: 'วันที่สร้าง' },
 ]
 
+const WARRANTY_WARNING_DAYS = 30
+
 function statusLabel(status) {
   return STATUS_OPTIONS.find((s) => s.value === status)?.label || status
 }
 
+function conditionLabel(condition) {
+  return CONDITION_OPTIONS.find((c) => c.value === condition)?.label || '-'
+}
+
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+// สถานะประกัน: หมดแล้ว / ใกล้หมดภายใน 30 วัน / ยังไม่ใกล้หมด (คืน null ถ้าไม่ต้องโชว์ badge)
+function warrantyBadge(warrantyExpiry) {
+  if (!warrantyExpiry) return null
+  const diffDays = Math.ceil((new Date(warrantyExpiry) - new Date()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return { label: 'หมดประกัน', className: 'badge-warranty-expired' }
+  if (diffDays <= WARRANTY_WARNING_DAYS) return { label: 'ใกล้หมดประกัน', className: 'badge-warranty-soon' }
+  return null
 }
 
 // onNavigateToMaster(tabKey) — ให้ AssetForm พาไปหน้า master data ที่เกี่ยวข้องได้ เมื่อ dropdown ว่าง
@@ -135,7 +150,7 @@ export default function Assets({ onNavigateToMaster }) {
         <input
           type="text"
           className="search-input"
-          placeholder="ค้นหา Asset Tag, ชื่อ, ยี่ห้อ, รุ่น, Serial Number..."
+          placeholder="ค้นหา Asset Tag, ชื่อ, ยี่ห้อ, รุ่น, Serial Number, Hostname, IP, MAC, OS..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
@@ -175,27 +190,41 @@ export default function Assets({ onNavigateToMaster }) {
                   <th>หมวดหมู่</th>
                   <th>ยี่ห้อ</th>
                   <th>รุ่น</th>
+                  <th>Hostname</th>
+                  <th>IP Address</th>
+                  <th>วันหมดประกัน</th>
+                  <th>สภาพ</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
-                {assets.map((asset) => (
-                  <tr key={asset.id}>
-                    <td>{asset.assetTag}</td>
-                    <td>{asset.name}</td>
-                    <td><span className={`badge badge-${asset.status.toLowerCase()}`}>{statusLabel(asset.status)}</span></td>
-                    <td>{formatDate(asset.createdAt)}</td>
-                    <td>{asset.category?.name || '-'}</td>
-                    <td>{asset.brand}</td>
-                    <td>{asset.model}</td>
-                    <td>
-                      <div className="row">
-                        <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>
-                        <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {assets.map((asset) => {
+                  const badge = warrantyBadge(asset.warrantyExpiry)
+                  return (
+                    <tr key={asset.id}>
+                      <td>{asset.assetTag}</td>
+                      <td>{asset.name}</td>
+                      <td><span className={`badge badge-${asset.status.toLowerCase()}`}>{statusLabel(asset.status)}</span></td>
+                      <td>{formatDate(asset.createdAt)}</td>
+                      <td>{asset.category?.name || '-'}</td>
+                      <td>{asset.brand}</td>
+                      <td>{asset.model}</td>
+                      <td>{asset.hostname || '-'}</td>
+                      <td>{asset.ipAddress || '-'}</td>
+                      <td>
+                        {asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}
+                        {badge && <span className={`badge ${badge.className}`}> {badge.label}</span>}
+                      </td>
+                      <td>{conditionLabel(asset.assetCondition)}</td>
+                      <td>
+                        <div className="row">
+                          <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>
+                          <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

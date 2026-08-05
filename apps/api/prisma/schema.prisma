@@ -15,19 +15,28 @@ datasource db {
 // ตารางผู้ใช้ (สำหรับ Register / Login)
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique                 // อีเมลห้ามซ้ำ
-  password  String                            // เก็บเป็น "hash" เท่านั้น ไม่เก็บรหัสจริง
-  name      String?                           // ? = ใส่หรือไม่ใส่ก็ได้
+  email     String   @unique // อีเมลห้ามซ้ำ
+  password  String // เก็บเป็น "hash" เท่านั้น ไม่เก็บรหัสจริง
+  name      String? // ? = ใส่หรือไม่ใส่ก็ได้
   createdAt DateTime @default(now())
-  assets    Asset[]                          // ผู้ใช้ 1 คน เป็นเจ้าของได้หลาย asset
+  assets    Asset[] // ผู้ใช้ 1 คน เป็นเจ้าของได้หลาย asset
 }
 
 // สถานะของ asset — ใช้ enum เพื่อจำกัดค่าที่เป็นไปได้ให้ชัดเจน
 enum AssetStatus {
   AVAILABLE // พร้อมใช้งาน / อยู่ในคลัง
-  IN_USE    // กำลังถูกใช้งานอยู่
-  REPAIR    // อยู่ระหว่างซ่อม
-  DISPOSED  // เลิกใช้งาน / ตัดจำหน่ายแล้ว
+  IN_USE // กำลังถูกใช้งานอยู่
+  REPAIR // อยู่ระหว่างซ่อม
+  DISPOSED // เลิกใช้งาน / ตัดจำหน่ายแล้ว
+}
+
+// สภาพครุภัณฑ์ทางกายภาพ — เพิ่มใน Milestone 3 (Asset Details)
+enum AssetCondition {
+  NEW // ใหม่
+  GOOD // สภาพดี
+  FAIR // สภาพปานกลาง
+  POOR // สภาพไม่ดี
+  DAMAGED // ชำรุด
 }
 
 // ---------------------------------------------------------------------------
@@ -99,17 +108,17 @@ model Vendor {
 // ตาราง Asset — ครุภัณฑ์/อุปกรณ์ IT ของผู้ใช้แต่ละคน
 model Asset {
   id           String      @id @default(uuid())
-  assetTag     String      @unique                 // เลขทะเบียนครุภัณฑ์ ห้ามซ้ำ
-  name         String                              // ชื่ออุปกรณ์ เช่น "โน้ตบุ๊ค Dev Team"
-  brand        String                              // ยี่ห้อ เช่น Dell, HP, Apple (ยังเป็น text — ไม่ใช่ master data)
-  model        String                              // รุ่น เช่น "XPS 13" (ยังเป็น text — ไม่ใช่ master data)
-  serialNumber String?     @unique                 // เลข serial จากผู้ผลิต (อาจไม่มี)
-  status       AssetStatus @default(AVAILABLE)      // สถานะปัจจุบัน
+  assetTag     String      @unique // เลขทะเบียนครุภัณฑ์ ห้ามซ้ำ
+  name         String // ชื่ออุปกรณ์ เช่น "โน้ตบุ๊ค Dev Team"
+  brand        String // ยี่ห้อ เช่น Dell, HP, Apple (ยังเป็น text — ไม่ใช่ master data)
+  model        String // รุ่น เช่น "XPS 13" (ยังเป็น text — ไม่ใช่ master data)
+  serialNumber String?     @unique // เลข serial จากผู้ผลิต (อาจไม่มี)
+  status       AssetStatus @default(AVAILABLE) // สถานะปัจจุบัน
   ownerId      String
   owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt              // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
-  deletedAt    DateTime?                           // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
+  updatedAt    DateTime    @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
+  deletedAt    DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
 
   // ความสัมพันธ์กับ master data — categoryId บังคับ (แทนที่ text field เดิม)
   // location/department/vendor เป็นทางเลือก เพราะ asset ที่มีอยู่ก่อนหน้ายังไม่มีข้อมูลนี้
@@ -121,6 +130,40 @@ model Asset {
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   vendorId     String?
   vendor       Vendor?     @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // ---- Milestone 3: Asset Details & Technical Specifications — ทุกฟิลด์ด้านล่างไม่บังคับ (optional) ----
+
+  // ข้อมูลทั่วไป
+  description       String?
+  assetCondition    AssetCondition?
+  purchaseDate      DateTime?
+  purchasePrice     Float?
+  currency          String? // รหัสสกุลเงิน ISO 4217 เช่น THB, USD
+  supplierReference String?
+  invoiceNumber     String?
+  warrantyExpiry    DateTime?
+  remark            String?
+
+  // ข้อมูลอุปกรณ์ (hardware/software)
+  hostname        String?
+  ipAddress       String? // IPv4
+  macAddress      String?
+  operatingSystem String?
+  osVersion       String?
+  cpu             String?
+  ram             String?
+  storage         String?
+  graphics        String?
+  monitorSize     String?
+
+  // ข้อมูลเครือข่าย
+  domainName String?
+  lastSeenAt DateTime?
+
+  // Lifecycle
+  receivedDate  DateTime?
+  installedDate DateTime?
+  retiredDate   DateTime?
 
   // query หลักของ list/get ทุกอันกรองด้วย ownerId + deletedAt เสมอ — index ผสมนี้ช่วยให้ query เร็วขึ้น
   @@index([ownerId, deletedAt])

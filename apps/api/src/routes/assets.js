@@ -15,6 +15,10 @@ import { requireAuth } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
+import {
+  optionalText, optionalDate, optionalIPv4, optionalMac,
+  optionalCurrency, optionalNonNegativeNumber, optionalEnum,
+} from '../utils/zodHelpers.js'
 
 const router = Router()
 
@@ -24,11 +28,50 @@ router.use(requireAuth)
 // สถานะที่อนุญาต — ต้องตรงกับ enum AssetStatus ใน schema.prisma
 const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
 
+// สภาพครุภัณฑ์ที่อนุญาต — ต้องตรงกับ enum AssetCondition ใน schema.prisma
+const ASSET_CONDITIONS = ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED']
+
 // ฟิลด์ที่ยอมให้ sort ได้ (ต้องตรงกับที่ระบุใน spec: Asset Tag, Name, Created Date, Status)
 const SORTABLE_FIELDS = ['assetTag', 'name', 'createdAt', 'status']
 
 // ฟิลด์ที่ค้นหาได้ — ค้นหาแบบ "มีคำนี้อยู่ที่ไหนก็ได้" (contains) และไม่สนตัวพิมพ์เล็ก/ใหญ่
-const SEARCHABLE_FIELDS = ['assetTag', 'name', 'brand', 'model', 'serialNumber']
+// ตั้งแต่ Milestone 3: เพิ่ม hostname/ipAddress/macAddress/operatingSystem ให้ค้นหาได้ด้วย
+const SEARCHABLE_FIELDS = [
+  'assetTag', 'name', 'brand', 'model', 'serialNumber',
+  'hostname', 'ipAddress', 'macAddress', 'operatingSystem',
+]
+
+// ---- Milestone 3: ฟิลด์รายละเอียดเพิ่มเติม — ไม่บังคับทั้งหมด ใช้ร่วมกันทั้ง create และ update schema
+// (เพื่อไม่ให้เขียน validation ซ้ำ 2 ที่) ----
+const detailFields = {
+  description: optionalText(),
+  assetCondition: optionalEnum(ASSET_CONDITIONS, 'สภาพครุภัณฑ์ไม่ถูกต้อง'),
+  purchaseDate: optionalDate(),
+  purchasePrice: optionalNonNegativeNumber('ราคาซื้อต้องเป็นตัวเลขและไม่ติดลบ'),
+  currency: optionalCurrency(),
+  supplierReference: optionalText(),
+  invoiceNumber: optionalText(),
+  warrantyExpiry: optionalDate(),
+  remark: optionalText(),
+
+  hostname: optionalText(),
+  ipAddress: optionalIPv4(),
+  macAddress: optionalMac(),
+  operatingSystem: optionalText(),
+  osVersion: optionalText(),
+  cpu: optionalText(),
+  ram: optionalText(),
+  storage: optionalText(),
+  graphics: optionalText(),
+  monitorSize: optionalText(),
+
+  domainName: optionalText(),
+  lastSeenAt: optionalDate(),
+
+  receivedDate: optionalDate(),
+  installedDate: optionalDate(),
+  retiredDate: optionalDate(),
+}
 
 // แนบข้อมูล master data ที่เกี่ยวข้องมาด้วยทุกครั้งที่อ่าน asset — frontend จะได้มีชื่อไปแสดงผล
 // ไม่ต้องยิง request แยกทีละตัว (แม้ master data นั้นจะถูก soft delete ไปแล้วก็ยังแนบมา ตาม
@@ -116,6 +159,7 @@ const createSchema = z.object({
   locationId: z.string().trim().min(1).optional().nullable(),
   departmentId: z.string().trim().min(1).optional().nullable(),
   vendorId: z.string().trim().min(1).optional().nullable(),
+  ...detailFields,
 })
 
 // ตรวจว่า assetTag / serialNumber ชนกับของที่มีอยู่แล้วหรือไม่ (แยกเช็กทีละฟิลด์ เพื่อบอกได้ชัดว่าฟิลด์ไหนซ้ำ)
@@ -171,6 +215,7 @@ const updateSchema = z.object({
   locationId: z.string().trim().min(1).optional().nullable(),
   departmentId: z.string().trim().min(1).optional().nullable(),
   vendorId: z.string().trim().min(1).optional().nullable(),
+  ...detailFields,
 })
 
 router.put('/:id', asyncHandler(async (req, res) => {

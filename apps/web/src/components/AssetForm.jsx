@@ -15,6 +15,15 @@ export const STATUS_OPTIONS = [
   { value: 'DISPOSED', label: 'เลิกใช้งาน' },
 ]
 
+// สภาพครุภัณฑ์ — ต้องตรงกับ enum AssetCondition ใน schema.prisma (Milestone 3)
+export const CONDITION_OPTIONS = [
+  { value: 'NEW', label: 'ใหม่' },
+  { value: 'GOOD', label: 'สภาพดี' },
+  { value: 'FAIR', label: 'สภาพปานกลาง' },
+  { value: 'POOR', label: 'สภาพไม่ดี' },
+  { value: 'DAMAGED', label: 'ชำรุด' },
+]
+
 // dropdown master data ทั้ง 4 ตัว — key ต้องตรงกับ field ใน Asset (categoryId, locationId, ...)
 // navTarget = ชื่อแท็บใน App.jsx ที่จะพาไปสร้างข้อมูลใหม่ ถ้ายังไม่มีตัวเลือกเลย
 const MASTER_DATA_FIELDS = [
@@ -24,8 +33,17 @@ const MASTER_DATA_FIELDS = [
   { key: 'vendorId', entityApi: api.vendors, label: 'ผู้ขาย/ผู้ผลิต', required: false, navTarget: 'vendors' },
 ]
 
-// ฟิลด์ text ธรรมดาของฟอร์ม (ใช้ตอน trim ก่อนส่ง) — ไม่รวม dropdown/select
-const TEXT_FIELDS = ['assetTag', 'name', 'brand', 'model', 'serialNumber']
+// ฟิลด์ text ธรรมดาของฟอร์ม (ใช้ตอน trim ก่อนส่ง) — ไม่รวม dropdown/select/วันที่/ตัวเลข
+// ตั้งแต่ Milestone 3: เพิ่มฟิลด์รายละเอียดครุภัณฑ์ (purchase/hardware/network/notes)
+const TEXT_FIELDS = [
+  'assetTag', 'name', 'brand', 'model', 'serialNumber',
+  'currency', 'supplierReference', 'invoiceNumber', 'remark',
+  'hostname', 'ipAddress', 'macAddress', 'operatingSystem', 'osVersion',
+  'cpu', 'ram', 'storage', 'graphics', 'monitorSize', 'domainName', 'description',
+]
+
+// ฟิลด์วันที่ของฟอร์ม (ใช้ <input type="date">) — แปลงจาก ISO string ที่ backend ส่งมาตอนแก้ไข
+const DATE_FIELDS = ['purchaseDate', 'warrantyExpiry', 'lastSeenAt']
 
 const REQUIRED_MESSAGES = {
   assetTag: 'กรุณาใส่เลขทะเบียนครุภัณฑ์',
@@ -46,11 +64,49 @@ const emptyForm = {
   locationId: '',
   departmentId: '',
   vendorId: '',
+  // Milestone 3: การจัดซื้อ
+  purchaseDate: '',
+  purchasePrice: '',
+  currency: '',
+  supplierReference: '',
+  invoiceNumber: '',
+  warrantyExpiry: '',
+  // Milestone 3: ฮาร์ดแวร์
+  cpu: '',
+  ram: '',
+  storage: '',
+  graphics: '',
+  monitorSize: '',
+  assetCondition: '',
+  // Milestone 3: เครือข่าย
+  hostname: '',
+  ipAddress: '',
+  macAddress: '',
+  operatingSystem: '',
+  osVersion: '',
+  domainName: '',
+  lastSeenAt: '',
+  // Milestone 3: หมายเหตุ
+  description: '',
+  remark: '',
+}
+
+// ตัด ISO datetime ที่ backend ส่งมาให้เหลือแค่ yyyy-mm-dd เพื่อใส่ใน <input type="date">
+function toDateInputValue(value) {
+  if (!value) return ''
+  return String(value).slice(0, 10)
 }
 
 export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaster }) {
   const isEdit = Boolean(asset)
-  const [form, setForm] = useState(() => (asset ? { ...emptyForm, ...asset } : emptyForm))
+  const [form, setForm] = useState(() => {
+    if (!asset) return emptyForm
+    const next = { ...emptyForm, ...asset }
+    DATE_FIELDS.forEach((f) => { next[f] = toDateInputValue(asset[f]) })
+    next.purchasePrice = (asset.purchasePrice === null || asset.purchasePrice === undefined) ? '' : String(asset.purchasePrice)
+    next.assetCondition = asset.assetCondition || ''
+    return next
+  })
   const [error, setError] = useState('')             // ข้อความ error ทั่วไป
   const [fieldErrors, setFieldErrors] = useState({})  // error รายฟิลด์ เช่น { assetTag: '...' }
   const [busy, setBusy] = useState(false)
@@ -186,11 +242,47 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
     )
   }
 
+  // ---- ช่อง input ธรรมดา (text/number/date) ตัวหนึ่ง — ใช้ซ้ำกับฟิลด์รายละเอียดของ Milestone 3 ----
+  function renderInput(key, label, { type = 'text', placeholder, step, min } = {}) {
+    return (
+      <div className="grow">
+        <label>{label}</label>
+        <input
+          type={type}
+          value={form[key] || ''}
+          placeholder={placeholder}
+          step={step}
+          min={min}
+          onChange={(e) => update(key, e.target.value)}
+          className={fieldErrors[key] ? 'invalid' : ''}
+        />
+        {fieldErrors[key] && <p className="field-error">{fieldErrors[key]}</p>}
+      </div>
+    )
+  }
+
+  // ---- ช่อง textarea เต็มความกว้าง — ใช้กับ description/remark ----
+  function renderTextarea(key, label) {
+    return (
+      <>
+        <label>{label}</label>
+        <textarea
+          rows={2}
+          value={form[key] || ''}
+          onChange={(e) => update(key, e.target.value)}
+          className={fieldErrors[key] ? 'invalid' : ''}
+        />
+        {fieldErrors[key] && <p className="field-error">{fieldErrors[key]}</p>}
+      </>
+    )
+  }
+
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
       <div className="card modal" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'แก้ไขครุภัณฑ์' : 'เพิ่มครุภัณฑ์ใหม่'}</h2>
         <form onSubmit={submit} noValidate>
+          <h3 className="form-section-title">ข้อมูลทั่วไป</h3>
           <label>เลขทะเบียนครุภัณฑ์ (Asset Tag)</label>
           <input
             ref={firstInputRef}
@@ -259,6 +351,61 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
             {renderMasterDataField(MASTER_DATA_FIELDS[2])}
             {renderMasterDataField(MASTER_DATA_FIELDS[3])}
           </div>
+
+          <h3 className="form-section-title">การจัดซื้อ</h3>
+          <div className="row">
+            {renderInput('purchaseDate', 'วันที่ซื้อ', { type: 'date' })}
+            {renderInput('purchasePrice', 'ราคาซื้อ', { type: 'number', step: '0.01', min: '0' })}
+          </div>
+          <div className="row">
+            {renderInput('currency', 'สกุลเงิน', { placeholder: 'เช่น THB, USD' })}
+            {renderInput('warrantyExpiry', 'วันหมดประกัน', { type: 'date' })}
+          </div>
+          <div className="row">
+            {renderInput('invoiceNumber', 'เลขที่ใบแจ้งหนี้')}
+            {renderInput('supplierReference', 'เลขอ้างอิงผู้ขาย')}
+          </div>
+
+          <h3 className="form-section-title">ฮาร์ดแวร์</h3>
+          <div className="row">
+            {renderInput('cpu', 'CPU')}
+            {renderInput('ram', 'RAM')}
+          </div>
+          <div className="row">
+            {renderInput('storage', 'พื้นที่จัดเก็บ')}
+            {renderInput('graphics', 'การ์ดจอ')}
+          </div>
+          <div className="row">
+            {renderInput('monitorSize', 'ขนาดหน้าจอ')}
+            <div className="grow">
+              <label>สภาพครุภัณฑ์</label>
+              <select value={form.assetCondition || ''} onChange={(e) => update('assetCondition', e.target.value)}>
+                <option value="">ไม่ระบุ</option>
+                {CONDITION_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <h3 className="form-section-title">เครือข่าย</h3>
+          <div className="row">
+            {renderInput('hostname', 'Hostname')}
+            {renderInput('ipAddress', 'IP Address', { placeholder: '192.168.1.10' })}
+          </div>
+          <div className="row">
+            {renderInput('macAddress', 'MAC Address', { placeholder: '00:1A:2B:3C:4D:5E' })}
+            {renderInput('operatingSystem', 'ระบบปฏิบัติการ')}
+          </div>
+          <div className="row">
+            {renderInput('osVersion', 'เวอร์ชันระบบปฏิบัติการ')}
+            {renderInput('domainName', 'โดเมน')}
+          </div>
+          {renderInput('lastSeenAt', 'พบเห็นล่าสุด', { type: 'date' })}
+
+          <h3 className="form-section-title">หมายเหตุ</h3>
+          {renderTextarea('description', 'รายละเอียด')}
+          {renderTextarea('remark', 'หมายเหตุ')}
 
           {error && <p className="error">{error}</p>}
 
