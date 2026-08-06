@@ -49,11 +49,13 @@ const SORTABLE_FIELDS = ['ticketNumber', 'openedAt', 'resolvedAt', 'closedAt', '
 
 // ค้นหาข้าม ticket/asset/ผู้แจ้ง/ผู้ดูแล ตาม spec: Ticket Number, Title, Asset Tag, Asset Name,
 // Hostname, Reporter Name, Assigned Staff
-const SEARCHABLE_TICKET_FIELDS = ['ticketNumber', 'title']
-const SEARCHABLE_ASSET_FIELDS = ['assetTag', 'name', 'hostname']
+// export ทั้งคู่ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8)
+export const SEARCHABLE_TICKET_FIELDS = ['ticketNumber', 'title']
+export const SEARCHABLE_ASSET_FIELDS = ['assetTag', 'name', 'hostname']
 
 // EMPLOYEE เห็นเฉพาะตั๋วที่ตัวเองเป็นผู้แจ้ง — ADMIN/IT_STAFF เห็นทุกตั๋ว
-function scopeForRead(user) {
+// export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8) — ดูเหตุผลเดียวกับที่ assets.js: scopeForRead ทำไว้
+export function scopeForRead(user) {
   if (user.role === 'EMPLOYEE') return { reportedById: user.id }
   return {}
 }

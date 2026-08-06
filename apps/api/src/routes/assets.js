@@ -57,7 +57,8 @@ const SORTABLE_FIELDS = ['assetTag', 'name', 'createdAt', 'status']
 
 // ฟิลด์ที่ค้นหาได้ — ค้นหาแบบ "มีคำนี้อยู่ที่ไหนก็ได้" (contains) และไม่สนตัวพิมพ์เล็ก/ใหญ่
 // ตั้งแต่ Milestone 3: เพิ่ม hostname/ipAddress/macAddress/operatingSystem ให้ค้นหาได้ด้วย
-const SEARCHABLE_FIELDS = [
+// export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8) กันไม่ต้องเขียนรายชื่อฟิลด์ค้นหาซ้ำ
+export const SEARCHABLE_FIELDS = [
   'assetTag', 'name', 'brand', 'model', 'serialNumber',
   'hostname', 'ipAddress', 'macAddress', 'operatingSystem',
 ]
@@ -126,7 +127,9 @@ function shapeAsset(asset) {
 // เงื่อนไขพื้นฐานที่ READ ทุกอันต้องมี: ยังไม่ถูกลบ + ตาม role
 // EMPLOYEE เห็นเฉพาะ asset ที่ตัวเองเป็น "ผู้ถือครองปัจจุบัน" (มี assignment active ที่ userId ตรงกับตัวเอง)
 // — ไม่ใช้ ownerId แล้วตั้งแต่ Milestone 5 (ดูคอมเมนต์หัวไฟล์)
-function scopeForRead(user) {
+// export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8) — รายงานต้องกรองขอบเขตเดียวกับที่ GET /api/assets ใช้เป๊ะ ๆ
+// (ห้ามเขียนเงื่อนไข RBAC ซ้ำ เพราะถ้าเขียนไม่ตรงกันจะกลายเป็นช่องโหว่รั่วข้อมูลข้ามขอบเขตได้)
+export function scopeForRead(user) {
   const where = { deletedAt: null }
   if (user.role === 'EMPLOYEE') {
     where.assignments = { some: { userId: user.id, ...ACTIVE_ASSIGNMENT_WHERE } }

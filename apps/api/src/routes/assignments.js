@@ -40,7 +40,8 @@ const RETURN_STATUSES = ['RETURNED', 'LOST', 'DAMAGED']
 const SORTABLE_FIELDS = ['assignedAt', 'returnedAt', 'createdAt', 'status']
 
 // ค้นหาข้าม asset/ผู้ถือครอง ตาม spec: Asset Tag, Asset Name, Employee Name, Hostname, Serial Number
-const SEARCHABLE_ASSET_FIELDS = ['assetTag', 'name', 'hostname', 'serialNumber']
+// export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8)
+export const SEARCHABLE_ASSET_FIELDS = ['assetTag', 'name', 'hostname', 'serialNumber']
 
 const WITH_RELATIONS = {
   include: {
@@ -51,7 +52,8 @@ const WITH_RELATIONS = {
 }
 
 // EMPLOYEE เห็นเฉพาะรายการที่ตัวเองเป็นผู้ถือครอง (ทั้งอดีต+ปัจจุบัน) — ADMIN/IT_STAFF เห็นทุกรายการ
-function scopeForRead(user) {
+// export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8) — ดูเหตุผลเดียวกับที่ assets.js: scopeForRead ทำไว้
+export function scopeForRead(user) {
   if (user.role === 'EMPLOYEE') return { userId: user.id }
   return {}
 }

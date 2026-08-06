@@ -5,6 +5,40 @@
 
 ---
 
+## [v0.8.0] — Milestone 8: Reports & Export
+
+### Added
+- หน้า "รายงาน" — การ์ดเลือกจาก 6 รายงาน (Asset Inventory, Asset Assignment, Warranty, Helpdesk,
+  Department Summary, Vendor Summary) แต่ละตัวมี preview เป็นตาราง + ตัวกรอง + ปุ่มส่งออก
+- `routes/reports.js` — `GET /api/reports/assets`, `/assignments`, `/warranty`, `/helpdesk`,
+  `/departments`, `/vendors` ทุกตัวรองรับ `?format=csv|xlsx|pdf` เพื่อดาวน์โหลดไฟล์แทนการตอบ JSON preview
+  (ไม่ส่ง `format` มา = JSON แบ่งหน้าปกติ)
+- `utils/reportHelpers.js` — ตัวแปลง query filter ที่ใช้ร่วมกันทั้ง 6 รายงาน, ตัวคำนวณ bucket การรับประกัน
+  (หมดแล้ว/ใกล้หมด 30/90 วัน/ปกติ), และตัวสร้างไฟล์ export ทั้ง 3 ฟอร์แมต (CSV เขียนตรงไปที่ response พร้อม
+  UTF-8 BOM, Excel ใช้ ExcelJS streaming writer, PDF ใช้ PDFKit วาดตารางเอง)
+- ฟอนต์ Sarabun (SIL OFL, ผ่าน Fontsource) บันทึกไว้ที่ `apps/api/assets/fonts/` — ใช้ render ข้อความไทยใน
+  PDF export ด้วยการตัดข้อความเป็นช่วงตาม Unicode range แล้วสลับฟอนต์ไทย/ละตินทีละช่วง (ไฟล์ subset ของ
+  Sarabun แยกชุดตัวอักษรไทย/ละตินคนละไฟล์ ไม่มีไฟล์เดียวที่ครอบคลุมทั้งคู่)
+- Export dependencies ใหม่: `exceljs`, `pdfkit`
+
+### Changed
+- `routes/assets.js`, `routes/assignments.js`, `routes/tickets.js`: export `scopeForRead` (และรายชื่อ
+  ฟิลด์ค้นหาที่เกี่ยวข้อง) ออกมาให้ `routes/reports.js` เรียกใช้ตรง ๆ — รายงานทุกตัวใช้เงื่อนไข RBAC เดียวกับ
+  endpoint หลักเป๊ะ ไม่มีการเขียนเงื่อนไขสิทธิ์ซ้ำที่เสี่ยงพลาดไม่ตรงกัน
+
+### Business Rules
+- ADMIN/IT_STAFF เข้าถึงรายงานได้ทุกตัวแบบภาพรวมทั้งองค์กร
+- EMPLOYEE เห็น Asset Inventory/Assignment/Warranty/Helpdesk เฉพาะของตัวเอง (ขอบเขตเดียวกับหน้าจอปกติ),
+  Department Summary/Vendor Summary เข้าไม่ได้เลย (403 — ภาพรวมองค์กรล้วน ๆ ไม่มีทาง scope ให้เหลือ "ของตัวเอง"
+  ได้อย่างมีความหมาย)
+- Export ดึงข้อมูล "ทั้งหมด" ที่ตรงกับตัวกรอง+ขอบเขตสิทธิ์เสมอ ไม่ใช่แค่หน้าที่กำลัง preview อยู่ — ไม่ export
+  รายการที่ถูกกรอง/ซ่อนออกไปแล้ว
+
+### Not Implemented (ตั้งใจเว้นไว้ ตามขอบเขต Milestone 8)
+- QR Code, Audit Log, Notifications, Email — ดู Roadmap ใน README
+
+---
+
 ## [v0.7.0] — Milestone 7: Helpdesk & Maintenance
 
 ### Added

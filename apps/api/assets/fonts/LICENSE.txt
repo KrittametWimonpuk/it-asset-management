@@ -1,0 +1,9 @@
+Sarabun font (Thai + Latin subsets), by Cadson Demak.
+Licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org
+
+Source: Google Fonts (https://fonts.google.com/specimen/Sarabun), distributed via
+the Fontsource project (https://github.com/fontsource/fontsource), package
+@fontsource/sarabun. Only the Regular (400) weight, Thai and Latin subsets, are
+included here — used to render mixed Thai/Latin report tables in PDF exports
+(see apps/api/src/utils/reportHelpers.js).

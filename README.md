@@ -1,12 +1,12 @@
 # 🚀 ระบบจัดการครุภัณฑ์ IT (IT Asset Management)
 
 เว็บแอประบบจัดการครุภัณฑ์ IT แบบครบวงจร — ตั้งแต่ทะเบียนครุภัณฑ์, สิทธิ์การใช้งานตาม role,
-การมอบหมาย/รับคืนครุภัณฑ์, แดชบอร์ดสรุปภาพรวม, ไปจนถึงระบบ Helpdesk แจ้งซ่อม/ปัญหาครุภัณฑ์
-พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
+การมอบหมาย/รับคืนครุภัณฑ์, แดชบอร์ดสรุปภาพรวม, ระบบ Helpdesk แจ้งซ่อม/ปัญหาครุภัณฑ์, ไปจนถึงรายงาน
+และส่งออกข้อมูลเป็น CSV/Excel/PDF พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.7.0` (Milestone 7 — Helpdesk & Maintenance)
+**เวอร์ชันปัจจุบัน:** `v0.8.0` (Milestone 8 — Reports & Export)
 
 ---
 
@@ -22,6 +22,7 @@
 | **Asset Assignment & Lifecycle** | มอบหมาย/รับคืนครุภัณฑ์ พร้อมประวัติเต็มรูปแบบ (ห้ามแก้/ลบประวัติเก่า), "ผู้ถือครองปัจจุบัน" คำนวณจากประวัติเสมอ ไม่ใช่ field ที่แก้ตรง ๆ ได้ |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
+| **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
 
@@ -69,22 +70,32 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   - Asset ↔ Ticket: หนึ่ง asset มีได้หลายตั๋ว (1:many) — `GET /api/assets` แนบ `openTicketsCount`,
     `closedTicketsCount`, `ticketHistoryCount`, `recentTickets` มาด้วยเสมอ (ดู [ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
     `summarizeAssetTickets`) ให้ Asset Explorer แสดง "ประวัติการซ่อมบำรุง" โดยไม่ต้องยิง request แยก
+- **Reports & Export (Milestone 8)**: `routes/reports.js` **ไม่มี business logic ใหม่ของตัวเอง** — ทุก endpoint
+  import `scopeForRead` ตัวเดียวกับที่ `routes/assets.js`/`assignments.js`/`tickets.js` ใช้จริงมาโดยตรง (ตั้งใจ
+  `export` ฟังก์ชันเดิมออกมาแทนเขียนเงื่อนไข RBAC ซ้ำ — ถ้าเขียนแยกแล้วพลาดไม่ตรงกันจะกลายเป็นช่องโหว่รั่ว
+  ข้อมูลข้ามขอบเขตได้) endpoint เดียวกันตอบได้ 2 แบบ: ไม่ส่ง `?format=` มา = JSON แบ่งหน้าปกติ (ใช้กับหน้า
+  Preview), ส่ง `?format=csv|xlsx|pdf` มา = ไฟล์ดาวน์โหลดตรง ๆ (ดึงข้อมูล "ทั้งหมด" ที่ตรงตัวกรอง ไม่ใช่แค่หน้า
+  ที่กำลังดู — ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว) Department Summary/Vendor Summary เป็นภาพรวมองค์กร
+  ล้วน ๆ จึงกัน EMPLOYEE ด้วย `requireRole('ADMIN','IT_STAFF')` ตั้งแต่ต้นทาง (403 ไม่ใช่แค่ซ่อนปุ่ม)
+  ดูรายละเอียดรายงานทั้งหมดที่หัวข้อ [📊 Reports & Export](#-reports--export) ด้านล่าง
 
 ```
 webapp-starter/
 ├── apps/
 │   ├── api/                    Backend (Express + Prisma)
+│   │   ├── assets/fonts/       ฟอนต์ Sarabun (SIL OFL) ที่ใช้ render ข้อความไทยใน PDF export
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
 │   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0007)
 │   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย+ใบแจ้งซ่อม)
 │   │   └── src/
-│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/...)
+│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/reports/...)
 │   │       ├── middleware/     requireAuth / requireRole
-│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope, ticketHelpers)
+│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope,
+│   │                            ticketHelpers, reportHelpers — filter parsing + CSV/Excel/PDF writers)
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
-│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/...)
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/Reports/...)
 │           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
@@ -174,10 +185,44 @@ Frontend ไม่ต้องตั้งค่า environment variable ใด 
 
 ---
 
+## 📊 Reports & Export
+
+หน้า "รายงาน" มีการ์ดให้เลือก 6 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
+CSV / Excel / PDF ที่มุมขวาบนของตาราง ทุกรายงานอ่านจากตารางที่มีอยู่แล้วเท่านั้น ไม่มีการคำนวณ/เก็บข้อมูลใหม่
+
+| รายงาน | คอลัมน์ | ตัวกรองที่รองรับ | ขอบเขต EMPLOYEE |
+|--------|---------|-------------------|-------------------|
+| **Asset Inventory** | Asset Tag, ชื่ออุปกรณ์, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย/ผู้ผลิต, สถานะ, ผู้ถือครองปัจจุบัน, วันหมดประกัน, วันที่ซื้อ, ราคาซื้อ | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, สถานะ, ค้นหา | เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่ |
+| **Asset Assignment** | ครุภัณฑ์, พนักงาน, วันที่มอบหมาย, วันที่คืน, สถานะการมอบหมาย, สภาพก่อน/หลัง, หมายเหตุ | ช่วงวันที่มอบหมาย, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, สถานะการมอบหมาย, ค้นหา | เฉพาะประวัติที่ตัวเองเป็นผู้ถือครอง |
+| **Warranty Report** | Asset Tag, ชื่ออุปกรณ์, หมวดหมู่, แผนก, ผู้ขาย/ผู้ผลิต, วันหมดประกัน, จำนวนวันคงเหลือ, สถานะประกัน | สถานะประกัน (หมดแล้ว/ใกล้หมด 30/90 วัน/ปกติ), หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, ค้นหา | เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่ |
+| **Helpdesk Report** | เลขที่ใบแจ้ง, ครุภัณฑ์, ความสำคัญ, สถานะ, ผู้ดูแล, วันที่แจ้ง/แก้ไขสำเร็จ/ปิดงาน, ระยะเวลาแก้ไข (ชั่วโมง) | ช่วงวันที่แจ้ง, หมวดหมู่/สถานที่/แผนก/ผู้ขายของครุภัณฑ์ที่ผูกอยู่, สถานะตั๋ว, หมวดหมู่ปัญหา, ค้นหา | เฉพาะตั๋วที่ตัวเองแจ้ง |
+| **Department Summary** | แผนก, จำนวนครุภัณฑ์, กำลังมอบหมายอยู่ (active), จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, ผู้ขาย | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
+| **Vendor Summary** | ผู้ขาย/ผู้ผลิต, จำนวนครุภัณฑ์, หมดประกันแล้ว, ใกล้หมดประกัน (90 วัน), ประกันปกติ, จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, แผนก | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
+
+**Export formats:**
+
+| ฟอร์แมต | Content-Type | รายละเอียด |
+|---------|--------------|-------------|
+| **CSV** | `text/csv; charset=utf-8` | เขียนทีละแถวตรงไปที่ HTTP response พร้อม UTF-8 BOM (กัน Excel เปิดภาษาไทยเพี้ยน) |
+| **Excel (.xlsx)** | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | ใช้ [ExcelJS](https://github.com/exceljs/exceljs) streaming writer (`WorkbookWriter`) — เขียนแต่ละแถวลง response ทันที ไม่รวมทั้งไฟล์ไว้ในหน่วยความจำก่อนส่ง หัวตารางตัวหนา |
+| **PDF** | `application/pdf` | ใช้ [PDFKit](http://pdfkit.org/) วาดตารางเอง (ไม่มี layout engine สำเร็จรูป) — แนวนอน A4, ตัดข้อความยาวด้วยการวัดความกว้างจริง, ตัดหน้าอัตโนมัติเมื่อแถวล้น |
+
+**PDF ภาษาไทย**: PDFKit ไม่มี OpenType text-shaping engine ในตัว และฟอนต์ Sarabun ที่ใช้ (จาก Google Fonts
+ผ่าน [Fontsource](https://fontsource.org/), สัญญาอนุญาต SIL OFL — ดู [assets/fonts/LICENSE.txt](apps/api/assets/fonts/LICENSE.txt))
+แยกไฟล์ตาม subset (ไทย/ละติน คนละไฟล์ คนละชุดตัวอักษร) จึงต้องตัดข้อความเป็นช่วง ๆ ตาม Unicode range แล้วสลับ
+ฟอนต์ทีละช่วงเอง (ดู `utils/reportHelpers.js`: `splitTextRuns`) — ทดสอบแล้วว่าข้อความไทย+ละตินผสมกันในเซลล์
+เดียวกัน (เช่น `IT-0001 — โน้ตบุ๊ค Dell Latitude 5440`) render ถูกต้อง
+
+**Preview vs Export**: preview (JSON) แบ่งหน้าเหมือนตารางอื่น ๆ ในระบบ ส่วน export (CSV/Excel/PDF) ดึงข้อมูล
+"ทั้งหมด" ที่ตรงกับตัวกรอง+ขอบเขตสิทธิ์เสมอ ไม่ใช่แค่หน้าที่กำลังดูอยู่ — ตรงกับความหมายของคำว่า "export" (เอา
+ทั้งหมดที่กรองไว้ ไม่ใช่แค่สิ่งที่มองเห็นบนจอ ณ ขณะนั้น)
+
+---
+
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.6.1-rc1`, ปัจจุบัน `v0.7.0`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.7.0`, ปัจจุบัน `v0.8.0`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -251,16 +296,25 @@ cd deploy
   milestone ถัดไปเพื่อไม่ให้ scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
 - **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
   (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
+- **Export ดึงข้อมูลทั้งหมดในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ
+  streaming (ไม่รวมไฟล์ทั้งก้อนไว้ในหน่วยความจำก่อนส่ง) แต่ query ฐานข้อมูลยังดึงแถวที่ตรงเงื่อนไขมาในคำสั่ง
+  เดียว เพราะ Prisma ไม่มี API สำหรับ stream ผลลัพธ์ทีละแถวแบบตรงไปตรงมา ปลอดภัยสำหรับขนาดรายงานของระบบนี้
+  (หลักพันแถว) แต่ถ้าข้อมูลโตถึงหลักแสน/ล้านแถว ควรทำ background export job แทนการ export แบบ synchronous
+- **PDF ภาษาไทยไม่มี OpenType shaping engine เต็มรูปแบบ** — ใช้การตัดข้อความตาม Unicode range แล้วสลับฟอนต์
+  เอง (ดูหัวข้อ Reports & Export ด้านบน) ทดสอบแล้วว่าข้อความไทยมาตรฐาน (รวม สระอำ) render ถูกต้อง แต่กรณีอักษร
+  ควบ/เครื่องหมายซับซ้อนเกินกว่านี้ยังไม่ได้ทดสอบครบทุกกรณี
+- **Department/Vendor Summary ไม่มี date range ที่กรอง "ใบแจ้งซ่อม"/"การมอบหมาย" โดยตรง** — ตัวกรองช่วงวันที่
+  ใน 2 รายงานนี้มีผลกับ "วันที่ซื้อครุภัณฑ์" เท่านั้น (จำนวนตั๋ว/การมอบหมายที่นับเป็นยอดสะสม ไม่ได้กรองตามช่วงวันที่)
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด) — ตั้งใจเว้นไว้จาก Milestone 7
-- [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7
-- [ ] รายงาน/ส่งออกข้อมูลเป็น CSV/Excel (ครุภัณฑ์, ใบแจ้งซ่อม, SLA) — ตั้งใจเว้นไว้จาก Milestone 7
-- [ ] Audit Log (ใครแก้ไขอะไร เมื่อไร) — ตั้งใจเว้นไว้จาก Milestone 7
+- [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
+- [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
+- [ ] Audit Log (ใครแก้ไขอะไร เมื่อไร) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
+- [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request
 - [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
 - [ ] Automated test suite (unit + integration) สำหรับ backend routes
 - [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที

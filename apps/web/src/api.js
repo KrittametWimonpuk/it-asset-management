@@ -44,6 +44,37 @@ function toQueryString(params = {}) {
   return qs ? `?${qs}` : ''
 }
 
+// Milestone 8: ดาวน์โหลดไฟล์รายงาน (CSV/Excel/PDF) — ต่างจาก request() ตรงที่ response ไม่ใช่ JSON
+// envelope แต่เป็นไฟล์ตรง ๆ จึงต้อง fetch เองแทนเรียก request(), อ่านชื่อไฟล์จาก Content-Disposition
+// ที่ backend ตั้งมาให้ แล้วจำลองคลิกลิงก์ดาวน์โหลด (วิธีมาตรฐานที่สุดสำหรับดาวน์โหลดไฟล์ที่ต้องแนบ
+// Authorization header ด้วย — จะใช้ <a href> ตรง ๆ ไม่ได้เพราะ browser ไม่แนบ header ให้ตอนคลิกลิงก์)
+async function downloadReport(reportKey, params, format) {
+  const headers = {}
+  const token = auth.get()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`/api/reports/${reportKey}${toQueryString({ ...params, format })}`, { headers })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    const err = new Error(body.message || 'ไม่สามารถส่งออกรายงานได้')
+    err.errors = body.errors || null
+    throw err
+  }
+
+  const blob = await res.blob()
+  const match = (res.headers.get('Content-Disposition') || '').match(/filename="?([^"]+)"?/)
+  const filename = match ? match[1] : `${reportKey}-report.${format}`
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 // สร้างชุดฟังก์ชัน list/get/add/update/delete ให้ entity ที่มี REST pattern เดียวกัน
 // (Category/Location/Department/Vendor ทำงานเหมือนกันทุกตัว ต่างแค่ path) — กันไม่ต้องเขียนซ้ำ 4 รอบ
 function createEntityApi(basePath) {
@@ -106,5 +137,18 @@ export const api = {
     update: (id, body) => request(`/tickets/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     resolve: (id, body) => request(`/tickets/${id}/resolve`, { method: 'POST', body: JSON.stringify(body) }),
     close: (id, body) => request(`/tickets/${id}/close`, { method: 'POST', body: JSON.stringify(body) }),
+  },
+
+  // Milestone 8: รายงาน — แต่ละตัว preview เป็น JSON ตามปกติ (page/pageSize/sortBy/sortOrder + ตัวกรอง
+  // เฉพาะของรายงานนั้น) ส่วน download() ยิง endpoint เดียวกันแต่แนบ ?format=csv|xlsx|pdf แล้วดาวน์โหลด
+  // ไฟล์แทนที่จะ parse เป็น JSON (ดู downloadReport ด้านบน)
+  reports: {
+    assets: (params) => request(`/reports/assets${toQueryString(params)}`),
+    assignments: (params) => request(`/reports/assignments${toQueryString(params)}`),
+    warranty: (params) => request(`/reports/warranty${toQueryString(params)}`),
+    helpdesk: (params) => request(`/reports/helpdesk${toQueryString(params)}`),
+    departments: (params) => request(`/reports/departments${toQueryString(params)}`),
+    vendors: (params) => request(`/reports/vendors${toQueryString(params)}`),
+    download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
 }

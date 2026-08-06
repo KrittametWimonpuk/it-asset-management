@@ -248,3 +248,14 @@ th.sortable:hover { color: #1f2933; }
 }
 .activity-item:last-child { border-bottom: none; }
 .activity-time { color: #6b7280; font-size: 12px; white-space: nowrap; }
+
+/* ---- การ์ดเลือกรายงาน (Milestone 8) — ใช้ grid เดียวกับ .stat-cards แต่เป็น <button> ที่คลิกได้ ----
+   รีเซ็ต style ปุ่มเริ่มต้นให้หน้าตาเหมือน .card ปกติ ต่างแค่กดได้ + มี hover ----*/
+.report-card {
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  display: block; width: 100%; border: 1px solid transparent;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.report-card:hover { border-color: #2563eb; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12); }
+.report-card h3 { margin: 0 0 6px; font-size: 15px; }
+.report-card p { margin: 0; }
