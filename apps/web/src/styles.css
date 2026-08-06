@@ -155,6 +155,11 @@ th.sortable:hover { color: #1f2933; }
 .badge-lost { background: #fee2e2; color: #b91c1c; }
 .badge-damaged { background: #fef3c7; color: #b45309; }
 
+/* ---- badge ประเภทกิจกรรมล่าสุด (Milestone 6) ---- */
+.badge-assignment { background: #dbeafe; color: #1d4ed8; }
+.badge-return { background: #dcfce7; color: #15803d; }
+.badge-new-asset { background: #ede9fe; color: #6d28d9; }
+
 /* ---- overlay + modal สำหรับฟอร์ม/ยืนยันการลบ ---- */
 .overlay {
   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
@@ -190,3 +195,43 @@ th.sortable:hover { color: #1f2933; }
   padding: 10px 12px; text-align: center;
 }
 .empty-dropdown p { margin: 0 0 4px; }
+
+/* ---- แดชบอร์ด (Milestone 6) ----
+   การ์ดสรุป: desktop 4 คอลัมน์, tablet 2 คอลัมน์, mobile 1 คอลัมน์ */
+.dashboard-section { margin-top: 28px; }
+.dashboard-section:first-child { margin-top: 0; }
+.dashboard-section h3 { font-size: 15px; margin: 0 0 12px; }
+
+.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 900px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .stat-cards { grid-template-columns: 1fr; } }
+
+.stat-card {
+  background: #fff; border: 1px solid #eef0f2; border-radius: 10px;
+  padding: 14px 16px;
+}
+.stat-card-label { color: #6b7280; font-size: 13px; margin: 0 0 6px; }
+.stat-card-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
+
+/* ---- กราฟแบบ bar เรียบ ๆ ด้วย CSS ล้วน (ไม่ผูกกับ chart library ใด ๆ) ---- */
+.charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-chart-row { display: flex; align-items: center; gap: 10px; }
+.bar-chart-label {
+  width: 40%; flex-shrink: 0; font-size: 13px; color: #4b5563;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bar-chart-track { flex: 1; background: #eef0f2; border-radius: 4px; height: 10px; overflow: hidden; }
+.bar-chart-fill { height: 100%; background: #2563eb; border-radius: 4px; }
+.bar-chart-value { width: 36px; flex-shrink: 0; text-align: right; font-size: 13px; font-weight: 600; }
+
+/* ---- กิจกรรมล่าสุด ---- */
+.activity-list { display: flex; flex-direction: column; }
+.activity-item {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid #eef0f2; font-size: 14px;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-time { color: #6b7280; font-size: 12px; white-space: nowrap; }

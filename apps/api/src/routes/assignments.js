@@ -32,7 +32,8 @@ router.use(requireAuth)
 const manageAssignments = requireRole('ADMIN', 'IT_STAFF')
 
 // สถานะที่อนุญาต — ต้องตรงกับ enum AssignmentStatus ใน schema.prisma
-const ASSIGNMENT_STATUSES = ['ASSIGNED', 'RETURNED', 'LOST', 'DAMAGED']
+// export ไว้ให้ routes/dashboard.js ใช้ร่วมกัน (สร้าง breakdown ให้ครบทุกสถานะแม้บางสถานะจะนับได้ 0)
+export const ASSIGNMENT_STATUSES = ['ASSIGNED', 'RETURNED', 'LOST', 'DAMAGED']
 // ผลลัพธ์ที่ยอมให้ตั้งตอน "รับคืน" ได้ — ไม่รวม ASSIGNED (นั่นคือสถานะตอนเริ่มมอบหมาย ไม่ใช่ผลตอนปิดรายการ)
 const RETURN_STATUSES = ['RETURNED', 'LOST', 'DAMAGED']
 

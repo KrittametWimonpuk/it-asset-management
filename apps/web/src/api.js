@@ -86,4 +86,9 @@ export const api = {
   users: {
     list: (params) => request(`/users${toQueryString(params)}`),
   },
+
+  // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
+  dashboard: {
+    get: () => request('/dashboard'),
+  },
 }

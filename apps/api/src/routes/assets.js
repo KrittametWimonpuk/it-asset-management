@@ -44,7 +44,8 @@ router.use(requireAuth)
 const manageAssets = requireRole('ADMIN', 'IT_STAFF')
 
 // สถานะที่อนุญาต — ต้องตรงกับ enum AssetStatus ใน schema.prisma
-const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
+// export ไว้ให้ routes/dashboard.js ใช้ร่วมกัน (สร้าง breakdown ให้ครบทุกสถานะแม้บางสถานะจะนับได้ 0)
+export const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
 
 // สภาพครุภัณฑ์ที่อนุญาต — ต้องตรงกับ enum AssetCondition ใน schema.prisma
 // export ไว้ให้ routes/assignments.js ใช้ร่วมกัน (conditionBefore/conditionAfter ใช้ enum เดียวกัน)
