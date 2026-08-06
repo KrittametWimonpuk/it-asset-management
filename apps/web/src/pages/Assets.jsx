@@ -353,6 +353,8 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory }) {
           onSubmit={handleSubmit}
           onCancel={() => { setFormOpen(false); setEditingAsset(null) }}
           onNavigateToMaster={onNavigateToMaster}
+          options={filterOptions}
+          optionsError={filterOptionsError}
         />
       )}
 

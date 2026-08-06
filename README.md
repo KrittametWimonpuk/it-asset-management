@@ -1,36 +1,83 @@
-# 🚀 Webapp Starter — เทมเพลตเริ่มต้นพัฒนาระบบ (แจกฟรี)
+# 🚀 ระบบจัดการครุภัณฑ์ IT (IT Asset Management)
 
-เทมเพลตเว็บแอปแบบ **"มีทุกอย่างที่ต้องใช้จริง"** สำหรับคนอยากเริ่มต้นพัฒนาระบบ
-มาพร้อม **สมัครสมาชิก / เข้าสู่ระบบ + ตัวอย่าง CRUD** และ **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
+เว็บแอประบบจัดการครุภัณฑ์ IT แบบครบวงจร — ตั้งแต่ทะเบียนครุภัณฑ์, สิทธิ์การใช้งานตาม role,
+การมอบหมาย/รับคืนครุภัณฑ์, ไปจนถึงแดชบอร์ดสรุปภาพรวม พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
 
-> เป้าหมาย: อ่านโค้ดรู้เรื่อง, รันได้ใน 5 นาที, และเข้าใจว่าระบบจริงประกอบด้วยอะไรบ้าง
-> โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายว่าแต่ละบรรทัดทำอะไร
+> โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
+
+**เวอร์ชันปัจจุบัน:** `v0.6.1-rc1` (Release Candidate — ก่อน Milestone 7)
 
 ---
 
-## 🧩 ในนี้มีอะไรบ้าง
+## 🧩 Features
 
-| ส่วน | เทคโนโลยี | ทำหน้าที่ |
-|------|-----------|-----------|
-| **Frontend** | React + Vite | หน้าเว็บ (สมัคร/ล็อกอิน/รายการครุภัณฑ์) |
-| **Backend** | Express (Node.js) | API + ตรวจสอบสิทธิ์ด้วย JWT |
-| **Database** | PostgreSQL + Prisma | เก็บข้อมูลผู้ใช้และครุภัณฑ์ IT |
-| **Container** | Docker | แพ็กแอปให้รันที่ไหนก็ได้ |
-| **Cloud** | AWS ECS (Fargate) + ALB + RDS | รันบนคลาวด์จริง |
+| หมวด | รายละเอียด |
+|------|-----------|
+| **Authentication** | สมัครสมาชิก / เข้าสู่ระบบด้วย JWT, รหัสผ่านเก็บเป็น bcrypt hash เท่านั้น |
+| **RBAC** | 3 สิทธิ์: `ADMIN` (เต็มระบบ), `IT_STAFF` (จัดการครุภัณฑ์/มอบหมายได้ จัดการผู้ใช้ไม่ได้), `EMPLOYEE` (เห็นเฉพาะของตัวเอง) — บังคับที่ backend เสมอ |
+| **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
+| **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
+| **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
+| **Asset Assignment & Lifecycle** | มอบหมาย/รับคืนครุภัณฑ์ พร้อมประวัติเต็มรูปแบบ (ห้ามแก้/ลบประวัติเก่า), "ผู้ถือครองปัจจุบัน" คำนวณจากประวัติเสมอ ไม่ใช่ field ที่แก้ตรง ๆ ได้ |
+| **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม), กิจกรรมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
+| **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
+| **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  PostgreSQL (Prisma)
+```
+
+- **Frontend**: React 18 + Vite, ไม่มี router library / state management library ใด ๆ (ตั้งใจให้เรียบง่าย
+  — สลับหน้าด้วย state ธรรมดาใน [App.jsx](apps/web/src/App.jsx)) หน้าจอหลักคุยกับ backend ผ่านตัวช่วยกลางที่
+  [api.js](apps/web/src/api.js) เดียว
+- **Backend**: Express — แต่ละ resource เป็น router แยกไฟล์ใน `src/routes/`, master data ทั้ง 4 ตัว
+  (Category/Location/Department/Vendor) ใช้ router factory ตัวเดียวกัน ([masterDataRouter.js](apps/api/src/utils/masterDataRouter.js))
+  กันเขียนโค้ดซ้ำ
+- **Auth**: JWT ที่ฝัง `{ id, email, role }` ไว้ในตัว, ตรวจสอบผ่าน middleware กลาง
+  ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
+  endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
+  ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0006_assignments`)
+  แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
+- **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
+  `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
+  ระดับฐานข้อมูล — asset หนึ่งชิ้นมีผู้ถือครองพร้อมกันได้สูงสุด 1 คน
+- **RBAC ที่ backend เสมอ**: ทุก query ที่ scope ตาม role (เช่น EMPLOYEE เห็นเฉพาะของตัวเอง) กรองใน
+  Prisma `where` โดยตรง ไม่ใช่กรองที่ frontend แล้วซ่อน UI — frontend ซ่อนปุ่ม/แท็บเป็นแค่ UX เสริม
+  ไม่ใช่ชั้นความปลอดภัยจริง
 
 ```
 webapp-starter/
 ├── apps/
-│   ├── api/          👈 Backend (Express + Prisma)
-│   └── web/          👈 Frontend (React)
-├── deploy/           👈 สคริปต์ deploy ขึ้น AWS ECS
-├── docker-compose.yml   👈 รันทั้งระบบบนเครื่องด้วยคำสั่งเดียว
+│   ├── api/                    Backend (Express + Prisma)
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
+│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0006)
+│   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย)
+│   │   └── src/
+│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/dashboard/...)
+│   │       ├── middleware/     requireAuth / requireRole
+│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope)
+│   └── web/                    Frontend (React + Vite)
+│       └── src/
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/...)
+│           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
+│           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
+│           └── api.js          จุดเดียวที่คุยกับ backend
+├── deploy/                     สคริปต์ deploy ขึ้น AWS ECS (00 → 03, และ 99-destroy)
+├── docs/
+├── docker-compose.yml          รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว
+├── CHANGELOG.md
 └── README.md
 ```
 
 ---
 
-## ▶️ วิธีรันบนเครื่องตัวเอง (ง่ายสุด)
+## ▶️ Installation — วิธีรันบนเครื่องตัวเอง (ง่ายสุด)
 
 ต้องมี **Docker Desktop** ติดตั้งไว้ก่อน จากนั้น:
 
@@ -48,7 +95,7 @@ docker compose up --build
 
 ---
 
-## 🛠️ วิธีรันแบบ "พัฒนา" (แก้โค้ดแล้วเห็นผลทันที)
+## 🛠️ Development Workflow — วิธีรันแบบ "พัฒนา" (แก้โค้ดแล้วเห็นผลทันที)
 
 เปิด 3 เทอร์มินัล (หรือใช้ Docker แค่ตัว db):
 
@@ -61,7 +108,7 @@ cd apps/api
 cp ../../.env.example .env      # แล้วแก้ค่าใน .env ถ้าต้องการ
 npm install
 npm run migrate:dev             # สร้างตารางในฐานข้อมูล
-npm run seed                    # (ไม่บังคับ) ใส่ผู้ใช้ตัวอย่าง 3 role — admin/itstaff/employee@example.com / password123
+npm run seed                    # (ไม่บังคับ) ใส่ข้อมูลตัวอย่าง 3 role + ครุภัณฑ์ + ประวัติมอบหมาย
 npm run dev
 
 # เทอร์มินัล 3 — Frontend
@@ -70,7 +117,49 @@ npm install
 npm run dev                     # เปิด http://localhost:5173
 ```
 
-Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 4000) ให้อัตโนมัติ
+Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 4000) ให้อัตโนมัติ ([vite.config.js](apps/web/vite.config.js))
+
+**บัญชีตัวอย่างหลัง `npm run seed`** (รหัสผ่านทุกบัญชี: `password123`):
+
+| Email | Role |
+|-------|------|
+| admin@example.com | ADMIN |
+| itstaff@example.com | IT_STAFF |
+| employee@example.com | EMPLOYEE |
+
+### คำสั่งที่ใช้บ่อย (apps/api)
+
+| คำสั่ง | ทำอะไร |
+|--------|--------|
+| `npm run dev` | รัน backend แบบ auto-reload |
+| `npm run migrate:dev` | สร้าง migration ใหม่จาก schema.prisma ที่แก้ไข + apply ทันที (dev เท่านั้น) |
+| `npm run migrate` | apply migration ที่มีอยู่แล้ว (ใช้ตอน deploy/production) |
+| `npm run seed` | ใส่ข้อมูลตัวอย่าง (idempotent — รันซ้ำได้ไม่สร้างข้อมูลซ้ำ) |
+| `npm run generate` | สร้าง Prisma Client ใหม่ (จำเป็นหลัง `npm install` บนเครื่องใหม่) |
+
+---
+
+## ⚙️ Environment Variables
+
+กำหนดใน `apps/api/.env` (คัดลอกจาก [.env.example](.env.example)):
+
+| ตัวแปร | ความหมาย | ค่าตัวอย่าง |
+|--------|----------|-------------|
+| `DATABASE_URL` | connection string ของ PostgreSQL | `postgresql://postgres:postgres@localhost:5432/appdb?schema=public` |
+| `JWT_SECRET` | กุญแจเซ็น/ตรวจสอบ JWT — **ห้ามใช้ค่าตัวอย่างในระบบจริง** สร้างด้วย `openssl rand -hex 32` | `change-me-to-a-long-random-string` |
+| `PORT` | พอร์ตที่ backend จะรัน | `4000` |
+
+Frontend ไม่ต้องตั้งค่า environment variable ใด ๆ ตอน dev (Vite proxy `/api` ให้อัตโนมัติ) ส่วนตอน build
+ขึ้น production ตัวแปร `API_UPSTREAM` ใน `docker-compose.yml` บอก nginx ว่าจะ proxy `/api` ไปที่ service ไหน
+
+---
+
+## 🌿 Git Workflow
+
+- Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.1.0` ... `v0.6.0`, ปัจจุบัน `v0.6.1-rc1`)
+- ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
+- ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -114,23 +203,39 @@ cd deploy
 
 ---
 
-## 🗺️ ระบบทำงานยังไง (ภาพรวม)
+## 📸 Screenshots
 
-```
-ผู้ใช้ (เบราว์เซอร์)
-      │  http://...elb.amazonaws.com
-      ▼
-┌─────────────────────┐
-│  ALB (Load Balancer)│   แยกเส้นทาง:
-└─────────────────────┘   /api/* → API,  อื่น ๆ → Web
-      │                        │
-      ▼                        ▼
-┌──────────┐            ┌──────────┐        ┌──────────────┐
-│  Web     │            │  API     │ ─────► │ RDS Postgres │
-│ (React)  │            │(Express) │        │  (ฐานข้อมูล)  │
-└──────────┘            └──────────┘        └──────────────┘
-   ทั้งสองรันเป็น container บน ECS Fargate
-```
+> _ยังไม่มีภาพหน้าจอในเอกสารชุดนี้ — เพิ่มได้โดยวางไฟล์ภาพไว้ที่ `docs/screenshots/` แล้วอ้างอิงที่นี่_
+
+- Dashboard — การ์ดสรุป + กราฟภาพรวม
+- Asset Explorer — ค้นหา/กรอง/เลือกคอลัมน์
+- Asset Assignment — มอบหมาย/รับคืนครุภัณฑ์
+
+---
+
+## ⚠️ Known Limitations
+
+- **JWT ไม่ revoke ได้ทันที** — ถ้าเปลี่ยน role ผู้ใช้ที่ล็อกอินค้างอยู่ token เดิมยังพก role เก่าไปจนกว่าจะหมดอายุ
+  (ต้อง logout/login ใหม่เพื่อรับ role ใหม่ทันที)
+- **ยังไม่มี endpoint จัดการผู้ใช้เต็มรูปแบบ** — สร้าง/แก้ไข/ลบ/เปลี่ยน role ผู้ใช้อื่นทำผ่าน UI ไม่ได้เลยในตอนนี้
+  (ตั้งใจเว้นไว้ กันการยกระดับสิทธิ์ตัวเองผ่านช่องโหว่ endpoint ที่ยังออกแบบไม่รอบคอบ)
+- **ไม่มี endpoint ลบประวัติการมอบหมาย** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติต้องอยู่ครบเสมอ) ไม่ใช่ข้อจำกัดทางเทคนิค
+- **Master data ที่ถูกลบยังผูกกับ asset เก่าได้** — ตั้งใจให้ asset เก่าที่อ้างอิง category/location ที่ถูกลบไปแล้ว
+  ยังแสดงชื่อได้ถูกต้อง แต่หมายความว่าการลบ master data ไม่ cascade ไปเช็ก asset ที่ใช้อยู่
+- **ไม่มี automated test suite** — การตรวจสอบคุณภาพทั้งหมดในตอนนี้เป็น manual regression testing
+- **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
+  (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Milestone 7: จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
+- [ ] Automated test suite (unit + integration) สำหรับ backend routes
+- [ ] Export รายการครุภัณฑ์/รายงานเป็น CSV/Excel
+- [ ] แจ้งเตือนล่วงหน้าเมื่อใกล้หมดประกัน (email/notification)
+- [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที
+- [ ] router library (เช่น react-router-dom) เมื่อแอปโตขึ้นจนต้องการ deep-link
 
 ---
 
@@ -138,7 +243,8 @@ cd deploy
 
 - **รหัสผ่านไม่เคยถูกเก็บตรง ๆ** — เก็บเป็น hash ด้วย bcrypt ([auth.js](apps/api/src/routes/auth.js))
 - **JWT** คือ "บัตรผ่าน" ที่เซิร์ฟเวอร์เซ็นให้ตอนล็อกอิน ฝั่งหน้าเว็บเก็บไว้แล้วแนบไปทุก request ([auth.js](apps/api/src/middleware/auth.js))
-- **CRUD ทุกอันเช็กเจ้าของเสมอ** — ผู้ใช้เห็น/แก้ได้เฉพาะข้อมูลตัวเอง ([assets.js](apps/api/src/routes/assets.js))
+- **RBAC บังคับที่ backend เสมอ ไม่ใช่แค่ซ่อนปุ่มฝั่งหน้าเว็บ** ([assets.js](apps/api/src/routes/assets.js))
+- **Soft delete** — ปุ่ม "ลบ" ทุกที่ตั้งค่า `deletedAt` แทนการลบแถวจริง ข้อมูลยังอยู่ในฐานข้อมูลเสมอ
 - **Health check** (`/health`) มีไว้ให้ AWS เช็กว่าเซิร์ฟเวอร์ยังมีชีวิต ([index.js](apps/api/src/index.js))
 - **Migration** = ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล รันอัตโนมัติตอน container สตาร์ท
 
@@ -157,4 +263,4 @@ cd deploy
 
 ## 📄 License
 
-MIT — ใช้ ต่อยอด แจกจ่าย ได้อิสระ ขอให้สนุกกับการเริ่มต้นพัฒนาระบบ 🎉
+MIT — ใช้ ต่อยอด แจกจ่าย ได้อิสระ

@@ -27,11 +27,11 @@ export default function Login({ onAuthed, goRegister }) {
       <div className="card">
         <h1>เข้าสู่ระบบ</h1>
         <form onSubmit={submit}>
-          <label>อีเมล</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="login-email">อีเมล</label>
+          <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
-          <label>รหัสผ่าน</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label htmlFor="login-password">รหัสผ่าน</label>
+          <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
           {error && <p className="error">{error}</p>}
 

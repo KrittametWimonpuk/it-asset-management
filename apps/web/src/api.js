@@ -76,9 +76,12 @@ export const api = {
   vendors: createEntityApi('/vendors'),
 
   // Milestone 5: มอบหมาย/รับคืนครุภัณฑ์ — params รองรับ: page, pageSize, sortBy, sortOrder, search, status, assetId, userId
-  // (ใช้ createEntityApi เหมือนเดิม แม้ backend จะไม่มี DELETE ก็ตาม — .remove ไม่ถูกเรียกใช้ที่ไหนเลย)
+  // (เขียนเองแทน createEntityApi เพราะ backend ไม่มี DELETE /assignments/:id — ประวัติการมอบหมายห้ามลบ)
   assignments: {
-    ...createEntityApi('/assignments'),
+    list: (params) => request(`/assignments${toQueryString(params)}`),
+    get: (id) => request(`/assignments/${id}`),
+    add: (body) => request('/assignments', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id, body) => request(`/assignments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     return: (id, body) => request(`/assignments/${id}/return`, { method: 'POST', body: JSON.stringify(body) }),
   },
 

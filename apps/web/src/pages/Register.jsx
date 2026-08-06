@@ -28,14 +28,14 @@ export default function Register({ onAuthed, goLogin }) {
       <div className="card">
         <h1>สมัครสมาชิก</h1>
         <form onSubmit={submit}>
-          <label>ชื่อ</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+          <label htmlFor="register-name">ชื่อ</label>
+          <input id="register-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
 
-          <label>อีเมล</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="register-email">อีเมล</label>
+          <input id="register-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
-          <label>รหัสผ่าน (อย่างน้อย 6 ตัว)</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label htmlFor="register-password">รหัสผ่าน (อย่างน้อย 6 ตัว)</label>
+          <input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
           {error && <p className="error">{error}</p>}
 

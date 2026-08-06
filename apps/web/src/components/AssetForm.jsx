@@ -6,7 +6,6 @@
 // (หมวดหมู่บังคับเลือก ที่เหลือเลือกหรือไม่ก็ได้)
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
-import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
 
 export const STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'พร้อมใช้งาน' },
@@ -98,7 +97,9 @@ function toDateInputValue(value) {
   return String(value).slice(0, 10)
 }
 
-export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaster }) {
+// options/optionsError — ตัวเลือก dropdown master data มาจาก Assets.jsx (useMasterDataOptions โหลดครั้งเดียวที่นั่น
+// แล้วส่งต่อลงมา) กันไม่ให้เปิดฟอร์มแล้วยิง request master data ซ้ำ 4 ตัวทั้งที่หน้ารายการมีข้อมูลอยู่แล้ว
+export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaster, options, optionsError }) {
   const isEdit = Boolean(asset)
   const [form, setForm] = useState(() => {
     if (!asset) return emptyForm
@@ -112,9 +113,6 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
   const [fieldErrors, setFieldErrors] = useState({})  // error รายฟิลด์ เช่น { assetTag: '...' }
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
-
-  // ตัวเลือก dropdown ของแต่ละ master data — โหลดจาก API ตอนเปิดฟอร์ม (เอาเฉพาะที่ isActive)
-  const { options, error: optionsError } = useMasterDataOptions()
 
   // auto-focus ช่องแรกทันทีที่เปิดฟอร์ม ให้พิมพ์ต่อได้เลยโดยไม่ต้องคลิก
   useEffect(() => {

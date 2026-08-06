@@ -304,6 +304,15 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
 
 // ---- DELETE (soft): ตั้งค่า deletedAt แทนการลบแถวจริง ----
 router.delete('/:id', manageAssets, asyncHandler(async (req, res) => {
+  // soft delete เป็นแค่ UPDATE ไม่ใช่ DELETE จริง — onDelete: Restrict ของ Assignment.assetId ใน schema
+  // จึงไม่ถูกกระตุ้นเลย ต้องเช็กเองตรงนี้ กันไม่ให้ asset ที่ยังมีผู้ถือครองอยู่หายไปจากรายการทั้งที่ assignment ยัง active
+  const activeAssignment = await prisma.assignment.findFirst({
+    where: { assetId: req.params.id, ...ACTIVE_ASSIGNMENT_WHERE },
+  })
+  if (activeAssignment) {
+    return fail(res, 409, 'ครุภัณฑ์นี้ยังมีผู้ถือครองอยู่ กรุณารับคืนก่อนลบ')
+  }
+
   const result = await prisma.asset.updateMany({
     where: { id: req.params.id, ...NOT_DELETED },
     data: { deletedAt: new Date() },
