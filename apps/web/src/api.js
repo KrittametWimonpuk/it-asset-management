@@ -94,4 +94,17 @@ export const api = {
   dashboard: {
     get: () => request('/dashboard'),
   },
+
+  // Milestone 7: ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ — params รองรับ: page, pageSize, sortBy, sortOrder, search,
+  // priority, status, category, assignedToId, reportedById, assetId
+  // (เขียนเองแทน createEntityApi เพราะ backend ไม่มี DELETE /tickets/:id — ประวัติใบแจ้งซ่อมห้ามลบ
+  // เหมือนแพทเทิร์นเดียวกับ assignments ด้านบน)
+  tickets: {
+    list: (params) => request(`/tickets${toQueryString(params)}`),
+    get: (id) => request(`/tickets/${id}`),
+    add: (body) => request('/tickets', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id, body) => request(`/tickets/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    resolve: (id, body) => request(`/tickets/${id}/resolve`, { method: 'POST', body: JSON.stringify(body) }),
+    close: (id, body) => request(`/tickets/${id}/close`, { method: 'POST', body: JSON.stringify(body) }),
+  },
 }

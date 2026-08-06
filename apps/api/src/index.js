@@ -13,6 +13,7 @@ import vendorRoutes from './routes/vendors.js'
 import userRoutes from './routes/users.js'
 import assignmentRoutes from './routes/assignments.js'
 import dashboardRoutes from './routes/dashboard.js'
+import ticketRoutes from './routes/tickets.js'
 import { fail } from './utils/response.js'
 
 const app = express()
@@ -37,6 +38,7 @@ app.use('/api/vendors', vendorRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/assignments', assignmentRoutes)
 app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/tickets', ticketRoutes)
 
 // ---- ดักกรณีเรียก path ที่ไม่มี ----
 app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))

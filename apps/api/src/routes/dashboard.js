@@ -21,6 +21,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
 import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
+import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -43,6 +44,28 @@ const ASSIGNMENT_STATUS_LABELS = {
   LOST: 'สูญหาย',
   DAMAGED: 'เสียหาย',
 }
+// Milestone 7 — ให้ตรงกับ TicketForm.jsx (STATUS/PRIORITY/CATEGORY_OPTIONS) เหมือนแพทเทิร์นเดียวกับด้านบน
+const TICKET_STATUS_LABELS = {
+  OPEN: 'เปิดใหม่',
+  IN_PROGRESS: 'กำลังดำเนินการ',
+  ON_HOLD: 'พักงาน',
+  RESOLVED: 'แก้ไขสำเร็จ',
+  CLOSED: 'ปิดงานแล้ว',
+}
+const TICKET_PRIORITY_LABELS = {
+  LOW: 'ต่ำ',
+  MEDIUM: 'ปานกลาง',
+  HIGH: 'สูง',
+  CRITICAL: 'วิกฤต',
+}
+const TICKET_CATEGORY_LABELS = {
+  HARDWARE: 'ฮาร์ดแวร์',
+  SOFTWARE: 'ซอฟต์แวร์',
+  NETWORK: 'เครือข่าย',
+  PRINTER: 'เครื่องพิมพ์',
+  ACCOUNT: 'บัญชีผู้ใช้',
+  OTHER: 'อื่น ๆ',
+}
 const NOT_SET_LABEL = 'ไม่ระบุ'
 
 function round1(n) {
@@ -64,6 +87,34 @@ function countByStatus(groups, statuses) {
 
 function toIdNameMap(rows) {
   return Object.fromEntries(rows.map((r) => [r.id, r.name]))
+}
+
+// เหมือน countByStatus แต่ใช้ได้กับ groupBy field ไหนก็ได้ (priority/category) ไม่ใช่แค่ status
+// (เขียนแยกจาก countByStatus เดิมเพื่อไม่แตะโค้ดที่ผ่านการทดสอบแล้วจาก Milestone 6)
+function countByGroupField(groups, values, field) {
+  const counts = {}
+  for (const v of values) counts[v] = 0
+  for (const g of groups) counts[g[field]] = g._count
+  return counts
+}
+
+// ขอบเขต "วันนี้" ตามเวลาเซิร์ฟเวอร์ — ใช้กับ resolvedToday/closedToday (Milestone 7)
+function todayRange(now) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return { gte: start, lt: end }
+}
+
+// select fields ของ ticket ที่ใช้แสดงใน "Recent Tickets" — ใช้ร่วมกันทั้ง org-wide และ employee branch
+const RECENT_TICKET_SELECT = {
+  id: true,
+  ticketNumber: true,
+  title: true,
+  status: true,
+  priority: true,
+  openedAt: true,
+  asset: { select: { assetTag: true, name: true } },
+  reportedBy: { select: { name: true, email: true } },
 }
 
 // รวม assets/assignments ล่าสุด 3 ชนิด (มอบหมายใหม่ / รับคืน / เพิ่ม asset ใหม่) เรียงใหม่สุดก่อน จำกัด N รายการ
@@ -115,6 +166,12 @@ async function buildOrgWideDashboard() {
     recentAssignments,
     recentReturns,
     recentNewAssets,
+    ticketStatusGroups,
+    ticketPriorityGroups,
+    ticketCategoryGroups,
+    resolvedToday,
+    closedToday,
+    recentTickets,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -163,6 +220,18 @@ async function buildOrgWideDashboard() {
       take: RECENT_ACTIVITIES_LIMIT,
       select: { assetTag: true, name: true, createdAt: true },
     }),
+    // Milestone 7 — สถิติใบแจ้งซ่อม: นับแยกตามสถานะ/ระดับความสำคัญ/หมวดหมู่ ในคำสั่งเดียวต่อชนิด (ไม่มี N+1)
+    prisma.ticket.groupBy({ by: ['status'], where: notDeleted, _count: true }),
+    prisma.ticket.groupBy({ by: ['priority'], where: notDeleted, _count: true }),
+    prisma.ticket.groupBy({ by: ['category'], where: notDeleted, _count: true }),
+    prisma.ticket.count({ where: { ...notDeleted, resolvedAt: todayRange(now) } }),
+    prisma.ticket.count({ where: { ...notDeleted, closedAt: todayRange(now) } }),
+    prisma.ticket.findMany({
+      where: notDeleted,
+      orderBy: { openedAt: 'desc' },
+      take: RECENT_ACTIVITIES_LIMIT,
+      select: RECENT_TICKET_SELECT,
+    }),
   ])
 
   const assetStatusCounts = countByStatus(assetStatusGroups, ASSET_STATUSES)
@@ -184,6 +253,15 @@ async function buildOrgWideDashboard() {
   }
   const topAssignedCategories = Object.entries(activeAssignmentsPerCategory)
     .map(([categoryId, value]) => ({ label: categoryNameById[categoryId] || NOT_SET_LABEL, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, TOP_LIST_LIMIT)
+
+  // Milestone 7 — สรุปสถิติใบแจ้งซ่อม
+  const ticketStatusCounts = countByGroupField(ticketStatusGroups, TICKET_STATUSES, 'status')
+  const ticketPriorityCounts = countByGroupField(ticketPriorityGroups, TICKET_PRIORITIES, 'priority')
+  const ticketCategoryCounts = countByGroupField(ticketCategoryGroups, TICKET_CATEGORIES, 'category')
+  const topTicketCategories = TICKET_CATEGORIES
+    .map((c) => ({ label: TICKET_CATEGORY_LABELS[c], value: ticketCategoryCounts[c] }))
     .sort((a, b) => b.value - a.value)
     .slice(0, TOP_LIST_LIMIT)
 
@@ -222,6 +300,14 @@ async function buildOrgWideDashboard() {
       expiringSoon: warrantyExpiringSoon,
       normal: normalWarranty,
     },
+    // Milestone 7 — การ์ดสรุปใบแจ้งซ่อม (แยกจาก charts.ticketsByStatus ที่มีครบทุกสถานะ — ตรงนี้เอาแค่ 2 ค่าที่
+    // ใช้เป็นการ์ดสรุปหน้าแดชบอร์ดโดยตรง ตามที่ spec ระบุ: Open Tickets, In Progress, Resolved Today, Closed Today)
+    tickets: {
+      open: ticketStatusCounts.OPEN,
+      inProgress: ticketStatusCounts.IN_PROGRESS,
+      resolvedToday,
+      closedToday,
+    },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
         label: categoryNameById[g.categoryId] || NOT_SET_LABEL,
@@ -247,8 +333,13 @@ async function buildOrgWideDashboard() {
       ],
       topVendors: topVendorGroups.map((g) => ({ label: vendorNameById[g.vendorId] || NOT_SET_LABEL, value: g._count })),
       topAssignedCategories,
+      // Milestone 7
+      ticketsByPriority: TICKET_PRIORITIES.map((p) => ({ label: TICKET_PRIORITY_LABELS[p], value: ticketPriorityCounts[p] })),
+      ticketsByStatus: TICKET_STATUSES.map((s) => ({ label: TICKET_STATUS_LABELS[s], value: ticketStatusCounts[s] })),
+      topTicketCategories,
     },
     recentActivities: mergeRecentActivities(recentAssignments, recentReturns, recentNewAssets, RECENT_ACTIVITIES_LIMIT),
+    recentTickets, // Milestone 7 — รายการล่าสุดของใบแจ้งซ่อม แยกจาก recentActivities (คนละความหมาย)
   }
 }
 
@@ -257,7 +348,15 @@ async function buildEmployeeDashboard(userId) {
   const now = new Date()
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
 
-  const [activeAssignments, assignmentStatusGroups, recentOwn] = await Promise.all([
+  const [
+    activeAssignments,
+    assignmentStatusGroups,
+    recentOwn,
+    ticketStatusGroups,
+    resolvedToday,
+    closedToday,
+    recentTickets,
+  ] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId, ...ACTIVE_ASSIGNMENT_WHERE },
       include: { asset: { select: { warrantyExpiry: true } } },
@@ -268,6 +367,16 @@ async function buildEmployeeDashboard(userId) {
       orderBy: { assignedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
       include: { asset: { select: { assetTag: true, name: true } } },
+    }),
+    // Milestone 7 — สถิติใบแจ้งซ่อมเฉพาะที่ตัวเองเป็นผู้แจ้ง (EMPLOYEE ไม่เห็นภาพรวมทั้งองค์กร)
+    prisma.ticket.groupBy({ by: ['status'], where: { reportedById: userId, deletedAt: null }, _count: true }),
+    prisma.ticket.count({ where: { reportedById: userId, deletedAt: null, resolvedAt: todayRange(now) } }),
+    prisma.ticket.count({ where: { reportedById: userId, deletedAt: null, closedAt: todayRange(now) } }),
+    prisma.ticket.findMany({
+      where: { reportedById: userId, deletedAt: null },
+      orderBy: { openedAt: 'desc' },
+      take: RECENT_ACTIVITIES_LIMIT,
+      select: RECENT_TICKET_SELECT,
     }),
   ])
 
@@ -286,6 +395,7 @@ async function buildEmployeeDashboard(userId) {
 
   const assignmentStatusCounts = countByStatus(assignmentStatusGroups, ASSIGNMENT_STATUSES)
   const totalAssignedAssets = activeAssignments.length
+  const ticketStatusCounts = countByGroupField(ticketStatusGroups, TICKET_STATUSES, 'status')
 
   return {
     summary: {
@@ -311,6 +421,14 @@ async function buildEmployeeDashboard(userId) {
       damaged: assignmentStatusCounts.DAMAGED,
     },
     warranty: { expired, expiringSoon, normal },
+    // Milestone 7 — สถิติส่วนตัว (ตั๋วที่ตัวเองแจ้ง) ยังเป็นตัวเลขจริง เหมือน `assignments` ด้านบน
+    // ต่างจาก charts.ticketsByStatus/topTicketCategories ด้านล่างที่เป็นภาพรวมองค์กร จึงว่างไว้
+    tickets: {
+      open: ticketStatusCounts.OPEN,
+      inProgress: ticketStatusCounts.IN_PROGRESS,
+      resolvedToday,
+      closedToday,
+    },
     charts: {
       assetsByCategory: [],
       assetsByDepartment: [],
@@ -320,6 +438,9 @@ async function buildEmployeeDashboard(userId) {
       warrantyStatus: [],
       topVendors: [],
       topAssignedCategories: [],
+      ticketsByPriority: [],
+      ticketsByStatus: [],
+      topTicketCategories: [],
     },
     recentActivities: recentOwn
       .map((a) => ({
@@ -331,6 +452,7 @@ async function buildEmployeeDashboard(userId) {
       }))
       .sort((x, y) => new Date(y.at) - new Date(x.at))
       .slice(0, RECENT_ACTIVITIES_LIMIT),
+    recentTickets, // Milestone 7 — ตั๋วล่าสุดที่ตัวเองแจ้ง (ไม่ใช่ภาพรวมองค์กร)
   }
 }
 

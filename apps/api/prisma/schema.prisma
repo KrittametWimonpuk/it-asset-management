@@ -26,6 +26,10 @@ model User {
   // Milestone 5: ประวัติการมอบหมายครุภัณฑ์ — แยก 2 ความสัมพันธ์เพราะ Assignment ชี้มาที่ User สองทาง
   assignmentsHeld    Assignment[] @relation("AssignmentHolder") // รายการที่ตัวเองเป็นผู้ถือครอง (ทั้งอดีต+ปัจจุบัน)
   assignmentsCreated Assignment[] @relation("AssignmentAssignedBy") // รายการที่ตัวเองเป็นคนมอบหมายให้คนอื่น
+
+  // Milestone 7: ใบแจ้งซ่อม/ปัญหา — แยก 2 ความสัมพันธ์เพราะ Ticket ชี้มาที่ User สองทางเช่นกัน
+  ticketsReported Ticket[] @relation("TicketReportedBy") // ตั๋วที่ตัวเองเป็นผู้แจ้ง
+  ticketsAssigned Ticket[] @relation("TicketAssignedTo") // ตั๋วที่ตัวเองถูกมอบหมายให้ดูแล (เฉพาะ ADMIN/IT_STAFF)
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -134,6 +138,7 @@ model Asset {
   ownerId     String
   owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   assignments Assignment[] // Milestone 5: ประวัติการมอบหมายทั้งหมด (ปัจจุบัน + อดีต) ของ asset นี้
+  tickets     Ticket[] // Milestone 7: ใบแจ้งซ่อม/ปัญหาทั้งหมด (ปัจจุบัน + ประวัติ) ของ asset นี้
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
   deletedAt   DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
@@ -241,4 +246,80 @@ model Assignment {
   @@index([userId])
   @@index([assignedById])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 7 — Helpdesk & Maintenance
+//
+// Ticket คือใบแจ้งปัญหา/ซ่อมบำรุงของครุภัณฑ์หนึ่งชิ้น หนึ่งแถว = ปัญหาหนึ่งเรื่อง ห้ามลบประวัติ
+// (เหมือนแพทเทิร์น Assignment — ดู deletedAt ด้านล่าง)
+//
+// วงจรชีวิต (บังคับจริงที่ backend ดู utils/ticketHelpers.js: TRANSITIONS):
+//   OPEN -> IN_PROGRESS -> RESOLVED -> CLOSED
+//   IN_PROGRESS <-> ON_HOLD (พักงานระหว่างทาง แล้วกลับมาทำต่อได้)
+// RESOLVED ตั้งได้ทางเดียวคือผ่าน endpoint POST /:id/resolve (ต้องมาจาก IN_PROGRESS เท่านั้น)
+// CLOSED ตั้งได้ทางเดียวคือผ่าน endpoint POST /:id/close (ต้องมาจาก RESOLVED เท่านั้น)
+// PUT ทั่วไปแก้ได้แค่ OPEN/IN_PROGRESS/ON_HOLD เท่านั้น — ปิดโอกาสข้ามขั้นตอนผ่าน field ตรง ๆ
+// ---------------------------------------------------------------------------
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN // เพิ่งแจ้งเข้ามา ยังไม่มีใครรับเรื่อง
+  IN_PROGRESS // มีผู้ดูแลรับเรื่องแล้ว กำลังแก้ไข
+  ON_HOLD // พักงานชั่วคราว (เช่น รอชิ้นส่วน/รออนุมัติ)
+  RESOLVED // แก้ไขเสร็จแล้ว รอปิดงาน
+  CLOSED // ปิดงานสมบูรณ์ (สถานะสุดท้าย แก้ไขต่อไม่ได้)
+}
+
+enum TicketCategory {
+  HARDWARE
+  SOFTWARE
+  NETWORK
+  PRINTER
+  ACCOUNT
+  OTHER
+}
+
+model Ticket {
+  id           String @id @default(uuid())
+  ticketNumber String @unique // รูปแบบ HD-000001 — สร้างอัตโนมัติจาก DB sequence กันเลขซ้ำเสมอแม้ request พร้อมกัน (ดู utils/ticketHelpers.js)
+
+  title       String
+  description String
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  reportedById String // ผู้แจ้งปัญหา — ตั้งจาก req.user.id เสมอ ไม่รับจาก client (กันแอบอ้างเป็นคนอื่น)
+  reportedBy   User   @relation("TicketReportedBy", fields: [reportedById], references: [id], onDelete: Restrict)
+
+  assignedToId String? // ผู้ดูแล — เฉพาะ ADMIN/IT_STAFF เท่านั้น (บังคับที่ backend) ว่างได้ตอนยังไม่มีใครรับเรื่อง
+  assignedTo   User?   @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  priority TicketPriority @default(MEDIUM)
+  status   TicketStatus   @default(OPEN)
+  category TicketCategory
+
+  resolution String? // สรุปวิธีแก้ไข — บังคับกรอกตอนเรียก /resolve เท่านั้น
+
+  openedAt   DateTime  @default(now())
+  resolvedAt DateTime? // ไม่เป็น null แปลว่าผ่านขั้นตอน /resolve มาแล้ว
+  closedAt   DateTime? // ไม่เป็น null แปลว่าผ่านขั้นตอน /close มาแล้ว (ปิดงานสมบูรณ์)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete (เผื่อไว้ใช้ในอนาคต — ยังไม่มี endpoint ลบใน milestone นี้ เหมือน Assignment.deletedAt)
+
+  // query หลักของ list/get/dashboard กรองด้วยฟิลด์เหล่านี้เสมอ — index ช่วยให้ query เร็วขึ้น
+  @@index([assetId, deletedAt])
+  @@index([reportedById])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
 }

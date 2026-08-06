@@ -5,6 +5,48 @@
 
 ---
 
+## [v0.7.0] — Milestone 7: Helpdesk & Maintenance
+
+### Added
+- โมเดล `Ticket` — ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ หนึ่งแถวต่อหนึ่งปัญหา ห้ามลบ (เหมือนแพทเทิร์น `Assignment`)
+  พร้อม enum `TicketPriority` (LOW/MEDIUM/HIGH/CRITICAL), `TicketStatus`
+  (OPEN/IN_PROGRESS/ON_HOLD/RESOLVED/CLOSED), `TicketCategory`
+  (HARDWARE/SOFTWARE/NETWORK/PRINTER/ACCOUNT/OTHER)
+- เลขที่ใบแจ้งซ่อมอัตโนมัติ (`HD-000001`, `HD-000002`, ...) สร้างจาก PostgreSQL sequence — atomic ในตัว
+  กันเลขซ้ำแม้มี request สร้างตั๋วพร้อมกันหลายตัว (migration `0007_tickets`)
+- `routes/tickets.js` — `GET /api/tickets` (list), `GET /api/tickets/:id`, `POST /api/tickets` (แจ้งใหม่ —
+  ทุก role รวม EMPLOYEE), `PUT /api/tickets/:id` (แก้ไข/มอบหมาย — ADMIN/IT_STAFF), `POST /api/tickets/:id/resolve`,
+  `POST /api/tickets/:id/close`
+- Workflow state machine บังคับจริงที่ backend (`utils/ticketHelpers.js`): `OPEN → IN_PROGRESS → RESOLVED →
+  CLOSED` พร้อม `IN_PROGRESS ↔ ON_HOLD` — ปฏิเสธ transition ที่ไม่ถูกต้องด้วย `400` เสมอ
+- ผสาน Ticket เข้ากับ Asset — `GET /api/assets` แนบ `openTicketsCount`, `closedTicketsCount`,
+  `ticketHistoryCount`, `recentTickets` มาด้วยเสมอ (ไม่ยิง query แยกต่อ asset)
+- ขยาย `GET /api/dashboard` (ไม่สร้าง endpointใหม่): เพิ่ม section `tickets` (open/inProgress/resolvedToday/
+  closedToday), กราฟ `ticketsByPriority`/`ticketsByStatus`/`topTicketCategories`, และ `recentTickets`
+  — ทั้ง org-wide (ADMIN/IT_STAFF) และ scoped เฉพาะตั๋วของตัวเอง (EMPLOYEE)
+- หน้า Helpdesk ฝั่ง frontend (`Tickets.jsx`) — ค้นหา/กรอง (ความสำคัญ/สถานะ/หมวดหมู่/ผู้ดูแล/ผู้แจ้ง/ครุภัณฑ์)/
+  แบ่งหน้า พร้อมฟอร์มแจ้งปัญหาใหม่ แก้ไข/มอบหมาย แก้ไขสำเร็จ และปิดงาน (`TicketForm`, `ResolveTicketForm`,
+  `CloseTicketForm`) — reuse โครงสร้างฟอร์ม/modal เดิมทั้งหมด
+- ปุ่ม "ดูใบแจ้งซ่อม" ในหน้าครุภัณฑ์ พาไปแท็บ Helpdesk กรองเฉพาะ asset นั้น (เหมือนแพทเทิร์น "ดูประวัติ" ของ
+  Milestone 5) และคอลัมน์เสริม (ซ่อน/แสดงได้) แสดงจำนวนใบแจ้งซ่อมที่เปิดอยู่/ทั้งหมดต่อ asset
+
+### Business Rules
+- EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่ (active assignment) เท่านั้น — กันเห็น/อ้างอิง asset ID
+  ของทั้งระบบผ่านฟอร์มแจ้งปัญหา, ดูได้เฉพาะตั๋วที่ตัวเองแจ้ง, มอบหมาย/แก้ไขสำเร็จ/ปิดงานไม่ได้
+- `assignedToId` ต้องเป็นผู้ใช้ role ADMIN/IT_STAFF เท่านั้น (ตรวจที่ backend เสมอ) — มอบหมายให้ EMPLOYEE ดูแลไม่ได้
+- ตั๋วที่ RESOLVED/CLOSED แล้วแก้ไขรายละเอียดไม่ได้อีก (เหมือนแพทเทิร์น Assignment ที่แก้ไม่ได้หลังคืนแล้ว)
+- มอบหมายผู้ดูแลครั้งแรกให้ตั๋วที่ยัง OPEN จะขยับสถานะเป็น IN_PROGRESS ให้อัตโนมัติ
+
+### Seed
+- เพิ่มครุภัณฑ์ตัวอย่าง 2 ชิ้น (เครื่องพิมพ์ HP LaserJet, Network Switch) และตั๋วตัวอย่างครบทั้ง 5 สถานะ:
+  Dell Latitude จอฟ้า (IN_PROGRESS), เครื่องพิมพ์กระดาษติด (RESOLVED), Network Switch packet loss (CLOSED),
+  Lenovo ติดตั้งโปรแกรมไม่ได้ (OPEN), iPhone ล็อกอินอีเมลไม่ได้ (ON_HOLD)
+
+### Not Implemented (ตั้งใจเว้นไว้ ตามขอบเขต Milestone 7)
+- แจ้งเตือนอีเมล, QR Code, รายงาน/ส่งออกข้อมูล, Audit Log — ดู Roadmap ใน README
+
+---
+
 ## [v0.6.1-rc1] — Release Candidate 1 (ก่อน Milestone 7)
 
 Release Candidate — ไม่ใช่ milestone ฟีเจอร์ใหม่ เป็นรอบตรวจสอบคุณภาพ/ความสม่ำเสมอ/เสถียรภาพก่อนเดินหน้า

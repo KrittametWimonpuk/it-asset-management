@@ -160,6 +160,19 @@ th.sortable:hover { color: #1f2933; }
 .badge-return { background: #dcfce7; color: #15803d; }
 .badge-new-asset { background: #ede9fe; color: #6d28d9; }
 
+/* ---- badge สถานะใบแจ้งซ่อม (Milestone 7) ---- */
+.badge-ticket-open { background: #dbeafe; color: #1d4ed8; }
+.badge-ticket-in_progress { background: #fef3c7; color: #b45309; }
+.badge-ticket-on_hold { background: #f3f4f6; color: #6b7280; }
+.badge-ticket-resolved { background: #dcfce7; color: #15803d; }
+.badge-ticket-closed { background: #e5e7eb; color: #374151; }
+
+/* ---- badge ระดับความสำคัญใบแจ้งซ่อม (Milestone 7) ---- */
+.badge-priority-low { background: #f3f4f6; color: #6b7280; }
+.badge-priority-medium { background: #dbeafe; color: #1d4ed8; }
+.badge-priority-high { background: #fef3c7; color: #b45309; }
+.badge-priority-critical { background: #fee2e2; color: #b91c1c; }
+
 /* ---- overlay + modal สำหรับฟอร์ม/ยืนยันการลบ ---- */
 .overlay {
   position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);

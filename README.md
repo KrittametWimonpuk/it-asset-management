@@ -1,11 +1,12 @@
 # 🚀 ระบบจัดการครุภัณฑ์ IT (IT Asset Management)
 
 เว็บแอประบบจัดการครุภัณฑ์ IT แบบครบวงจร — ตั้งแต่ทะเบียนครุภัณฑ์, สิทธิ์การใช้งานตาม role,
-การมอบหมาย/รับคืนครุภัณฑ์, ไปจนถึงแดชบอร์ดสรุปภาพรวม พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
+การมอบหมาย/รับคืนครุภัณฑ์, แดชบอร์ดสรุปภาพรวม, ไปจนถึงระบบ Helpdesk แจ้งซ่อม/ปัญหาครุภัณฑ์
+พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.6.1-rc1` (Release Candidate — ก่อน Milestone 7)
+**เวอร์ชันปัจจุบัน:** `v0.7.0` (Milestone 7 — Helpdesk & Maintenance)
 
 ---
 
@@ -19,7 +20,8 @@
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
 | **Asset Assignment & Lifecycle** | มอบหมาย/รับคืนครุภัณฑ์ พร้อมประวัติเต็มรูปแบบ (ห้ามแก้/ลบประวัติเก่า), "ผู้ถือครองปัจจุบัน" คำนวณจากประวัติเสมอ ไม่ใช่ field ที่แก้ตรง ๆ ได้ |
-| **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม), กิจกรรมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
+| **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
+| **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
 
@@ -41,7 +43,7 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0006_assignments`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0007_tickets`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -49,6 +51,24 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
 - **RBAC ที่ backend เสมอ**: ทุก query ที่ scope ตาม role (เช่น EMPLOYEE เห็นเฉพาะของตัวเอง) กรองใน
   Prisma `where` โดยตรง ไม่ใช่กรองที่ frontend แล้วซ่อน UI — frontend ซ่อนปุ่ม/แท็บเป็นแค่ UX เสริม
   ไม่ใช่ชั้นความปลอดภัยจริง
+- **Ticket lifecycle (Milestone 7)**: วงจรสถานะบังคับจริงที่ backend ([ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
+  `TICKET_TRANSITIONS`) ไม่ใช่แค่ UI ซ่อนตัวเลือก — transition ที่ไม่อยู่ในตารางนี้ถูกปฏิเสธด้วย `400` เสมอ:
+
+  ```
+  OPEN ──(มอบหมายผู้ดูแล)──▶ IN_PROGRESS ──(POST /resolve)──▶ RESOLVED ──(POST /close)──▶ CLOSED
+                                  ▲   │
+                                  └───┘  (ON_HOLD — พักงานแล้วกลับมาทำต่อได้)
+  ```
+
+  - `RESOLVED`/`CLOSED` ตั้งได้ทางเดียวคือผ่าน `POST /:id/resolve` และ `POST /:id/close` เท่านั้น (ไม่ใช่ `PUT`
+    ทั่วไป) เพราะสองสถานะนี้ต้องตั้ง `resolvedAt`/`closedAt` เพิ่ม และ `resolve` ยังบังคับกรอก `resolution` ด้วย
+  - เลขที่ใบแจ้ง (`HD-000001`, ...) สร้างจาก PostgreSQL sequence ([migration 0007](apps/api/prisma/migrations/0007_tickets/migration.sql))
+    ไม่ใช่ `count()+1` — กันเลขซ้ำแม้มี request สร้างตั๋วพร้อมกันหลายตัว
+  - `assignedToId` ต้องเป็นผู้ใช้ role `ADMIN`/`IT_STAFF` เท่านั้น (ตรวจที่ backend) — มอบหมายให้ `EMPLOYEE`
+    ดูแลไม่ได้
+  - Asset ↔ Ticket: หนึ่ง asset มีได้หลายตั๋ว (1:many) — `GET /api/assets` แนบ `openTicketsCount`,
+    `closedTicketsCount`, `ticketHistoryCount`, `recentTickets` มาด้วยเสมอ (ดู [ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
+    `summarizeAssetTickets`) ให้ Asset Explorer แสดง "ประวัติการซ่อมบำรุง" โดยไม่ต้องยิง request แยก
 
 ```
 webapp-starter/
@@ -56,15 +76,15 @@ webapp-starter/
 │   ├── api/                    Backend (Express + Prisma)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
-│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0006)
-│   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย)
+│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0007)
+│   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย+ใบแจ้งซ่อม)
 │   │   └── src/
-│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/dashboard/...)
+│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/...)
 │   │       ├── middleware/     requireAuth / requireRole
-│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope)
+│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope, ticketHelpers)
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
-│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/...)
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/...)
 │           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
@@ -108,7 +128,7 @@ cd apps/api
 cp ../../.env.example .env      # แล้วแก้ค่าใน .env ถ้าต้องการ
 npm install
 npm run migrate:dev             # สร้างตารางในฐานข้อมูล
-npm run seed                    # (ไม่บังคับ) ใส่ข้อมูลตัวอย่าง 3 role + ครุภัณฑ์ + ประวัติมอบหมาย
+npm run seed                    # (ไม่บังคับ) ใส่ข้อมูลตัวอย่าง 3 role + ครุภัณฑ์ + ประวัติมอบหมาย + ใบแจ้งซ่อม
 npm run dev
 
 # เทอร์มินัล 3 — Frontend
@@ -157,7 +177,7 @@ Frontend ไม่ต้องตั้งค่า environment variable ใด 
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.1.0` ... `v0.6.0`, ปัจจุบัน `v0.6.1-rc1`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.6.1-rc1`, ปัจจุบัน `v0.7.0`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -225,15 +245,24 @@ cd deploy
 - **ไม่มี automated test suite** — การตรวจสอบคุณภาพทั้งหมดในตอนนี้เป็น manual regression testing
 - **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
+- **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
+  ไม่ใช่ข้อจำกัดทางเทคนิค
+- **Helpdesk ยังไม่มี**: แจ้งเตือนอีเมล, QR Code ติดครุภัณฑ์, รายงาน/ส่งออกข้อมูล, Audit Log — ตั้งใจเว้นไว้สำหรับ
+  milestone ถัดไปเพื่อไม่ให้ scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
+- **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
+  (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] Milestone 7: จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
+- [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด) — ตั้งใจเว้นไว้จาก Milestone 7
+- [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7
+- [ ] รายงาน/ส่งออกข้อมูลเป็น CSV/Excel (ครุภัณฑ์, ใบแจ้งซ่อม, SLA) — ตั้งใจเว้นไว้จาก Milestone 7
+- [ ] Audit Log (ใครแก้ไขอะไร เมื่อไร) — ตั้งใจเว้นไว้จาก Milestone 7
+- [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
+- [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
 - [ ] Automated test suite (unit + integration) สำหรับ backend routes
-- [ ] Export รายการครุภัณฑ์/รายงานเป็น CSV/Excel
-- [ ] แจ้งเตือนล่วงหน้าเมื่อใกล้หมดประกัน (email/notification)
 - [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที
 - [ ] router library (เช่น react-router-dom) เมื่อแอปโตขึ้นจนต้องการ deep-link
 

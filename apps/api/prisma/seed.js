@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 import bcrypt from 'bcryptjs'
 import { prisma } from '../src/db.js'
+import { nextTicketNumber } from '../src/utils/ticketHelpers.js'
 
 // upsert master data ทีละตัวโดยอิง "name" (ไม่สนตัวพิมพ์เล็ก/ใหญ่ไม่ได้ในระดับนี้ แต่ค่าที่ seed
 // ให้เขียนตรงกันทุกครั้งอยู่แล้ว จึง upsert ซ้ำได้อย่างปลอดภัยโดยไม่สร้างซ้ำ)
@@ -221,6 +222,53 @@ async function main() {
     include: { assets: true },
   })
 
+  // ---- Milestone 7: ครุภัณฑ์เพิ่มเติมสำหรับตัวอย่างใบแจ้งซ่อม (เครื่องพิมพ์/เครือข่าย ไม่มีผู้ถือครองรายบุคคล) ----
+  // แยก upsert ต่างหากจาก assets ที่ผูกกับ admin ตอนสร้างผู้ใช้ด้านบน เพราะ upsert ของ admin ใช้
+  // update: {} เมื่อมีอยู่แล้ว (รันซ้ำจะไม่สร้าง asset ใหม่ในนั้นอีก) — ฟังก์ชันนี้เช็คซ้ำเองจาก assetTag แทน
+  async function ensureAsset(assetTag, data) {
+    const existing = await prisma.asset.findFirst({ where: { assetTag } })
+    if (existing) return existing
+    return prisma.asset.create({ data: { assetTag, ownerId: admin.id, ...data } })
+  }
+
+  const printer = await ensureAsset('IT-0005', {
+    name: 'เครื่องพิมพ์ HP LaserJet Pro',
+    brand: 'HP',
+    model: 'LaserJet Pro M404dn',
+    serialNumber: 'SN-HP-LJ404-005',
+    status: 'IN_USE',
+    categoryId: categories['Printer'].id,
+    locationId: locations['Head Office'].id,
+    departmentId: departments['IT'].id,
+    vendorId: vendors['HP'].id,
+    description: 'เครื่องพิมพ์ส่วนกลางชั้น 3 ใช้งานร่วมกันทั้งแผนก',
+    assetCondition: 'FAIR',
+    purchaseDate: addDays(-800),
+    purchasePrice: 8900,
+    currency: 'THB',
+    warrantyExpiry: addDays(-100),
+    receivedDate: addDays(-795),
+  })
+
+  const networkSwitch = await ensureAsset('IT-0006', {
+    name: 'Network Switch สาขา',
+    brand: 'Cisco',
+    model: 'Catalyst 1000-24T',
+    serialNumber: 'SN-CISCO-C1000-006',
+    status: 'IN_USE',
+    categoryId: categories['Network Device'].id,
+    locationId: locations['Server Room'].id,
+    departmentId: departments['IT'].id,
+    description: 'สวิตช์หลักของสาขา เชื่อมทุกเครื่องในชั้นเข้าเครือข่ายบริษัท',
+    assetCondition: 'GOOD',
+    purchaseDate: addDays(-300),
+    purchasePrice: 15500,
+    currency: 'THB',
+    warrantyExpiry: addDays(700),
+    receivedDate: addDays(-295),
+    installedDate: addDays(-290),
+  })
+
   // ---- Milestone 5: Asset Assignment — ประวัติการมอบหมาย/รับคืนครุภัณฑ์ ----
   // idempotent: ถ้า asset นี้มีประวัติ assignment อยู่แล้ว (รันซ้ำ) ให้ข้าม ไม่สร้างซ้ำ
   async function ensureAssignment(assetId, data) {
@@ -274,9 +322,84 @@ async function main() {
     remark: 'โทรศัพท์มือถือประจำตำแหน่ง',
   })
 
+  // ---- Milestone 7: Helpdesk & Maintenance — ตัวอย่างใบแจ้งซ่อมครบทั้ง 5 สถานะ ----
+  // idempotent: เช็คจาก (assetId, title) คู่กัน — ถ้ามีตั๋วเรื่องเดียวกันของ asset นี้อยู่แล้ว (รันซ้ำ) ให้ข้าม
+  async function ensureTicket(assetId, data) {
+    const existing = await prisma.ticket.findFirst({ where: { assetId, title: data.title } })
+    if (existing) return existing
+    const ticketNumber = await nextTicketNumber()
+    return prisma.ticket.create({ data: { ticketNumber, assetId, ...data } })
+  }
+
+  // Dell Latitude -> จอฟ้าบ่อย (HARDWARE) — Admin แจ้ง (ผู้ถือครองปัจจุบัน) มอบให้ IT Staff กำลังตรวจสอบอยู่
+  await ensureTicket(assetByTag['IT-0001'].id, {
+    title: 'จอฟ้า (Blue Screen) ขึ้นบ่อยขณะใช้งาน',
+    description: 'เครื่องขึ้นจอฟ้าแล้วรีสตาร์ทเองประมาณ 2-3 ครั้งต่อวัน ช่วงหลังเปิดโปรแกรมหลายตัวพร้อมกัน',
+    reportedById: admin.id,
+    assignedToId: itStaff.id,
+    priority: 'HIGH',
+    category: 'HARDWARE',
+    status: 'IN_PROGRESS',
+    openedAt: addDays(-3),
+  })
+
+  // เครื่องพิมพ์ HP -> กระดาษติดบ่อย (PRINTER) — IT Staff พบเจอเองและแก้ไขจบแล้ว (RESOLVED รอปิดงาน)
+  await ensureTicket(printer.id, {
+    title: 'กระดาษติดบ่อย พิมพ์งานไม่ผ่าน',
+    description: 'เครื่องพิมพ์กระดาษติดเกือบทุกครั้งที่พิมพ์เกิน 5 แผ่นต่อเนื่อง ต้องดึงกระดาษออกเองทุกรอบ',
+    reportedById: itStaff.id,
+    assignedToId: itStaff.id,
+    priority: 'MEDIUM',
+    category: 'PRINTER',
+    status: 'RESOLVED',
+    resolution: 'ทำความสะอาดลูกกลิ้งดึงกระดาษและเปลี่ยนถาดกระดาษที่ชำรุด ทดสอบพิมพ์ต่อเนื่อง 20 แผ่นผ่านปกติ',
+    openedAt: addDays(-10),
+    resolvedAt: addDays(-8),
+  })
+
+  // Network Switch -> Packet loss สูง (NETWORK) — แจ้ง/แก้ไข/ปิดงานเสร็จสมบูรณ์แล้ว (CLOSED)
+  await ensureTicket(networkSwitch.id, {
+    title: 'Packet loss สูงผิดปกติ เครือข่ายสาขาใช้งานช้า',
+    description: 'พนักงานสาขารายงานว่าเข้าระบบช้าและหลุดบ่อย ตรวจสอบเบื้องต้นพบ packet loss ประมาณ 15-20%',
+    reportedById: itStaff.id,
+    assignedToId: admin.id,
+    priority: 'CRITICAL',
+    category: 'NETWORK',
+    status: 'CLOSED',
+    resolution: 'พบสาย LAN เสื่อมสภาพที่พอร์ต 4 เปลี่ยนสายใหม่และย้ายไปพอร์ตสำรอง packet loss กลับมาเป็นปกติ',
+    openedAt: addDays(-20),
+    resolvedAt: addDays(-19),
+    closedAt: addDays(-18),
+  })
+
+  // Lenovo ThinkPad -> ติดตั้งโปรแกรมไม่ได้ (SOFTWARE) — เพิ่งแจ้งเข้ามา ยังไม่มีใครรับเรื่อง (OPEN)
+  await ensureTicket(assetByTag['IT-0003'].id, {
+    title: 'ติดตั้งโปรแกรมบัญชีไม่สำเร็จ ขึ้น error',
+    description: 'พยายามติดตั้งโปรแกรมบัญชีเวอร์ชันล่าสุดแล้วขึ้น error code 1603 ทุกครั้ง',
+    reportedById: itStaff.id,
+    priority: 'MEDIUM',
+    category: 'SOFTWARE',
+    status: 'OPEN',
+    openedAt: addDays(-1),
+  })
+
+  // iPhone -> ล็อกอินอีเมลไม่ได้ (ACCOUNT) — Employee แจ้ง (ผู้ถือครองปัจจุบัน) กำลังพักรอฝ่ายความปลอดภัยอนุมัติ (ON_HOLD)
+  await ensureTicket(assetByTag['IT-0004'].id, {
+    title: 'ล็อกอินอีเมลบริษัทไม่ได้',
+    description: 'ขึ้นข้อความรหัสผ่านไม่ถูกต้องทั้งที่มั่นใจว่าใส่ถูก ลองรีเซ็ตรหัสผ่านแล้วก็ยังเข้าไม่ได้',
+    reportedById: employee.id,
+    assignedToId: itStaff.id,
+    priority: 'LOW',
+    category: 'ACCOUNT',
+    status: 'ON_HOLD',
+    openedAt: addDays(-5),
+  })
+
   console.log(`Seeded master data: ${categoryNames.length} categories, ${locationNames.length} locations, ${departmentNames.length} departments, ${vendorSeed.length} vendors`)
   console.log(`Seeded users: ${admin.email} (ADMIN), ${itStaff.email} (IT_STAFF), ${employee.email} (EMPLOYEE) — รหัสผ่านทุกบัญชี: password123`)
   console.log('Seeded assignments: Dell->Admin (active), HP->IT Staff (returned), Lenovo->IT Staff (active), iPhone->Employee (active)')
+  console.log('Seeded assets: +printer (IT-0005), +network switch (IT-0006)')
+  console.log('Seeded tickets: Dell blue screen (IN_PROGRESS), Printer jam (RESOLVED), Network packet loss (CLOSED), Lenovo software (OPEN), iPhone account (ON_HOLD)')
 }
 
 main()

@@ -35,12 +35,41 @@ const CHART_DEFS = [
   { key: 'warrantyStatus', title: 'สถานะการรับประกัน' },
   { key: 'topVendors', title: 'ผู้ขาย/ผู้ผลิตยอดนิยม' },
   { key: 'topAssignedCategories', title: 'หมวดหมู่ที่ถูกมอบหมายมากที่สุด' },
+  // Milestone 7
+  { key: 'ticketsByPriority', title: 'ใบแจ้งซ่อมตามความสำคัญ' },
+  { key: 'ticketsByStatus', title: 'ใบแจ้งซ่อมตามสถานะ' },
+  { key: 'topTicketCategories', title: 'หมวดหมู่ปัญหาที่พบมากที่สุด' },
+]
+
+// Milestone 7 — การ์ดสรุปใบแจ้งซ่อม (data.tickets) แยกจาก SUMMARY_CARDS (data.summary) เพราะ backend
+// ส่งมาเป็นคนละ section กัน (ดู routes/dashboard.js) — เป็นสถิติส่วนตัวจริงทั้ง ADMIN/IT_STAFF/EMPLOYEE
+// (ไม่ null เหมือน summary บางฟิลด์ตอน EMPLOYEE)
+const TICKET_SUMMARY_CARDS = [
+  { key: 'open', label: 'ใบแจ้งซ่อมที่เปิดอยู่' },
+  { key: 'inProgress', label: 'กำลังดำเนินการ' },
+  { key: 'resolvedToday', label: 'แก้ไขสำเร็จวันนี้' },
+  { key: 'closedToday', label: 'ปิดงานวันนี้' },
 ]
 
 const ACTIVITY_TYPE_LABELS = {
   ASSIGNMENT: 'มอบหมาย',
   RETURN: 'รับคืน',
   NEW_ASSET: 'เพิ่มใหม่',
+}
+
+// Milestone 7 — ให้ตรงกับ TicketForm.jsx (TICKET_STATUS_OPTIONS/TICKET_PRIORITY_OPTIONS)
+const TICKET_STATUS_LABELS = {
+  OPEN: 'เปิดใหม่',
+  IN_PROGRESS: 'กำลังดำเนินการ',
+  ON_HOLD: 'พักงาน',
+  RESOLVED: 'แก้ไขสำเร็จ',
+  CLOSED: 'ปิดงานแล้ว',
+}
+const TICKET_PRIORITY_LABELS = {
+  LOW: 'ต่ำ',
+  MEDIUM: 'ปานกลาง',
+  HIGH: 'สูง',
+  CRITICAL: 'วิกฤต',
 }
 
 // กราฟแบบ bar เรียบ ๆ ด้วย CSS ล้วน — ไม่ผูกกับ chart library ใด ๆ ตามที่ spec ต้องการ
@@ -126,6 +155,18 @@ export default function Dashboard({ role }) {
         )}
       </div>
 
+      <div className="dashboard-section">
+        <h3>Helpdesk</h3>
+        <div className="stat-cards">
+          {TICKET_SUMMARY_CARDS.map((c) => (
+            <div className="stat-card" key={c.key}>
+              <p className="stat-card-label">{c.label}</p>
+              <p className="stat-card-value">{data.tickets[c.key]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {data.assets.utilization && (
         <div className="dashboard-section">
           <h3>การใช้งานครุภัณฑ์</h3>
@@ -176,6 +217,29 @@ export default function Dashboard({ role }) {
                     {' '}{item.message}
                   </span>
                   <span className="activity-time">{formatDate(item.at)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-section">
+        <h3>ใบแจ้งซ่อมล่าสุด</h3>
+        {data.recentTickets.length === 0 ? (
+          <p className="muted">ยังไม่มีใบแจ้งซ่อม</p>
+        ) : (
+          <div className="card">
+            <div className="activity-list">
+              {data.recentTickets.map((t) => (
+                <div className="activity-item" key={t.id}>
+                  <span>
+                    <span className={`badge badge-ticket-${t.status.toLowerCase()}`}>{TICKET_STATUS_LABELS[t.status] || t.status}</span>
+                    {' '}
+                    <span className={`badge badge-priority-${t.priority.toLowerCase()}`}>{TICKET_PRIORITY_LABELS[t.priority] || t.priority}</span>
+                    {' '}{t.ticketNumber} — {t.title} ({t.asset.assetTag})
+                  </span>
+                  <span className="activity-time">{formatDate(t.openedAt)}</span>
                 </div>
               ))}
             </div>

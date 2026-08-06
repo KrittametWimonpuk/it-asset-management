@@ -26,6 +26,7 @@ const EMPTY_FILTERS = { categoryId: '', status: '', locationId: '', departmentId
 
 // ---- Milestone 4.1: คอลัมน์ที่ผู้ใช้เลือกซ่อน/แสดงได้ — จำค่าไว้ใน localStorage ----
 // ตั้งแต่ Milestone 5: เพิ่มคอลัมน์เกี่ยวกับการมอบหมาย (มาจาก asset.currentAssignment/assignmentHistoryCount)
+// ตั้งแต่ Milestone 7: เพิ่มคอลัมน์เกี่ยวกับใบแจ้งซ่อม (มาจาก asset.openTicketsCount/ticketHistoryCount)
 const OPTIONAL_COLUMNS = [
   { key: 'brand', label: 'ยี่ห้อ' },
   { key: 'model', label: 'รุ่น' },
@@ -37,6 +38,8 @@ const OPTIONAL_COLUMNS = [
   { key: 'assignedDate', label: 'วันที่มอบหมาย' },
   { key: 'expectedReturn', label: 'วันที่คาดว่าจะคืน' },
   { key: 'historyCount', label: 'จำนวนประวัติ' },
+  { key: 'openTickets', label: 'ใบแจ้งซ่อมที่เปิดอยู่' },
+  { key: 'ticketHistory', label: 'จำนวนใบแจ้งซ่อมทั้งหมด' },
 ]
 const COLUMNS_STORAGE_KEY = 'assetVisibleColumns'
 
@@ -81,7 +84,8 @@ function warrantyBadge(warrantyExpiry) {
 // EMPLOYEE เห็นได้อย่างเดียว (backend คืนเฉพาะ asset ของตัวเองมาให้แล้ว) — Milestone 4
 // onNavigateToMaster(tabKey) — ให้ AssetForm พาไปหน้า master data ที่เกี่ยวข้องได้ เมื่อ dropdown ว่าง
 // onViewHistory(assetId) — Milestone 5: พาไปแท็บ "การมอบหมาย" กรองเฉพาะ asset นี้ (ทุก role ดูได้)
-export default function Assets({ role, onNavigateToMaster, onViewHistory }) {
+// onViewTickets(assetId) — Milestone 7: พาไปแท็บ "Helpdesk" กรองเฉพาะ asset นี้ (ทุก role ดูได้)
+export default function Assets({ role, onNavigateToMaster, onViewHistory, onViewTickets }) {
   const canManage = role === 'ADMIN' || role === 'IT_STAFF'
   const [assets, setAssets] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
@@ -277,6 +281,8 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory }) {
                   {visibleColumns.assignedDate && <th>วันที่มอบหมาย</th>}
                   {visibleColumns.expectedReturn && <th>วันที่คาดว่าจะคืน</th>}
                   {visibleColumns.historyCount && <th>จำนวนประวัติ</th>}
+                  {visibleColumns.openTickets && <th>ใบแจ้งซ่อมที่เปิดอยู่</th>}
+                  {visibleColumns.ticketHistory && <th>จำนวนใบแจ้งซ่อมทั้งหมด</th>}
                   <th>สภาพ</th>
                   <th>จัดการ</th>
                 </tr>
@@ -307,10 +313,19 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory }) {
                       {visibleColumns.assignedDate && <td>{holder ? formatDate(holder.assignedAt) : '-'}</td>}
                       {visibleColumns.expectedReturn && <td>{holder?.expectedReturnDate ? formatDate(holder.expectedReturnDate) : '-'}</td>}
                       {visibleColumns.historyCount && <td>{asset.assignmentHistoryCount}</td>}
+                      {visibleColumns.openTickets && (
+                        <td>
+                          {asset.openTicketsCount > 0
+                            ? <span className="badge badge-ticket-open">{asset.openTicketsCount}</span>
+                            : '-'}
+                        </td>
+                      )}
+                      {visibleColumns.ticketHistory && <td>{asset.ticketHistoryCount}</td>}
                       <td>{conditionLabel(asset.assetCondition)}</td>
                       <td>
                         <div className="row">
                           <button className="link" onClick={() => onViewHistory?.(asset.id)}>ดูประวัติ</button>
+                          <button className="link" onClick={() => onViewTickets?.(asset.id)}>ดูใบแจ้งซ่อม</button>
                           {canManage && <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>}
                           {canManage && <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>}
                         </div>

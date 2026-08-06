@@ -34,6 +34,7 @@ import {
   optionalCurrency, optionalNonNegativeNumber, optionalEnum,
 } from '../utils/zodHelpers.js'
 import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE, shapeAssetWithAssignment } from '../utils/assignmentHelpers.js'
+import { ASSET_TICKETS_INCLUDE, summarizeAssetTickets } from '../utils/ticketHelpers.js'
 
 const router = Router()
 
@@ -99,6 +100,10 @@ const detailFields = {
 //
 // Milestone 5: แนบ assignments (เฉพาะที่ active — ดู CURRENT_ASSIGNMENT_INCLUDE) + จำนวนประวัติทั้งหมด
 // มาด้วยเสมอ แล้วแปลงผ่าน shapeAssetWithAssignment ก่อนส่งกลับ ให้ได้ currentAssignment/assignmentHistoryCount
+//
+// Milestone 7: แนบ tickets (ดู ASSET_TICKETS_INCLUDE) มาด้วยเสมอเช่นกัน แล้วแปลงผ่าน summarizeAssetTickets
+// ให้ได้ openTicketsCount/closedTicketsCount/recentTickets/ticketHistoryCount — ใช้แสดง "Recent Maintenance"
+// ในรายละเอียด asset โดยไม่ต้องยิง query แยก
 const WITH_RELATIONS = {
   include: {
     category: true,
@@ -107,7 +112,15 @@ const WITH_RELATIONS = {
     vendor: true,
     assignments: CURRENT_ASSIGNMENT_INCLUDE,
     _count: { select: { assignments: { where: { deletedAt: null } } } },
+    tickets: ASSET_TICKETS_INCLUDE,
   },
+}
+
+// รวมการแปลงทั้ง assignment (Milestone 5) และ ticket (Milestone 7) ไว้ในจุดเดียว — เรียกใช้แทน
+// shapeAssetWithAssignment ตรง ๆ ทุกจุดที่ตอบ response ของ asset กลับไป
+function shapeAsset(asset) {
+  const { tickets, ...rest } = asset
+  return { ...shapeAssetWithAssignment(rest), ...summarizeAssetTickets(tickets) }
 }
 
 // เงื่อนไขพื้นฐานที่ READ ทุกอันต้องมี: ยังไม่ถูกลบ + ตาม role
@@ -186,7 +199,7 @@ router.get('/', asyncHandler(async (req, res) => {
     prisma.asset.count({ where }),
   ])
 
-  ok(res, { items: items.map(shapeAssetWithAssignment), ...buildPageMeta(pagination, totalItems) })
+  ok(res, { items: items.map(shapeAsset), ...buildPageMeta(pagination, totalItems) })
 }))
 
 // ---- READ: ดึง asset ชิ้นเดียว — ขอบเขตขึ้นกับ role ----
@@ -198,7 +211,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   if (!asset) {
     return fail(res, 404, NOT_FOUND_MESSAGE)
   }
-  ok(res, shapeAssetWithAssignment(asset))
+  ok(res, shapeAsset(asset))
 }))
 
 // ---- CREATE: เพิ่ม asset ใหม่ ----
@@ -255,7 +268,7 @@ router.post('/', manageAssets, asyncHandler(async (req, res) => {
     data: { ...parsed.data, ownerId: req.user.id },
     ...WITH_RELATIONS,
   })
-  ok(res, shapeAssetWithAssignment(asset), 201)
+  ok(res, shapeAsset(asset), 201)
 }))
 
 // ---- UPDATE: แก้ไขข้อมูล asset (แก้ไม่ได้ถ้าถูกลบไปแล้ว) ----
@@ -299,7 +312,7 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
   }
 
   const asset = await prisma.asset.findUnique({ where: { id: req.params.id }, ...WITH_RELATIONS })
-  ok(res, shapeAssetWithAssignment(asset))
+  ok(res, shapeAsset(asset))
 }))
 
 // ---- DELETE (soft): ตั้งค่า deletedAt แทนการลบแถวจริง ----
