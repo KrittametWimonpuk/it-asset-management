@@ -62,6 +62,20 @@ async function main() {
   // ---- ผู้ใช้ตัวอย่าง (Milestone 4: RBAC) — หนึ่งบัญชีต่อ role ให้ทดสอบสิทธิ์ได้ครบ ----
   const password = await bcrypt.hash('password123', 10)
 
+  const itStaff = await prisma.user.upsert({
+    where: { email: 'itstaff@example.com' },
+    update: {},
+    create: { email: 'itstaff@example.com', password, name: 'IT Staff', role: 'IT_STAFF' },
+  })
+
+  const employee = await prisma.user.upsert({
+    where: { email: 'employee@example.com' },
+    update: {},
+    create: { email: 'employee@example.com', password, name: 'Employee User', role: 'EMPLOYEE' },
+  })
+
+  // Milestone 5: ownerId บันทึกแค่ "ใครสร้าง asset" (deprecated ไม่ใช้ตัดสิน "ผู้ถือครอง" อีกต่อไป)
+  // ครุภัณฑ์ทุกชิ้นจึงสร้างโดย admin แล้วค่อยมอบหมาย (Assignment) ให้แต่ละคนถือครองแยกต่างหากด้านล่าง
   // upsert = ถ้ามีอยู่แล้วให้ข้าม, ถ้ายังไม่มีให้สร้าง
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
@@ -74,7 +88,7 @@ async function main() {
       assets: {
         create: [
           {
-            // ใกล้หมดประกันภายใน 30 วัน -> badge "ใกล้หมดประกัน"
+            // ใกล้หมดประกันภายใน 30 วัน -> badge "ใกล้หมดประกัน" — ปัจจุบัน Admin ถือครองอยู่
             assetTag: 'IT-0001',
             name: 'โน้ตบุ๊ค Dell Latitude 5440',
             brand: 'Dell',
@@ -110,7 +124,7 @@ async function main() {
             installedDate: addDays(-490),
           },
           {
-            // หมดประกันไปแล้ว -> badge "หมดประกัน"
+            // หมดประกันไปแล้ว -> badge "หมดประกัน" — เคยมอบหมายแล้วคืนแล้ว ตอนนี้ไม่มีผู้ถือครอง (อยู่ในคลัง)
             assetTag: 'IT-0002',
             name: 'คอมพิวเตอร์ตั้งโต๊ะ HP ProDesk 600',
             brand: 'HP',
@@ -141,23 +155,8 @@ async function main() {
             domainName: 'corp.example.com',
             receivedDate: addDays(-1195),
           },
-        ],
-      },
-    },
-  })
-
-  const itStaff = await prisma.user.upsert({
-    where: { email: 'itstaff@example.com' },
-    update: {},
-    create: {
-      email: 'itstaff@example.com',
-      password,
-      name: 'IT Staff',
-      role: 'IT_STAFF',
-      assets: {
-        create: [
           {
-            // ยังไม่ใกล้หมดประกัน -> ไม่มี badge
+            // ยังไม่ใกล้หมดประกัน -> ไม่มี badge — ปัจจุบัน IT Staff ถือครองอยู่
             assetTag: 'IT-0003',
             name: 'โน้ตบุ๊ค Lenovo ThinkPad E14',
             brand: 'Lenovo',
@@ -191,23 +190,8 @@ async function main() {
             receivedDate: addDays(-57),
             installedDate: addDays(-55),
           },
-        ],
-      },
-    },
-  })
-
-  // EMPLOYEE เห็นเฉพาะ asset ของตัวเอง — asset นี้ไว้ทดสอบขอบเขตการมองเห็นตาม role
-  const employee = await prisma.user.upsert({
-    where: { email: 'employee@example.com' },
-    update: {},
-    create: {
-      email: 'employee@example.com',
-      password,
-      name: 'Employee User',
-      role: 'EMPLOYEE',
-      assets: {
-        create: [
           {
+            // ปัจจุบัน Employee ถือครองอยู่ — ใช้ทดสอบขอบเขตการมองเห็นตาม role (EMPLOYEE เห็นแค่ของตัวเอง)
             assetTag: 'IT-0004',
             name: 'โทรศัพท์มือถือบริษัท',
             brand: 'Apple',
@@ -234,10 +218,65 @@ async function main() {
         ],
       },
     },
+    include: { assets: true },
+  })
+
+  // ---- Milestone 5: Asset Assignment — ประวัติการมอบหมาย/รับคืนครุภัณฑ์ ----
+  // idempotent: ถ้า asset นี้มีประวัติ assignment อยู่แล้ว (รันซ้ำ) ให้ข้าม ไม่สร้างซ้ำ
+  async function ensureAssignment(assetId, data) {
+    const existing = await prisma.assignment.findFirst({ where: { assetId } })
+    if (existing) return existing
+    return prisma.assignment.create({ data: { assetId, ...data } })
+  }
+
+  const assetByTag = Object.fromEntries(admin.assets.map((a) => [a.assetTag, a]))
+
+  // Dell Latitude -> Admin ถือครองอยู่ (active) — มอบโดย IT Staff
+  await ensureAssignment(assetByTag['IT-0001'].id, {
+    userId: admin.id,
+    assignedById: itStaff.id,
+    assignedAt: addDays(-490),
+    status: 'ASSIGNED',
+    conditionBefore: 'GOOD',
+    remark: 'มอบให้ทีมพัฒนาใช้งานประจำ',
+  })
+
+  // HP ProDesk -> เคยมอบให้ IT Staff แล้วคืนแล้ว (ประวัติ) — ตอนนี้ไม่มีผู้ถือครอง กลับเข้าคลัง
+  await ensureAssignment(assetByTag['IT-0002'].id, {
+    userId: itStaff.id,
+    assignedById: admin.id,
+    assignedAt: addDays(-1195),
+    expectedReturnDate: addDays(-900),
+    returnedAt: addDays(-895),
+    status: 'RETURNED',
+    conditionBefore: 'GOOD',
+    conditionAfter: 'FAIR',
+    remark: 'คืนเครื่องเมื่อเปลี่ยนตำแหน่งงาน',
+  })
+
+  // Lenovo ThinkPad -> IT Staff ถือครองอยู่ (active) — มอบโดย Admin
+  await ensureAssignment(assetByTag['IT-0003'].id, {
+    userId: itStaff.id,
+    assignedById: admin.id,
+    assignedAt: addDays(-55),
+    status: 'ASSIGNED',
+    conditionBefore: 'NEW',
+    remark: 'มอบให้ทีมขายใช้งาน',
+  })
+
+  // iPhone -> Employee ถือครองอยู่ (active) — มอบโดย Admin
+  await ensureAssignment(assetByTag['IT-0004'].id, {
+    userId: employee.id,
+    assignedById: admin.id,
+    assignedAt: addDays(-198),
+    status: 'ASSIGNED',
+    conditionBefore: 'GOOD',
+    remark: 'โทรศัพท์มือถือประจำตำแหน่ง',
   })
 
   console.log(`Seeded master data: ${categoryNames.length} categories, ${locationNames.length} locations, ${departmentNames.length} departments, ${vendorSeed.length} vendors`)
   console.log(`Seeded users: ${admin.email} (ADMIN), ${itStaff.email} (IT_STAFF), ${employee.email} (EMPLOYEE) — รหัสผ่านทุกบัญชี: password123`)
+  console.log('Seeded assignments: Dell->Admin (active), HP->IT Staff (returned), Lenovo->IT Staff (active), iPhone->Employee (active)')
 }
 
 main()

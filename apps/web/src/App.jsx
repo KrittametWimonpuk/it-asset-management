@@ -11,6 +11,7 @@ import { auth, api } from './api.js'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Assets from './pages/Assets.jsx'
+import Assignments from './pages/Assignments.jsx'
 import MasterDataPage from './pages/MasterDataPage.jsx'
 import { categoryConfig, locationConfig, departmentConfig, vendorConfig } from './pages/masterDataConfigs.jsx'
 
@@ -34,7 +35,10 @@ export default function App() {
   const [user, setUser] = useState(null)      // ข้อมูลผู้ใช้ที่ล็อกอินอยู่
   const [view, setView] = useState('login')   // 'login' | 'register'
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('assets')    // 'assets' | 'categories' | 'locations' | 'departments' | 'vendors'
+  const [tab, setTab] = useState('assets')    // 'assets' | 'assignments' | 'categories' | 'locations' | 'departments' | 'vendors'
+
+  // Milestone 5: asset ที่จะกรองไว้ล่วงหน้าตอนเปิดแท็บ "การมอบหมาย" (มาจาก Assets.jsx ปุ่ม "ดูประวัติ")
+  const [assignmentsAssetFilter, setAssignmentsAssetFilter] = useState('')
 
   // ตอนเปิดแอป: ถ้ามี token เก่าอยู่ ลองถามเซิร์ฟเวอร์ว่ายังใช้ได้ไหม
   useEffect(() => {
@@ -55,6 +59,18 @@ export default function App() {
     setUser(null)
     setView('login')
     setTab('assets')
+  }
+
+  // เปิดแท็บ "การมอบหมาย" แบบไม่กรอง (คลิกที่แท็บตรง ๆ) — ล้างตัวกรอง asset เดิมที่อาจค้างจาก "ดูประวัติ" ทิ้งก่อนเสมอ
+  function goToAssignments() {
+    setAssignmentsAssetFilter('')
+    setTab('assignments')
+  }
+
+  // Milestone 5: จาก Assets.jsx ปุ่ม "ดูประวัติ" — พาไปแท็บการมอบหมาย กรองเฉพาะ asset นั้น
+  function handleViewHistory(assetId) {
+    setAssignmentsAssetFilter(assetId)
+    setTab('assignments')
   }
 
   if (loading) {
@@ -83,13 +99,17 @@ export default function App() {
 
         <nav className="tabs mt">
           <button className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => setTab('assets')}>ครุภัณฑ์</button>
+          <button className={`tab${tab === 'assignments' ? ' active' : ''}`} onClick={goToAssignments}>การมอบหมาย</button>
           {canManageMasterData && Object.entries(MASTER_TABS).map(([key, { label }]) => (
             <button key={key} className={`tab${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}>{label}</button>
           ))}
         </nav>
 
         <div className="mt">
-          {tab === 'assets' && <Assets role={user.role} onNavigateToMaster={(target) => setTab(target)} />}
+          {tab === 'assets' && (
+            <Assets role={user.role} onNavigateToMaster={(target) => setTab(target)} onViewHistory={handleViewHistory} />
+          )}
+          {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
           {activeMaster && <MasterDataPage {...activeMaster.config} />}
         </div>
       </div>

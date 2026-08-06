@@ -11,6 +11,7 @@ import locationRoutes from './routes/locations.js'
 import departmentRoutes from './routes/departments.js'
 import vendorRoutes from './routes/vendors.js'
 import userRoutes from './routes/users.js'
+import assignmentRoutes from './routes/assignments.js'
 import { fail } from './utils/response.js'
 
 const app = express()
@@ -33,6 +34,7 @@ app.use('/api/locations', locationRoutes)
 app.use('/api/departments', departmentRoutes)
 app.use('/api/vendors', vendorRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/assignments', assignmentRoutes)
 
 // ---- ดักกรณีเรียก path ที่ไม่มี ----
 app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))

@@ -15,6 +15,12 @@
 //
 // ตั้งแต่ Milestone 4.1: GET / รองรับ query filter เพิ่ม (categoryId/status/locationId/
 // departmentId/vendorId) ทำงานร่วมกับ search ได้ — ใช้กับ filter bar ฝั่ง frontend
+//
+// ตั้งแต่ Milestone 5 (Asset Assignment): "ผู้ถือครองปัจจุบัน" ไม่ใช้ ownerId แล้ว (deprecated —
+// ดูคอมเมนต์ที่ schema.prisma) แต่ดูจาก Assignment ล่าสุดที่ยัง active แทน (utils/assignmentHelpers.js)
+//   - EMPLOYEE เห็นเฉพาะ asset ที่ตัวเองเป็นผู้ถือครองอยู่ (มี assignment active ที่ userId ตรงกับตัวเอง)
+//   - ทุก response แนบ currentAssignment + assignmentHistoryCount มาด้วย
+//   - GET / รองรับ ?unassigned=true ไว้กรองเฉพาะ asset ที่ยังไม่มีผู้ถือครอง (ใช้ตอนเลือก asset จะมอบหมายใหม่)
 // ---------------------------------------------------------------------------
 import { Router } from 'express'
 import { z } from 'zod'
@@ -27,6 +33,7 @@ import {
   optionalText, optionalDate, optionalIPv4, optionalMac,
   optionalCurrency, optionalNonNegativeNumber, optionalEnum,
 } from '../utils/zodHelpers.js'
+import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE, shapeAssetWithAssignment } from '../utils/assignmentHelpers.js'
 
 const router = Router()
 
@@ -40,7 +47,8 @@ const manageAssets = requireRole('ADMIN', 'IT_STAFF')
 const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
 
 // สภาพครุภัณฑ์ที่อนุญาต — ต้องตรงกับ enum AssetCondition ใน schema.prisma
-const ASSET_CONDITIONS = ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED']
+// export ไว้ให้ routes/assignments.js ใช้ร่วมกัน (conditionBefore/conditionAfter ใช้ enum เดียวกัน)
+export const ASSET_CONDITIONS = ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED']
 
 // ฟิลด์ที่ยอมให้ sort ได้ (ต้องตรงกับที่ระบุใน spec: Asset Tag, Name, Created Date, Status)
 const SORTABLE_FIELDS = ['assetTag', 'name', 'createdAt', 'status']
@@ -87,14 +95,28 @@ const detailFields = {
 // แนบข้อมูล master data ที่เกี่ยวข้องมาด้วยทุกครั้งที่อ่าน asset — frontend จะได้มีชื่อไปแสดงผล
 // ไม่ต้องยิง request แยกทีละตัว (แม้ master data นั้นจะถูก soft delete ไปแล้วก็ยังแนบมา ตาม
 // requirement ที่ต้องการให้ asset เก่าที่อ้างถึง master data ที่ถูกลบ ยังแสดงผลได้ถูกต้อง)
+//
+// Milestone 5: แนบ assignments (เฉพาะที่ active — ดู CURRENT_ASSIGNMENT_INCLUDE) + จำนวนประวัติทั้งหมด
+// มาด้วยเสมอ แล้วแปลงผ่าน shapeAssetWithAssignment ก่อนส่งกลับ ให้ได้ currentAssignment/assignmentHistoryCount
 const WITH_RELATIONS = {
-  include: { category: true, location: true, department: true, vendor: true },
+  include: {
+    category: true,
+    location: true,
+    department: true,
+    vendor: true,
+    assignments: CURRENT_ASSIGNMENT_INCLUDE,
+    _count: { select: { assignments: { where: { deletedAt: null } } } },
+  },
 }
 
-// เงื่อนไขพื้นฐานที่ READ ทุกอันต้องมี: ยังไม่ถูกลบ + ตาม role (EMPLOYEE เห็นเฉพาะของตัวเอง)
+// เงื่อนไขพื้นฐานที่ READ ทุกอันต้องมี: ยังไม่ถูกลบ + ตาม role
+// EMPLOYEE เห็นเฉพาะ asset ที่ตัวเองเป็น "ผู้ถือครองปัจจุบัน" (มี assignment active ที่ userId ตรงกับตัวเอง)
+// — ไม่ใช้ ownerId แล้วตั้งแต่ Milestone 5 (ดูคอมเมนต์หัวไฟล์)
 function scopeForRead(user) {
   const where = { deletedAt: null }
-  if (user.role === 'EMPLOYEE') where.ownerId = user.id
+  if (user.role === 'EMPLOYEE') {
+    where.assignments = { some: { userId: user.id, ...ACTIVE_ASSIGNMENT_WHERE } }
+  }
   return where
 }
 
@@ -151,12 +173,19 @@ router.get('/', asyncHandler(async (req, res) => {
   if (req.query.vendorId) where.vendorId = req.query.vendorId
   if (ASSET_STATUSES.includes(req.query.status)) where.status = req.query.status
 
+  // Milestone 5: ใช้ตอนฟอร์มมอบหมายครุภัณฑ์ต้องเลือกเฉพาะ asset ที่ยังไม่มีผู้ถือครอง
+  // เฉพาะ ADMIN/IT_STAFF เท่านั้นที่ใช้ตัวกรองนี้ได้ (EMPLOYEE ขอบเขตอยู่ที่ "ถือครองอยู่" ซึ่งขัดกับ
+  // "ยังไม่มีผู้ถือครอง" อยู่แล้วโดยธรรมชาติ — ข้ามไปเพื่อไม่ให้ไปเขียนทับเงื่อนไข scopeForRead ของ EMPLOYEE)
+  if (req.query.unassigned === 'true' && req.user.role !== 'EMPLOYEE') {
+    where.assignments = { none: ACTIVE_ASSIGNMENT_WHERE }
+  }
+
   const [items, totalItems] = await Promise.all([
     prisma.asset.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...WITH_RELATIONS }),
     prisma.asset.count({ where }),
   ])
 
-  ok(res, { items, ...buildPageMeta(pagination, totalItems) })
+  ok(res, { items: items.map(shapeAssetWithAssignment), ...buildPageMeta(pagination, totalItems) })
 }))
 
 // ---- READ: ดึง asset ชิ้นเดียว — ขอบเขตขึ้นกับ role ----
@@ -168,7 +197,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   if (!asset) {
     return fail(res, 404, NOT_FOUND_MESSAGE)
   }
-  ok(res, asset)
+  ok(res, shapeAssetWithAssignment(asset))
 }))
 
 // ---- CREATE: เพิ่ม asset ใหม่ ----
@@ -225,7 +254,7 @@ router.post('/', manageAssets, asyncHandler(async (req, res) => {
     data: { ...parsed.data, ownerId: req.user.id },
     ...WITH_RELATIONS,
   })
-  ok(res, asset, 201)
+  ok(res, shapeAssetWithAssignment(asset), 201)
 }))
 
 // ---- UPDATE: แก้ไขข้อมูล asset (แก้ไม่ได้ถ้าถูกลบไปแล้ว) ----
@@ -269,7 +298,7 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
   }
 
   const asset = await prisma.asset.findUnique({ where: { id: req.params.id }, ...WITH_RELATIONS })
-  ok(res, asset)
+  ok(res, shapeAssetWithAssignment(asset))
 }))
 
 // ---- DELETE (soft): ตั้งค่า deletedAt แทนการลบแถวจริง ----

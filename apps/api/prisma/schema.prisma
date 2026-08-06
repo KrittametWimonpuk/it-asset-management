@@ -21,7 +21,11 @@ model User {
   role      UserRole @default(EMPLOYEE) // Milestone 4: สิทธิ์การใช้งาน — สมัครใหม่เป็น EMPLOYEE เสมอ (เปลี่ยนได้เฉพาะ ADMIN ในอนาคต)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  assets    Asset[] // ผู้ใช้ 1 คน เป็นเจ้าของได้หลาย asset
+  assets    Asset[] // @deprecated ทางประวัติศาสตร์ (ผู้สร้าง asset) — ไม่ใช้บอก "ใครถือครองอยู่" อีกต่อไปตั้งแต่ Milestone 5 ดู Asset.ownerId
+
+  // Milestone 5: ประวัติการมอบหมายครุภัณฑ์ — แยก 2 ความสัมพันธ์เพราะ Assignment ชี้มาที่ User สองทาง
+  assignmentsHeld    Assignment[] @relation("AssignmentHolder") // รายการที่ตัวเองเป็นผู้ถือครอง (ทั้งอดีต+ปัจจุบัน)
+  assignmentsCreated Assignment[] @relation("AssignmentAssignedBy") // รายการที่ตัวเองเป็นคนมอบหมายให้คนอื่น
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -123,11 +127,16 @@ model Asset {
   model        String // รุ่น เช่น "XPS 13" (ยังเป็น text — ไม่ใช่ master data)
   serialNumber String?     @unique // เลข serial จากผู้ผลิต (อาจไม่มี)
   status       AssetStatus @default(AVAILABLE) // สถานะปัจจุบัน
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
-  deletedAt    DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
+
+  // @deprecated ตั้งแต่ Milestone 5 — เดิมใช้บอกว่า asset นี้เป็นของใคร แต่ตอนนี้ "ผู้ถือครองปัจจุบัน"
+  // ต้องดูจาก Assignment ล่าสุดที่ returnedAt IS NULL แทน (ดู utils/assignmentHelpers.js: getCurrentHolder)
+  // เก็บคอลัมน์นี้ไว้แค่บันทึกว่า "ใครเป็นคนสร้าง asset นี้" ไม่ใช้ตัดสินสิทธิ์การมองเห็น/ความเป็นเจ้าของอีกต่อไป
+  ownerId     String
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  assignments Assignment[] // Milestone 5: ประวัติการมอบหมายทั้งหมด (ปัจจุบัน + อดีต) ของ asset นี้
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
+  deletedAt   DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
 
   // ความสัมพันธ์กับ master data — categoryId บังคับ (แทนที่ text field เดิม)
   // location/department/vendor เป็นทางเลือก เพราะ asset ที่มีอยู่ก่อนหน้ายังไม่มีข้อมูลนี้
@@ -174,10 +183,62 @@ model Asset {
   installedDate DateTime?
   retiredDate   DateTime?
 
-  // query หลักของ list/get ทุกอันกรองด้วย ownerId + deletedAt เสมอ — index ผสมนี้ช่วยให้ query เร็วขึ้น
+  // เก็บ index นี้ไว้เผื่อ query เก่า/ในอนาคตที่อ้างอิง ownerId (แม้จะไม่ใช้กรองสิทธิ์การมองเห็นแล้วก็ตาม)
   @@index([ownerId, deletedAt])
   @@index([categoryId])
   @@index([locationId])
   @@index([departmentId])
   @@index([vendorId])
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 5 — Asset Assignment & Lifecycle
+//
+// Assignment คือประวัติการมอบหมายครุภัณฑ์ให้พนักงานถือครอง หนึ่งแถว = การมอบหมายหนึ่งรอบ
+// (ตั้งแต่มอบจนกว่าจะคืน) ห้ามแก้ไข/ลบแถวเก่าเมื่อคืนแล้ว — ประวัติต้องอยู่ครบเสมอ
+//
+// "ผู้ถือครองปัจจุบัน" ของ asset หนึ่งชิ้น = Assignment ล่าสุดที่ returnedAt IS NULL AND
+// deletedAt IS NULL (นี่คือ source of truth เดียว — ไม่ใช้ Asset.ownerId อีกต่อไป)
+// asset หนึ่งชิ้นมี "แถวที่ active" แบบนี้ได้สูงสุด 1 แถวเท่านั้น บังคับจริงด้วย partial unique
+// index บน assetId ใน migration.sql (เหมือนแพทเทิร์นชื่อ master data ที่ห้ามซ้ำ)
+// ---------------------------------------------------------------------------
+enum AssignmentStatus {
+  ASSIGNED // กำลังถือครองอยู่ (active)
+  RETURNED // คืนแล้วตามปกติ
+  LOST // สูญหายระหว่างถือครอง
+  DAMAGED // เสียหายระหว่างถือครอง
+}
+
+model Assignment {
+  id String @id @default(uuid())
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  userId String // ผู้ถือครอง (พนักงานที่ได้รับมอบหมาย)
+  user   User   @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+
+  assignedById String // ผู้ทำรายการมอบหมาย (ADMIN/IT_STAFF) — ตั้งจาก req.user.id เสมอ ไม่รับจาก client
+  assignedBy   User   @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  assignedAt         DateTime  @default(now())
+  expectedReturnDate DateTime?
+  returnedAt         DateTime? // ไม่เป็น null แปลว่าปิดรายการนี้แล้ว (คืน/หาย/เสียหาย) — ตั้งค่าได้ทางเดียวคือผ่าน endpoint /return
+
+  status AssignmentStatus @default(ASSIGNED)
+
+  conditionBefore AssetCondition? // สภาพตอนมอบหมาย (ใช้ enum เดียวกับ Asset.assetCondition)
+  conditionAfter  AssetCondition? // สภาพตอนคืน — มีค่าก็ต่อเมื่อคืนแล้วเท่านั้น
+
+  remark String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete (เผื่อไว้ใช้ในอนาคต — ยังไม่มี endpoint ลบใน milestone นี้)
+
+  // query หลักของ list/get กรองด้วย assetId/userId/deletedAt เสมอ — index ช่วยให้ query เร็วขึ้น
+  @@index([assetId, deletedAt])
+  @@index([userId])
+  @@index([assignedById])
+  @@index([status])
 }

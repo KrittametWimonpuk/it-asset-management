@@ -6,6 +6,8 @@ import AssetForm, { STATUS_OPTIONS, CONDITION_OPTIONS } from '../components/Asse
 import AssetFilterBar from '../components/AssetFilterBar.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
+import { formatDate } from '../utils/format.js'
+import { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 
 const PAGE_SIZE = 20
 
@@ -23,12 +25,18 @@ const WARRANTY_WARNING_DAYS = 30
 const EMPTY_FILTERS = { categoryId: '', status: '', locationId: '', departmentId: '', vendorId: '' }
 
 // ---- Milestone 4.1: คอลัมน์ที่ผู้ใช้เลือกซ่อน/แสดงได้ — จำค่าไว้ใน localStorage ----
+// ตั้งแต่ Milestone 5: เพิ่มคอลัมน์เกี่ยวกับการมอบหมาย (มาจาก asset.currentAssignment/assignmentHistoryCount)
 const OPTIONAL_COLUMNS = [
   { key: 'brand', label: 'ยี่ห้อ' },
   { key: 'model', label: 'รุ่น' },
   { key: 'hostname', label: 'Hostname' },
   { key: 'ipAddress', label: 'IP Address' },
   { key: 'warrantyExpiry', label: 'วันหมดประกัน' },
+  { key: 'currentHolder', label: 'ผู้ถือครองปัจจุบัน' },
+  { key: 'assignmentStatus', label: 'สถานะการมอบหมาย' },
+  { key: 'assignedDate', label: 'วันที่มอบหมาย' },
+  { key: 'expectedReturn', label: 'วันที่คาดว่าจะคืน' },
+  { key: 'historyCount', label: 'จำนวนประวัติ' },
 ]
 const COLUMNS_STORAGE_KEY = 'assetVisibleColumns'
 
@@ -56,8 +64,8 @@ function conditionLabel(condition) {
   return CONDITION_OPTIONS.find((c) => c.value === condition)?.label || '-'
 }
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
+function assignmentStatusLabel(status) {
+  return ASSIGNMENT_STATUS_OPTIONS.find((s) => s.value === status)?.label || status
 }
 
 // สถานะประกัน: หมดแล้ว / ใกล้หมดภายใน 30 วัน / ยังไม่ใกล้หมด (คืน null ถ้าไม่ต้องโชว์ badge)
@@ -72,7 +80,8 @@ function warrantyBadge(warrantyExpiry) {
 // role: ADMIN/IT_STAFF จัดการ asset ได้เต็มที่ (เพิ่ม/แก้/ลบ ของใครก็ได้)
 // EMPLOYEE เห็นได้อย่างเดียว (backend คืนเฉพาะ asset ของตัวเองมาให้แล้ว) — Milestone 4
 // onNavigateToMaster(tabKey) — ให้ AssetForm พาไปหน้า master data ที่เกี่ยวข้องได้ เมื่อ dropdown ว่าง
-export default function Assets({ role, onNavigateToMaster }) {
+// onViewHistory(assetId) — Milestone 5: พาไปแท็บ "การมอบหมาย" กรองเฉพาะ asset นี้ (ทุก role ดูได้)
+export default function Assets({ role, onNavigateToMaster, onViewHistory }) {
   const canManage = role === 'ADMIN' || role === 'IT_STAFF'
   const [assets, setAssets] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
@@ -263,13 +272,19 @@ export default function Assets({ role, onNavigateToMaster }) {
                   {visibleColumns.hostname && <th>Hostname</th>}
                   {visibleColumns.ipAddress && <th>IP Address</th>}
                   {visibleColumns.warrantyExpiry && <th>วันหมดประกัน</th>}
+                  {visibleColumns.currentHolder && <th>ผู้ถือครองปัจจุบัน</th>}
+                  {visibleColumns.assignmentStatus && <th>สถานะการมอบหมาย</th>}
+                  {visibleColumns.assignedDate && <th>วันที่มอบหมาย</th>}
+                  {visibleColumns.expectedReturn && <th>วันที่คาดว่าจะคืน</th>}
+                  {visibleColumns.historyCount && <th>จำนวนประวัติ</th>}
                   <th>สภาพ</th>
-                  {canManage && <th>จัดการ</th>}
+                  <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {assets.map((asset) => {
                   const badge = warrantyBadge(asset.warrantyExpiry)
+                  const holder = asset.currentAssignment
                   return (
                     <tr key={asset.id}>
                       <td>{asset.assetTag}</td>
@@ -287,15 +302,19 @@ export default function Assets({ role, onNavigateToMaster }) {
                           {badge && <span className={`badge ${badge.className}`}> {badge.label}</span>}
                         </td>
                       )}
+                      {visibleColumns.currentHolder && <td>{holder ? (holder.user.name || holder.user.email) : 'ไม่มีผู้ถือครอง'}</td>}
+                      {visibleColumns.assignmentStatus && <td>{holder ? assignmentStatusLabel(holder.status) : '-'}</td>}
+                      {visibleColumns.assignedDate && <td>{holder ? formatDate(holder.assignedAt) : '-'}</td>}
+                      {visibleColumns.expectedReturn && <td>{holder?.expectedReturnDate ? formatDate(holder.expectedReturnDate) : '-'}</td>}
+                      {visibleColumns.historyCount && <td>{asset.assignmentHistoryCount}</td>}
                       <td>{conditionLabel(asset.assetCondition)}</td>
-                      {canManage && (
-                        <td>
-                          <div className="row">
-                            <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>
-                            <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>
-                          </div>
-                        </td>
-                      )}
+                      <td>
+                        <div className="row">
+                          <button className="link" onClick={() => onViewHistory?.(asset.id)}>ดูประวัติ</button>
+                          {canManage && <button className="link" onClick={() => openEdit(asset)}>แก้ไข</button>}
+                          {canManage && <button className="danger" onClick={() => setDeleteTarget(asset)}>ลบ</button>}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
