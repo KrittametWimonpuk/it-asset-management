@@ -259,3 +259,32 @@ th.sortable:hover { color: #1f2933; }
 .report-card:hover { border-color: #2563eb; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12); }
 .report-card h3 { margin: 0 0 6px; font-size: 15px; }
 .report-card p { margin: 0; }
+
+/* ---- badge การกระทำใน Audit Log (Milestone 9) — สีตามกลุ่มความหมาย: สร้าง/เข้าสู่ระบบ = ฟ้า,
+   แก้ไข/พักงาน = เหลือง, ลบ = แดง, สำเร็จ/ปิดงาน/รับคืน = เขียว, ส่งออก = ม่วง ---- */
+.badge-audit-create { background: #dbeafe; color: #1d4ed8; }
+.badge-audit-update { background: #fef3c7; color: #b45309; }
+.badge-audit-delete { background: #fee2e2; color: #b91c1c; }
+.badge-audit-assign { background: #dbeafe; color: #1d4ed8; }
+.badge-audit-return { background: #dcfce7; color: #15803d; }
+.badge-audit-open { background: #dbeafe; color: #1d4ed8; }
+.badge-audit-start-progress { background: #fef3c7; color: #b45309; }
+.badge-audit-on-hold { background: #f3f4f6; color: #6b7280; }
+.badge-audit-resolve { background: #dcfce7; color: #15803d; }
+.badge-audit-close { background: #e5e7eb; color: #374151; }
+.badge-audit-login { background: #dbeafe; color: #1d4ed8; }
+.badge-audit-export-report { background: #ede9fe; color: #6d28d9; }
+
+/* ---- กล่องรายละเอียด Audit Log (Milestone 9) — กว้างกว่า .modal ปกติ เพราะต้องโชว์ JSON 2 คอลัมน์ ---- */
+.audit-detail-modal { max-width: 720px; }
+.audit-detail-meta { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.audit-detail-json { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.audit-detail-json h3 { margin: 0 0 6px; font-size: 14px; }
+@media (max-width: 600px) { .audit-detail-json { grid-template-columns: 1fr; } }
+
+/* ---- ตัวแสดง JSON แบบ pretty-print — ใช้ font monospace อ่านง่าย ไม่ใช้ syntax-highlight library ---- */
+.json-viewer {
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+  padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+  line-height: 1.5; overflow-x: auto; white-space: pre; margin: 0;
+}

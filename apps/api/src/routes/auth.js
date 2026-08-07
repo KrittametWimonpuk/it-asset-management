@@ -9,6 +9,7 @@ import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
+import { logAudit, auditContext } from '../utils/auditLog.js'
 
 const router = Router()
 
@@ -59,6 +60,15 @@ router.post('/register', asyncHandler(async (req, res) => {
   })
 
   const token = signToken(user)
+
+  // สมัครสมาชิกเอง — ผู้ทำรายการคือ user ที่เพิ่งสร้างขึ้นเอง (ตอนนี้ยังไม่มี req.user เพราะ endpoint นี้ไม่ผ่าน requireAuth)
+  logAudit({
+    action: 'CREATE', entityType: 'User', entityId: user.id,
+    description: `สมัครสมาชิกใหม่: ${user.email}`,
+    newValues: { email: user.email, name: user.name, role: user.role },
+    performedById: user.id, ipAddress: req.ip, userAgent: req.get('user-agent'),
+  })
+
   ok(res, { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } }, 201)
 }))
 
@@ -77,6 +87,13 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user)
+
+  logAudit({
+    action: 'LOGIN', entityType: 'User', entityId: user.id,
+    description: `เข้าสู่ระบบ: ${user.email}`,
+    performedById: user.id, ipAddress: req.ip, userAgent: req.get('user-agent'),
+  })
+
   ok(res, { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } })
 }))
 

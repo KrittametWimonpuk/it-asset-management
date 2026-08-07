@@ -5,6 +5,59 @@
 
 ---
 
+## [v0.9.0] — Milestone 9: Audit Log
+
+### Added
+- โมเดล `AuditLog` (migration `0008_audit_log`) — บันทึกประวัติการทำรายการสำคัญทั้งระบบ: `action`,
+  `entityType`, `entityId`, `description`, `oldValues`/`newValues` (JSON), `performedById`, `performedAt`,
+  `ipAddress`, `userAgent` พร้อม index บน `(entityType, entityId)`, `performedById`, `performedAt`, `action` —
+  ไม่แตะตารางเดิมตารางไหนเลย (ไม่ผูก Prisma relation กับ `User` โดยเจตนา ดูเหตุผลในคอมเมนต์ schema.prisma)
+- `utils/auditLog.js` — `logAudit()` (เขียน audit record แบบ fire-and-forget ไม่ block business logic),
+  `auditContext(req)` (ดึง performedById/ipAddress/userAgent จาก request), `attachPerformer()` (join กับ
+  `User` ด้วยมือครั้งเดียวต่อหน้า ไม่ query ทีละแถว), และค่าคงที่ `AUDIT_ACTIONS`/`AUDIT_ENTITY_TYPES`
+- `routes/audit.js` — `GET /api/audit` (แบ่งหน้า + กรอง page/pageSize/action/entityType/performedBy/
+  dateFrom/dateTo/search, เรียง `performedAt desc` เสมอ) และ `GET /api/audit/:id` — อ่านอย่างเดียว ไม่มี
+  endpoint สร้าง/แก้ไข/ลบ (immutable) เฉพาะ ADMIN/IT_STAFF
+- หน้า "Audit Log" ฝั่ง frontend (`AuditLog.jsx`) — ตาราง + ค้นหา + ตัวกรอง + แบ่งหน้า + กล่องรายละเอียด
+  (`AuditLogDetail.jsx`) แสดง `oldValues`/`newValues` เป็น JSON viewer อ่านง่าย (`.json-viewer`)
+- ขยาย `GET /api/dashboard` (ไม่สร้าง endpoint ใหม่): เพิ่ม `recentAuditLogs` (10 เหตุการณ์ล่าสุดทั้งระบบ,
+  array ว่างสำหรับ EMPLOYEE) และการ์ด "Audit Log ล่าสุด" ในหน้าแดชบอร์ด — section ใหม่ ไม่แก้ logic
+  `recentActivities`/`recentTickets` เดิม
+- Swagger: schema `AuditLog`/`AuditAction`/`AuditEntityType`, tag "Audit Log", และ path docs
+  `docs/paths/audit.js` ครอบคลุมทั้ง 2 endpoint
+
+### Changed (เพิ่ม audit call เท่านั้น ไม่แก้ business logic เดิม)
+- `routes/auth.js` — log `CREATE` (entityType `User`) ตอนสมัครสมาชิก, log `LOGIN` ตอนเข้าสู่ระบบสำเร็จ
+- `routes/assets.js` — log `CREATE`/`UPDATE`/`DELETE` พร้อม `oldValues`/`newValues` เฉพาะฟิลด์ที่เปลี่ยน
+- `utils/masterDataRouter.js` — log `CREATE`/`UPDATE`/`DELETE` ผ่าน option ใหม่ `entityType` (ใช้ร่วมกันทั้ง
+  Category/Location/Department/Vendor ในจุดเดียว ไม่เขียนซ้ำ 4 รอบ) — `routes/categories.js`/`locations.js`/
+  `departments.js`/`vendors.js` เพิ่มแค่ `entityType` เข้าไปใน config ที่ส่งให้ factory
+- `routes/assignments.js` — log `ASSIGN` ตอนมอบหมาย, `UPDATE` ตอนแก้ไขรายละเอียด, `RETURN` ตอนรับคืน
+- `routes/tickets.js` — log `OPEN` ตอนแจ้งปัญหาใหม่, `START_PROGRESS`/`ON_HOLD`/`UPDATE` ตอน PUT (action
+  ตาม target status ของ transition), `RESOLVE` ตอนแก้ไขสำเร็จ, `CLOSE` ตอนปิดงาน
+- `routes/reports.js` — log `EXPORT_REPORT` ทุกครั้งที่ export ไฟล์สำเร็จ (`?format=csv|xlsx|pdf`) ผ่าน
+  helper กลาง `logReportExport()` ใช้ร่วมกันทั้ง 6 รายงาน
+- `apps/api/src/index.js` — mount `app.use('/api/audit', auditRoutes)`
+- `apps/api/.env.example`/README — ไม่เปลี่ยนแปลง (audit log ไม่เพิ่ม environment variable ใหม่)
+
+### Business Rules
+- Log เฉพาะการกระทำที่สำเร็จจริงเท่านั้น — validation ที่ล้มเหลว (400) หรือสิทธิ์ไม่พอ (403) ไม่ถูกบันทึก
+- ทุกการทำรายการสำเร็จหนึ่งครั้งสร้าง audit record ได้เพียงหนึ่งแถวเท่านั้น ไม่มีการ log คำสั่ง GET ใด ๆ
+- ADMIN/IT_STAFF เข้าถึง audit log ได้เต็มรูปแบบ, EMPLOYEE เข้าไม่ได้เลย (403 ทั้ง endpoint และ dashboard field)
+- `oldValues`/`newValues` ไม่มี password hash หรือ JWT token ปนอยู่เด็ดขาด (ผู้เรียก `logAudit()` เลือกเฉพาะ
+  ฟิลด์ที่เปลี่ยนมาเองก่อนส่งเข้ามาเสมอ)
+
+### Fixed
+- Bug เดิมจาก Milestone 8.1 (swagger-jsdoc glob ไม่รองรับ backslash Windows path) ไม่กระทบรอบนี้ — path
+  docs ใหม่ (`docs/paths/audit.js`) ทำงานถูกต้องตั้งแต่แรกเพราะ glob ที่แก้ไว้แล้วใน `openapi.js`
+
+### Not Implemented (ตั้งใจเว้นไว้ ตามขอบเขต Milestone 9)
+- Log `LOGOUT` — ไม่มี server-side logout endpoint ในระบบ (JWT stateless, logout ทำที่ frontend อย่างเดียว)
+- Retry queue / dead-letter mechanism สำหรับ audit write ที่ล้มเหลว — ปัจจุบันแค่ log error ไว้ที่ console
+- Export/ดาวน์โหลด audit log เป็นไฟล์ (ไม่ได้อยู่ใน scope ของ Reports & Export เดิม)
+
+---
+
 ## [v0.8.1] — Milestone 8.1: OpenAPI Documentation
 
 Milestone เอกสารล้วน ๆ — ไม่มีการเปลี่ยน business logic, ไม่มีการแก้ database schema, ไม่มี endpoint ใหม่

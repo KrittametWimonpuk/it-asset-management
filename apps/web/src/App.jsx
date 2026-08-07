@@ -15,6 +15,7 @@ import Assets from './pages/Assets.jsx'
 import Assignments from './pages/Assignments.jsx'
 import Tickets from './pages/Tickets.jsx'
 import Reports from './pages/Reports.jsx'
+import AuditLog from './pages/AuditLog.jsx'
 import MasterDataPage from './pages/MasterDataPage.jsx'
 import { categoryConfig, locationConfig, departmentConfig, vendorConfig } from './pages/masterDataConfigs.jsx'
 
@@ -120,6 +121,9 @@ export default function App() {
           <button className={`tab${tab === 'assignments' ? ' active' : ''}`} onClick={goToAssignments}>การมอบหมาย</button>
           <button className={`tab${tab === 'tickets' ? ' active' : ''}`} onClick={goToTickets}>Helpdesk</button>
           <button className={`tab${tab === 'reports' ? ' active' : ''}`} onClick={() => setTab('reports')}>รายงาน</button>
+          {canManageMasterData && (
+            <button className={`tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>Audit Log</button>
+          )}
           {canManageMasterData && Object.entries(MASTER_TABS).map(([key, { label }]) => (
             <button key={key} className={`tab${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}>{label}</button>
           ))}
@@ -138,6 +142,7 @@ export default function App() {
           {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}
+          {tab === 'audit' && canManageMasterData && <AuditLog />}
           {activeMaster && <MasterDataPage {...activeMaster.config} />}
         </div>
       </div>

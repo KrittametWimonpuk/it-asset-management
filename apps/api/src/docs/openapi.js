@@ -535,6 +535,10 @@ const dashboardSchemas = {
       },
       recentActivities: { type: 'array', items: { $ref: '#/components/schemas/ActivityItem' } },
       recentTickets: { type: 'array', items: { $ref: '#/components/schemas/RecentTicketItem' } },
+      recentAuditLogs: {
+        type: 'array', items: { $ref: '#/components/schemas/AuditLog' },
+        description: 'เหตุการณ์ audit log ล่าสุด 10 รายการทั้งระบบ (Milestone 9) — array ว่างสำหรับ EMPLOYEE (ไม่มีสิทธิ์ดู audit log)',
+      },
     },
   },
 }
@@ -619,14 +623,48 @@ const reportSchemas = {
   },
 }
 
+// ---- Audit Log (Milestone 9) — record เดียวใช้ทั้ง GET /api/audit, GET /api/audit/:id และ
+// DashboardResponse.recentAuditLogs (โครงสร้างเดียวกันทุกจุด) ----
+const auditSchemas = {
+  AuditAction: {
+    type: 'string',
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT'],
+  },
+  AuditEntityType: {
+    type: 'string',
+    enum: ['Asset', 'Assignment', 'Ticket', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
+  },
+  AuditLog: {
+    type: 'object',
+    description: 'บันทึกประวัติหนึ่งรายการ — immutable ไม่มี endpoint แก้ไข/ลบ',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      action: { $ref: '#/components/schemas/AuditAction' },
+      entityType: { $ref: '#/components/schemas/AuditEntityType' },
+      entityId: { type: 'string', nullable: true, description: 'id ของ record ที่ถูกกระทำ — ไม่มีค่าสำหรับ action ที่ไม่มี entity เช่น LOGIN' },
+      description: { type: 'string', nullable: true, example: 'แก้ไขครุภัณฑ์ IT-0001 — โน้ตบุ๊ค Dell Latitude 5440' },
+      oldValues: { type: 'object', nullable: true, description: 'ค่าก่อนแก้ไข (เฉพาะฟิลด์ที่เปลี่ยน) — มีเฉพาะ UPDATE/DELETE', additionalProperties: true },
+      newValues: { type: 'object', nullable: true, description: 'ค่าหลังแก้ไข (เฉพาะฟิลด์ที่เปลี่ยน) — มีเฉพาะ CREATE/UPDATE ไม่มี password hash/JWT ปนอยู่แน่นอน', additionalProperties: true },
+      performedById: { type: 'string', format: 'uuid', nullable: true },
+      performedBy: {
+        type: 'object', nullable: true, description: 'join กับ User ตอนอ่าน (ไม่ใช่ field ที่เก็บจริงในตาราง)',
+        properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string', nullable: true }, email: { type: 'string' } },
+      },
+      performedAt: { type: 'string', format: 'date-time' },
+      ipAddress: { type: 'string', nullable: true, example: '127.0.0.1' },
+      userAgent: { type: 'string', nullable: true },
+    },
+  },
+}
+
 const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '0.8.1',
+    version: '0.9.0',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
-      'Helpdesk, แดชบอร์ด, และรายงาน/ส่งออกข้อมูล\n\n' +
+      'Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
       'เอกสารชุดนี้สร้างจาก JSDoc annotation ที่อ่าน route/validation/response จริงจากซอร์สโค้ด ' +
       '(ดู `src/docs/paths/*.js`) — ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง\n\n' +
       '**สิทธิ์การใช้งาน (RBAC)** บังคับที่ backend เสมอในทุก endpoint ที่ต้องล็อกอิน ' +
@@ -647,6 +685,7 @@ const definition = {
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },
     { name: 'Reports', description: 'รายงานและส่งออกข้อมูล (CSV/Excel/PDF)' },
+    { name: 'Audit Log', description: 'ประวัติการทำรายการสำคัญทั้งระบบ (อ่านอย่างเดียว — ADMIN/IT_STAFF เท่านั้น)' },
     { name: 'Health', description: 'Health check สำหรับ infrastructure (AWS ALB)' },
   ],
   components: {
@@ -669,8 +708,14 @@ const definition = {
       ...ticketSchemas,
       ...dashboardSchemas,
       ...reportSchemas,
+      ...auditSchemas,
     },
     parameters: {
+      AuditLogId: {
+        name: 'id', in: 'path', required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Audit Log ID (UUID)',
+      },
       AssetId: {
         name: 'id', in: 'path', required: true,
         schema: { type: 'string', format: 'uuid' },

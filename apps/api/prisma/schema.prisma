@@ -323,3 +323,39 @@ model Ticket {
   @@index([priority])
   @@index([category])
 }
+
+// ---------------------------------------------------------------------------
+// Milestone 9 — Audit Log
+//
+// บันทึกการกระทำทางธุรกิจที่สำคัญทุกครั้ง (ไม่ใช่ทุก request) เป็นประวัติเท่านั้น — immutable
+// (ไม่มี endpoint แก้ไข/ลบ) ดูรายการ action/entityType ที่รองรับที่ utils/auditLog.js
+//
+// ตั้งใจไม่ผูก relation แบบเป็นทางการกับ User (performedById เป็นแค่ string เก็บ id ดิบ ๆ) —
+// เหตุผล 2 ข้อ: (1) ไม่ต้องแก้ model User เลยแม้แต่บรรทัดเดียวตามข้อกำหนด "ห้ามแก้ตารางเดิม เว้นแต่จำเป็นจริง ๆ"
+// (2) ประวัติต้องอยู่ครบเสมอแม้ในอนาคตจะมี endpoint ลบผู้ใช้ — ถ้าผูก FK ปกติจะต้องตัดสินใจ onDelete
+// (Cascade จะทำให้ประวัติหายไปด้วย, Restrict จะบล็อกการลบผู้ใช้ที่เคยทำรายการไว้) ซึ่งไม่มีคำตอบที่ถูกต้อง
+// ชัดเจนในตอนนี้ — เก็บเป็น string เฉย ๆ ปลอดภัยที่สุด (routes/audit.js join กับ User เองตอนอ่านแทน)
+model AuditLog {
+  id String @id @default(uuid())
+
+  action     String // CREATE/UPDATE/DELETE/ASSIGN/RETURN/OPEN/START_PROGRESS/ON_HOLD/RESOLVE/CLOSE/LOGIN/EXPORT_REPORT
+  entityType String // Asset/Assignment/Ticket/Category/Location/Department/Vendor/User/Report
+  entityId   String? // id ของ record ที่ถูกกระทำ — ไม่บังคับ (เช่น LOGIN ไม่มี entity ให้อ้างอิง)
+
+  description String? // สรุปเหตุการณ์แบบอ่านง่าย (ภาษาไทย) เช่น "สร้างครุภัณฑ์ IT-0001 — Dell Latitude 5440"
+
+  oldValues Json? // สถานะก่อนแก้ไข (เฉพาะ UPDATE/DELETE) — เก็บเฉพาะฟิลด์ที่เปลี่ยน ไม่ใช่ raw DB row ทั้งแถว
+  newValues Json? // สถานะหลังแก้ไข (เฉพาะ CREATE/UPDATE) — ห้ามมี password hash/JWT ปนอยู่เด็ดขาด
+
+  performedById String? // ผู้ทำรายการ — เก็บแค่ id ดิบ ๆ (ดูเหตุผลด้านบน)
+  performedAt   DateTime @default(now())
+
+  ipAddress String? // req.ip ตอนทำรายการ (ไม่บังคับ)
+  userAgent String? // req.get('user-agent') ตอนทำรายการ (ไม่บังคับ)
+
+  // query หลักของหน้า Audit Log กรอง/เรียงด้วยฟิลด์เหล่านี้เสมอ — index ช่วยให้ query เร็วขึ้น
+  @@index([entityType, entityId])
+  @@index([performedById])
+  @@index([performedAt])
+  @@index([action])
+}

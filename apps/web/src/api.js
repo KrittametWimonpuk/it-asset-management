@@ -151,4 +151,11 @@ export const api = {
     vendors: (params) => request(`/reports/vendors${toQueryString(params)}`),
     download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
+
+  // Milestone 9: Audit Log — อ่านอย่างเดียว (ไม่มี add/update/remove — ประวัติแก้ไข/ลบไม่ได้)
+  // params รองรับ: page, pageSize, action, entityType, performedBy, dateFrom, dateTo, search
+  audit: {
+    list: (params) => request(`/audit${toQueryString(params)}`),
+    get: (id) => request(`/audit/${id}`),
+  },
 }

@@ -31,6 +31,11 @@ import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
 import {
   nextTicketNumber, TICKET_WITH_RELATIONS, isValidTransition, PUT_EDITABLE_STATUSES,
 } from '../utils/ticketHelpers.js'
+import { logAudit, auditContext } from '../utils/auditLog.js'
+
+// ป้าย action ของ audit log ตามสถานะเป้าหมายที่ PUT ทั่วไปเปลี่ยนได้ (ไม่รวม RESOLVED/CLOSED — ใช้ action
+// คงที่ RESOLVE/CLOSE ที่ endpoint เฉพาะของมันเองแทน ดูด้านล่าง)
+const STATUS_TO_AUDIT_ACTION = { IN_PROGRESS: 'START_PROGRESS', ON_HOLD: 'ON_HOLD' }
 
 const router = Router()
 
@@ -180,6 +185,13 @@ router.post('/', asyncHandler(async (req, res) => {
     data: { ticketNumber, assetId, reportedById: req.user.id, ...rest },
     ...TICKET_WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'OPEN', entityType: 'Ticket', entityId: ticket.id,
+    description: `แจ้งปัญหาใหม่ ${ticket.ticketNumber} — ${ticket.title} (${ticket.asset.assetTag})`,
+    newValues: { assetId, ...rest },
+  })
+
   ok(res, ticket, 201)
 }))
 
@@ -219,6 +231,19 @@ router.put('/:id', manageTickets, asyncHandler(async (req, res) => {
     data,
     ...TICKET_WITH_RELATIONS,
   })
+
+  // ถ้า status เปลี่ยน (รวมกรณีขยับเป็น IN_PROGRESS อัตโนมัติจากการมอบหมายครั้งแรก) ใช้ action ตามสถานะเป้าหมาย
+  // (START_PROGRESS/ON_HOLD) ไม่งั้นถือเป็นการแก้ไขรายละเอียดทั่วไป (UPDATE)
+  const statusChanged = data.status !== undefined && data.status !== existing.status
+  const action = statusChanged ? (STATUS_TO_AUDIT_ACTION[data.status] || 'UPDATE') : 'UPDATE'
+
+  logAudit({
+    ...auditContext(req), action, entityType: 'Ticket', entityId: ticket.id,
+    description: `แก้ไข/มอบหมายตั๋ว ${ticket.ticketNumber} — ${ticket.title}`,
+    oldValues: Object.fromEntries(Object.keys(data).map((k) => [k, existing[k]])),
+    newValues: data,
+  })
+
   ok(res, ticket)
 }))
 
@@ -237,11 +262,20 @@ router.post('/:id/resolve', manageTickets, asyncHandler(async (req, res) => {
   }
 
   const resolvedAt = parsed.data.resolvedAt || new Date()
+  const resolveData = { status: 'RESOLVED', resolution: parsed.data.resolution, resolvedAt }
   const ticket = await prisma.ticket.update({
     where: { id: req.params.id },
-    data: { status: 'RESOLVED', resolution: parsed.data.resolution, resolvedAt },
+    data: resolveData,
     ...TICKET_WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'RESOLVE', entityType: 'Ticket', entityId: ticket.id,
+    description: `แก้ไขปัญหาสำเร็จ ${ticket.ticketNumber} — ${ticket.title}`,
+    oldValues: { status: existing.status, resolution: existing.resolution, resolvedAt: existing.resolvedAt },
+    newValues: resolveData,
+  })
+
   ok(res, ticket)
 }))
 
@@ -260,11 +294,20 @@ router.post('/:id/close', manageTickets, asyncHandler(async (req, res) => {
   }
 
   const closedAt = parsed.data.closedAt || new Date()
+  const closeData = { status: 'CLOSED', closedAt }
   const ticket = await prisma.ticket.update({
     where: { id: req.params.id },
-    data: { status: 'CLOSED', closedAt },
+    data: closeData,
     ...TICKET_WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'CLOSE', entityType: 'Ticket', entityId: ticket.id,
+    description: `ปิดงาน ${ticket.ticketNumber} — ${ticket.title}`,
+    oldValues: { status: existing.status, closedAt: existing.closedAt },
+    newValues: closeData,
+  })
+
   ok(res, ticket)
 }))
 

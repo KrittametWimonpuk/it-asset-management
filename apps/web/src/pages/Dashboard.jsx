@@ -9,7 +9,8 @@
 // ---------------------------------------------------------------------------
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
-import { formatDate } from '../utils/format.js'
+import { formatDate, formatDateTime } from '../utils/format.js'
+import { ACTION_LABELS, ENTITY_TYPE_LABELS } from '../utils/auditLabels.js'
 
 const SUMMARY_CARDS = [
   { key: 'totalAssets', label: 'ครุภัณฑ์ทั้งหมด' },
@@ -246,6 +247,30 @@ export default function Dashboard({ role }) {
           </div>
         )}
       </div>
+
+      {data.recentAuditLogs.length > 0 && (
+        <div className="dashboard-section">
+          <h3>Audit Log ล่าสุด</h3>
+          <div className="card">
+            <div className="activity-list">
+              {data.recentAuditLogs.map((log) => (
+                <div className="activity-item" key={log.id}>
+                  <span>
+                    <span className={`badge badge-audit-${log.action.toLowerCase().replace(/_/g, '-')}`}>
+                      {ACTION_LABELS[log.action] || log.action}
+                    </span>
+                    {' '}
+                    {ENTITY_TYPE_LABELS[log.entityType] || log.entityType}
+                    {' — '}{log.description || log.entityId || '-'}
+                    {' '}({log.performedBy ? (log.performedBy.name || log.performedBy.email) : 'ระบบ/ไม่ทราบ'})
+                  </span>
+                  <span className="activity-time">{formatDateTime(log.performedAt)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

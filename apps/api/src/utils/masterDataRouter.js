@@ -17,11 +17,13 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from './response.js'
 import { asyncHandler } from './asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from './queryParams.js'
+import { logAudit, auditContext } from './auditLog.js'
 
 /**
  * @param {object} opts
  * @param {object} opts.model - prisma delegate เช่น prisma.category
  * @param {string} opts.entityLabel - ชื่อเรียกภาษาไทยไว้ใช้ในข้อความ error เช่น "หมวดหมู่"
+ * @param {string} opts.entityType - ชื่อ entity ภาษาอังกฤษไว้ใช้ใน audit log (ต้องตรงกับ AUDIT_ENTITY_TYPES) เช่น "Category"
  * @param {import('zod').ZodSchema} opts.createSchema - zod schema ตอนสร้างใหม่ (ต้องมี name)
  * @param {import('zod').ZodSchema} opts.updateSchema - zod schema ตอนแก้ไข (ทุกฟิลด์ optional)
  * @param {string[]} [opts.searchableFields] - ฟิลด์อื่นนอกจาก name ที่ค้นหาได้ (เช่น vendor: contactName, email)
@@ -31,6 +33,7 @@ import { parsePagination, parseSort, buildPageMeta } from './queryParams.js'
 export function createMasterDataRouter({
   model,
   entityLabel,
+  entityType,
   createSchema,
   updateSchema,
   searchableFields = [],
@@ -105,6 +108,13 @@ export function createMasterDataRouter({
     }
 
     const item = await model.create({ data: parsed.data })
+
+    logAudit({
+      ...auditContext(req), action: 'CREATE', entityType, entityId: item.id,
+      description: `สร้าง${entityLabel} ${item.name}`,
+      newValues: parsed.data,
+    })
+
     ok(res, item, 201)
   }))
 
@@ -120,6 +130,12 @@ export function createMasterDataRouter({
       return fail(res, 409, message, errors)
     }
 
+    // ดึงค่าเดิมเฉพาะฟิลด์ที่กำลังจะถูกแก้ไว้ก่อน (สำหรับ audit log oldValues)
+    const existing = await model.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      select: Object.fromEntries(Object.keys(parsed.data).map((k) => [k, true])),
+    })
+
     const result = await model.updateMany({
       where: { id: req.params.id, deletedAt: null },
       data: parsed.data,
@@ -127,16 +143,32 @@ export function createMasterDataRouter({
     if (result.count === 0) return fail(res, 404, NOT_FOUND_MESSAGE)
 
     const item = await model.findUnique({ where: { id: req.params.id } })
+
+    logAudit({
+      ...auditContext(req), action: 'UPDATE', entityType, entityId: req.params.id,
+      description: `แก้ไข${entityLabel} ${item.name}`,
+      oldValues: existing, newValues: parsed.data,
+    })
+
     ok(res, item)
   }))
 
   // ---- DELETE (soft) ----
   router.delete('/:id', canManage, asyncHandler(async (req, res) => {
+    const existing = await model.findFirst({ where: { id: req.params.id, deletedAt: null }, select: { name: true } })
+
     const result = await model.updateMany({
       where: { id: req.params.id, deletedAt: null },
       data: { deletedAt: new Date() },
     })
     if (result.count === 0) return fail(res, 404, NOT_FOUND_MESSAGE)
+
+    logAudit({
+      ...auditContext(req), action: 'DELETE', entityType, entityId: req.params.id,
+      description: `ลบ${entityLabel} (soft delete) ${existing?.name}`,
+      oldValues: existing,
+    })
+
     ok(res, { id: req.params.id })
   }))
 

@@ -26,6 +26,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
 import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE } from '../utils/assignmentHelpers.js'
 import { parseReportQuery, dateRangeWhere, warrantyBucketWhere, warrantyInfo, sendExport } from '../utils/reportHelpers.js'
+import { logAudit, auditContext } from '../utils/auditLog.js'
 import {
   ASSET_STATUSES, SEARCHABLE_FIELDS as ASSET_SEARCH_FIELDS, scopeForRead as assetScopeForRead,
 } from './assets.js'
@@ -59,6 +60,16 @@ const TICKET_CATEGORY_LABELS = { HARDWARE: 'ฮาร์ดแวร์', SOFTWA
 // ตัด T + เวลาออก เหลือแค่ yyyy-mm-dd — เพียงพอสำหรับรายงาน (export ไม่จำเป็นต้องมีเวลาละเอียดระดับวินาที)
 function fmtDate(v) {
   return v ? new Date(v).toISOString().slice(0, 10) : ''
+}
+
+// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 6 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
+// (เรียกก่อน sendExport เสมอ ไม่ await เพราะเป็น fire-and-forget — ไม่หน่วงการดาวน์โหลดไฟล์)
+function logReportExport(req, reportLabel, format) {
+  logAudit({
+    ...auditContext(req), action: 'EXPORT_REPORT', entityType: 'Report',
+    description: `ส่งออกรายงาน${reportLabel} (${format.toUpperCase()})`,
+    newValues: { format },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +142,7 @@ router.get('/assets', asyncHandler(async (req, res) => {
   }
 
   const rows = await prisma.asset.findMany({ where, orderBy: { assetTag: 'asc' }, include })
+  logReportExport(req, 'ครุภัณฑ์คงเหลือ', f.format)
   return sendExport(res, f.format, 'asset-inventory-report', 'รายงานครุภัณฑ์คงเหลือ', ASSET_REPORT_COLUMNS, rows.map(shapeAssetRow))
 }))
 
@@ -202,6 +214,7 @@ router.get('/assignments', asyncHandler(async (req, res) => {
   }
 
   const rows = await prisma.assignment.findMany({ where, orderBy: { assignedAt: 'desc' }, ...ASSIGNMENT_REPORT_INCLUDE })
+  logReportExport(req, 'การมอบหมายครุภัณฑ์', f.format)
   return sendExport(res, f.format, 'assignment-report', 'รายงานการมอบหมายครุภัณฑ์', ASSIGNMENT_REPORT_COLUMNS, rows.map(shapeAssignmentRow))
 }))
 
@@ -265,6 +278,7 @@ router.get('/warranty', asyncHandler(async (req, res) => {
   }
 
   const rows = await prisma.asset.findMany({ where, orderBy: { warrantyExpiry: 'asc' }, include })
+  logReportExport(req, 'การรับประกัน', f.format)
   return sendExport(res, f.format, 'warranty-report', 'รายงานการรับประกัน', WARRANTY_REPORT_COLUMNS, rows.map(shapeWarrantyRow))
 }))
 
@@ -339,6 +353,7 @@ router.get('/helpdesk', asyncHandler(async (req, res) => {
   }
 
   const rows = await prisma.ticket.findMany({ where, orderBy: { openedAt: 'desc' }, ...HELPDESK_REPORT_INCLUDE })
+  logReportExport(req, 'ใบแจ้งซ่อม', f.format)
   return sendExport(res, f.format, 'helpdesk-report', 'รายงานใบแจ้งซ่อม', HELPDESK_REPORT_COLUMNS, rows.map(shapeHelpdeskRow))
 }))
 
@@ -407,6 +422,7 @@ router.get('/departments', orgWideOnly, asyncHandler(async (req, res) => {
   }))
 
   if (!f.format) return ok(res, { items: rows })
+  logReportExport(req, 'สรุปตามแผนก', f.format)
   return sendExport(res, f.format, 'department-summary-report', 'สรุปตามแผนก', DEPARTMENT_REPORT_COLUMNS, rows)
 }))
 
@@ -478,6 +494,7 @@ router.get('/vendors', orgWideOnly, asyncHandler(async (req, res) => {
   }))
 
   if (!f.format) return ok(res, { items: rows })
+  logReportExport(req, 'สรุปตามผู้ขาย/ผู้ผลิต', f.format)
   return sendExport(res, f.format, 'vendor-summary-report', 'สรุปตามผู้ขาย/ผู้ผลิต', VENDOR_REPORT_COLUMNS, rows)
 }))
 

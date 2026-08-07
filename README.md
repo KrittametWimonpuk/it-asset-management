@@ -6,7 +6,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.8.1` (Milestone 8.1 — OpenAPI Documentation)
+**เวอร์ชันปัจจุบัน:** `v0.9.0` (Milestone 9 — Audit Log)
 
 ---
 
@@ -24,6 +24,7 @@
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
 | **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 49 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
 
@@ -79,6 +80,15 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   ที่กำลังดู — ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว) Department Summary/Vendor Summary เป็นภาพรวมองค์กร
   ล้วน ๆ จึงกัน EMPLOYEE ด้วย `requireRole('ADMIN','IT_STAFF')` ตั้งแต่ต้นทาง (403 ไม่ใช่แค่ซ่อนปุ่ม)
   ดูรายละเอียดรายงานทั้งหมดที่หัวข้อ [📊 Reports & Export](#-reports--export) ด้านล่าง
+- **Audit Log (Milestone 9)**: `utils/auditLog.js` มีฟังก์ชันเดียว `logAudit()` ที่ทุก route เรียกใช้หลัง
+  ทำรายการสำเร็จ (**ไม่ `await`** — fire-and-forget เพื่อไม่ให้การเขียน audit log หน่วง response หลัก
+  ถ้าเขียนไม่สำเร็จจะ log error ที่ server console เฉย ๆ ไม่กระทบ response ที่ตอบผู้ใช้ไปแล้ว) `AuditLog.performedById`
+  ตั้งใจไม่ผูก Prisma relation กับ `User` (เป็นแค่ string ธรรมดา) เพื่อไม่ต้องแก้ model `User` เลย และกันปัญหา
+  onDelete policy ที่ยังไม่มีคำตอบชัดเจนในอนาคต — `routes/audit.js` จึง join กับ `User` เองตอนอ่าน (ดึง id ที่ไม่ซ้ำ
+  ในหน้าที่กำลังแสดงมา query ครั้งเดียว ไม่ query ทีละแถว) ฟังก์ชัน join นี้ (`attachPerformer`) ใช้ร่วมกันทั้ง
+  `routes/audit.js` และ `routes/dashboard.js` (`recentAuditLogs`) กันโค้ดซ้ำ สำหรับ Master Data (Category/Location/
+  Department/Vendor) การ log ทำแบบรวมศูนย์อยู่ใน `createMasterDataRouter` เดียว (ผ่าน option `entityType`) แทนที่จะ
+  เขียนซ้ำ 4 รอบ ดูรายละเอียดที่หัวข้อ [📝 Audit Log](#-audit-log) ด้านล่าง
 
 ```
 webapp-starter/
@@ -87,17 +97,17 @@ webapp-starter/
 │   │   ├── assets/fonts/       ฟอนต์ Sarabun (SIL OFL) ที่ใช้ render ข้อความไทยใน PDF export
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
-│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0007)
+│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0008)
 │   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย+ใบแจ้งซ่อม)
 │   │   └── src/
-│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/reports/...)
+│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/reports/audit/...)
 │   │       ├── middleware/     requireAuth / requireRole
 │   │       ├── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope,
-│   │       │                    ticketHelpers, reportHelpers — filter parsing + CSV/Excel/PDF writers)
+│   │       │                    ticketHelpers, reportHelpers, auditLog — logAudit()/attachPerformer())
 │   │       └── docs/           OpenAPI/Swagger config + คอมเมนต์เอกสาร endpoint (paths/*.js) — ไม่แตะ route file
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
-│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/Reports/...)
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/Reports/AuditLog/...)
 │           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
@@ -265,10 +275,46 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
+## 📝 Audit Log
+
+หน้า "Audit Log" (เฉพาะ ADMIN/IT_STAFF) แสดงประวัติการทำรายการสำคัญทั้งระบบ — ตาราง (เวลา/ผู้ทำรายการ/
+การกระทำ/ประเภท/รายละเอียด) พร้อมค้นหา, ตัวกรอง, แบ่งหน้า และกล่องรายละเอียดที่โชว์ค่าก่อน/หลังแก้ไข
+(`oldValues`/`newValues`) เป็น JSON ที่จัดรูปแบบอ่านง่าย เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable) — ไม่มี
+endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้แต่ตัวเดียว
+
+**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Category, Department, Location, Vendor, User, Report
+
+**Actions ที่รองรับ:** `CREATE`, `UPDATE`, `DELETE`, `ASSIGN`, `RETURN`, `OPEN`, `START_PROGRESS`, `ON_HOLD`,
+`RESOLVE`, `CLOSE`, `LOGIN`, `EXPORT_REPORT`
+
+| เหตุการณ์ | Action ที่บันทึก | จุดที่เรียก |
+|-----------|------------------|-------------|
+| สร้าง/แก้ไข/ลบครุภัณฑ์ | `CREATE` / `UPDATE` / `DELETE` | `routes/assets.js` |
+| สร้าง/แก้ไข/ลบ master data (Category/Location/Department/Vendor) | `CREATE` / `UPDATE` / `DELETE` | `utils/masterDataRouter.js` (จุดเดียว ใช้ร่วมกันทั้ง 4 entity) |
+| มอบหมาย / แก้ไขรายละเอียด / รับคืนครุภัณฑ์ | `ASSIGN` / `UPDATE` / `RETURN` | `routes/assignments.js` |
+| แจ้งปัญหาใหม่ / เริ่มดำเนินการ / พักงาน / แก้ไขสำเร็จ / ปิดงาน | `OPEN` / `START_PROGRESS` / `ON_HOLD` / `RESOLVE` / `CLOSE` | `routes/tickets.js` (action ตาม target status ของแต่ละ transition) |
+| สมัครสมาชิก / เข้าสู่ระบบ | `CREATE` (entityType `User`) / `LOGIN` | `routes/auth.js` |
+| ส่งออกรายงาน (CSV/Excel/PDF) | `EXPORT_REPORT` | `routes/reports.js` (ทุก endpoint ที่ `?format=` มา) |
+
+**กฎการบันทึก:** log เฉพาะการกระทำที่สำเร็จจริงเท่านั้น — validation ที่ล้มเหลว (400) หรือสิทธิ์ไม่พอ (403)
+ไม่ถูกบันทึก, และทุกการทำรายการสำเร็จหนึ่งครั้งสร้าง audit record ได้เพียงหนึ่งแถวเท่านั้น (ไม่มีการ log ซ้ำ)
+ไม่มีการ log คำสั่ง GET ใด ๆ
+
+**Performance:** `logAudit()` เรียกแบบ fire-and-forget (**ไม่ `await`**) เสมอ — การเขียน audit log ไม่มีทาง
+หน่วง response ของ business action หลัก แม้เขียนล้มเหลว (เช่น DB มีปัญหาชั่วคราว) ก็แค่ log error ไว้ที่
+server console โดยไม่กระทบผู้ใช้
+
+**RBAC:** ADMIN/IT_STAFF อ่านได้ทั้งหมด (`GET /api/audit`, `GET /api/audit/:id`), EMPLOYEE เข้าไม่ได้เลย (403)
+
+**Dashboard:** ส่วน "Audit Log ล่าสุด" แสดง 10 เหตุการณ์ล่าสุดทั้งระบบ (เฉพาะ ADMIN/IT_STAFF — array ว่าง
+สำหรับ EMPLOYEE) เป็นฟิลด์ใหม่ที่เพิ่มเข้าไปใน `GET /api/dashboard` เดิม ไม่ใช่หน้าแดชบอร์ดใหม่
+
+---
+
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.8.0`, ปัจจุบัน `v0.8.1`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.8.1`, ปัจจุบัน `v0.9.0`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -338,8 +384,8 @@ cd deploy
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
   ไม่ใช่ข้อจำกัดทางเทคนิค
-- **Helpdesk ยังไม่มี**: แจ้งเตือนอีเมล, QR Code ติดครุภัณฑ์, รายงาน/ส่งออกข้อมูล, Audit Log — ตั้งใจเว้นไว้สำหรับ
-  milestone ถัดไปเพื่อไม่ให้ scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
+- **Helpdesk ยังไม่มี**: แจ้งเตือนอีเมล, QR Code ติดครุภัณฑ์ — ตั้งใจเว้นไว้สำหรับ milestone ถัดไปเพื่อไม่ให้
+  scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
 - **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
   (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
 - **Export ดึงข้อมูลทั้งหมดในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ
@@ -354,6 +400,16 @@ cd deploy
 - **เอกสาร Swagger เขียนแยกจาก route file ทั้งหมด** (`apps/api/src/docs/`) ตั้งใจให้ Milestone 8.1 ไม่แตะ
   business logic แม้แต่บรรทัดเดียว — หมายความว่าถ้า route จริงถูกแก้ในอนาคต (เพิ่ม field/เปลี่ยน validation)
   ต้องอัปเดตไฟล์เอกสารคู่กันด้วยตนเอง ไม่มีการ sync อัตโนมัติจากโค้ดจริงไปเอกสาร
+- **ไม่มีการ log LOGOUT** — ระบบไม่มี server-side logout endpoint (JWT เป็น stateless token, ออกจากระบบทำที่
+  ฝั่งเว็บด้วยการลบ token ออกจาก `localStorage` เท่านั้น) จึงไม่มีจุดที่จะบันทึก audit event นี้ได้จริง
+- **`AuditLog.performedById` ไม่ผูก Prisma relation กับ `User`** — เป็น string ธรรมดา ไม่มี foreign key
+  constraint ระดับฐานข้อมูล (ตั้งใจ ดูเหตุผลที่ schema.prisma และหัวข้อ Architecture Overview) หมายความว่าถ้า
+  ในอนาคตมี endpoint ลบผู้ใช้จริง ๆ audit log เก่าจะยังอ้างอิง id ที่ไม่มีตัวตนอยู่ในระบบแล้วได้ (แสดงผลเป็น
+  "ระบบ/ไม่ทราบ" ที่หน้า Audit Log แทน ไม่ error)
+- **การเขียน audit log เป็นแบบ fire-and-forget** — เรียก `logAudit()` โดยไม่ `await` เสมอ (ตั้งใจ กันไม่ให้
+  หน่วง response ของ business action หลัก) หมายความว่าในกรณีที่หายากมาก ๆ (เช่น DB connection หลุดพอดีตอนนั้น)
+  business action อาจสำเร็จแต่ audit record เขียนไม่สำเร็จ (log error ไว้ที่ server console เท่านั้น) — ไม่มี
+  retry queue หรือ dead-letter mechanism ในตอนนี้
 
 ---
 
@@ -361,7 +417,6 @@ cd deploy
 
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
-- [ ] Audit Log (ใครแก้ไขอะไร เมื่อไร) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
 - [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request
 - [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN

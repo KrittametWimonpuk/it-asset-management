@@ -16,6 +16,7 @@ const updateSchema = createSchema.partial()
 export default createMasterDataRouter({
   model: prisma.department,
   entityLabel: 'แผนก',
+  entityType: 'Department',
   createSchema,
   updateSchema,
 })

@@ -16,6 +16,7 @@ const updateSchema = createSchema.partial()
 export default createMasterDataRouter({
   model: prisma.location,
   entityLabel: 'สถานที่',
+  entityType: 'Location',
   createSchema,
   updateSchema,
 })

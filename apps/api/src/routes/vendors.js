@@ -20,6 +20,7 @@ const updateSchema = createSchema.partial()
 export default createMasterDataRouter({
   model: prisma.vendor,
   entityLabel: 'ผู้ขาย/ผู้ผลิต',
+  entityType: 'Vendor',
   createSchema,
   updateSchema,
   // ให้ค้นหาจากชื่อผู้ติดต่อ/อีเมลได้ด้วย นอกเหนือจาก name

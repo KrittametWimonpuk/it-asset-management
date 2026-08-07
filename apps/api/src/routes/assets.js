@@ -35,6 +35,7 @@ import {
 } from '../utils/zodHelpers.js'
 import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE, shapeAssetWithAssignment } from '../utils/assignmentHelpers.js'
 import { ASSET_TICKETS_INCLUDE, summarizeAssetTickets } from '../utils/ticketHelpers.js'
+import { logAudit, auditContext } from '../utils/auditLog.js'
 
 const router = Router()
 
@@ -271,6 +272,13 @@ router.post('/', manageAssets, asyncHandler(async (req, res) => {
     data: { ...parsed.data, ownerId: req.user.id },
     ...WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'CREATE', entityType: 'Asset', entityId: asset.id,
+    description: `สร้างครุภัณฑ์ ${asset.assetTag} — ${asset.name}`,
+    newValues: parsed.data,
+  })
+
   ok(res, shapeAsset(asset), 201)
 }))
 
@@ -305,6 +313,12 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
     return fail(res, 400, invalidRef.message, [invalidRef])
   }
 
+  // ดึงค่าเดิมเฉพาะฟิลด์ที่กำลังจะถูกแก้ไว้ก่อน (สำหรับ audit log oldValues) — เลือกเฉพาะ key ที่ parsed.data มี
+  const existing = await prisma.asset.findFirst({
+    where: { id: req.params.id, ...NOT_DELETED },
+    select: Object.fromEntries(Object.keys(parsed.data).map((k) => [k, true])),
+  })
+
   // updateMany + เงื่อนไข deletedAt = ป้องกันไม่ให้แก้ของที่ถูกลบไปแล้ว (ownership ไม่จำกัด — ผ่าน manageAssets มาแล้ว)
   const result = await prisma.asset.updateMany({
     where: { id: req.params.id, ...NOT_DELETED },
@@ -315,6 +329,13 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
   }
 
   const asset = await prisma.asset.findUnique({ where: { id: req.params.id }, ...WITH_RELATIONS })
+
+  logAudit({
+    ...auditContext(req), action: 'UPDATE', entityType: 'Asset', entityId: req.params.id,
+    description: `แก้ไขครุภัณฑ์ ${asset.assetTag} — ${asset.name}`,
+    oldValues: existing, newValues: parsed.data,
+  })
+
   ok(res, shapeAsset(asset))
 }))
 
@@ -329,6 +350,11 @@ router.delete('/:id', manageAssets, asyncHandler(async (req, res) => {
     return fail(res, 409, 'ครุภัณฑ์นี้ยังมีผู้ถือครองอยู่ กรุณารับคืนก่อนลบ')
   }
 
+  const existing = await prisma.asset.findFirst({
+    where: { id: req.params.id, ...NOT_DELETED },
+    select: { assetTag: true, name: true, status: true },
+  })
+
   const result = await prisma.asset.updateMany({
     where: { id: req.params.id, ...NOT_DELETED },
     data: { deletedAt: new Date() },
@@ -336,6 +362,13 @@ router.delete('/:id', manageAssets, asyncHandler(async (req, res) => {
   if (result.count === 0) {
     return fail(res, 404, NOT_FOUND_MESSAGE)
   }
+
+  logAudit({
+    ...auditContext(req), action: 'DELETE', entityType: 'Asset', entityId: req.params.id,
+    description: `ลบครุภัณฑ์ (soft delete) ${existing?.assetTag} — ${existing?.name}`,
+    oldValues: existing,
+  })
+
   ok(res, { id: req.params.id })
 }))
 

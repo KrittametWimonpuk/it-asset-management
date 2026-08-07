@@ -22,6 +22,10 @@ import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
 import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
+import { attachPerformer } from '../utils/auditLog.js'
+
+// Milestone 9 — จำนวน audit event ล่าสุดที่แนบไปกับแดชบอร์ด (เฉพาะ ADMIN/IT_STAFF — ดู recentAuditLogs ด้านล่าง)
+const RECENT_AUDIT_LOGS_LIMIT = 10
 
 const router = Router()
 router.use(requireAuth)
@@ -172,6 +176,7 @@ async function buildOrgWideDashboard() {
     resolvedToday,
     closedToday,
     recentTickets,
+    recentAuditLogRows,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -232,7 +237,12 @@ async function buildOrgWideDashboard() {
       take: RECENT_ACTIVITIES_LIMIT,
       select: RECENT_TICKET_SELECT,
     }),
+    // Milestone 9 — เหตุการณ์ audit log ล่าสุด (ยังไม่รู้ชื่อผู้ทำรายการตรงนี้ — attachPerformer join ทีหลัง
+    // นอก Promise.all เพราะต้องรู้ก่อนว่ามี performedById อะไรบ้างในหน้านี้)
+    prisma.auditLog.findMany({ orderBy: { performedAt: 'desc' }, take: RECENT_AUDIT_LOGS_LIMIT }),
   ])
+
+  const recentAuditLogs = await attachPerformer(recentAuditLogRows)
 
   const assetStatusCounts = countByStatus(assetStatusGroups, ASSET_STATUSES)
   const assignmentStatusCounts = countByStatus(assignmentStatusGroups, ASSIGNMENT_STATUSES)
@@ -340,6 +350,7 @@ async function buildOrgWideDashboard() {
     },
     recentActivities: mergeRecentActivities(recentAssignments, recentReturns, recentNewAssets, RECENT_ACTIVITIES_LIMIT),
     recentTickets, // Milestone 7 — รายการล่าสุดของใบแจ้งซ่อม แยกจาก recentActivities (คนละความหมาย)
+    recentAuditLogs, // Milestone 9 — เหตุการณ์ audit log ล่าสุดทั้งระบบ (ADMIN/IT_STAFF เท่านั้น — ดู buildEmployeeDashboard)
   }
 }
 
@@ -453,6 +464,7 @@ async function buildEmployeeDashboard(userId) {
       .sort((x, y) => new Date(y.at) - new Date(x.at))
       .slice(0, RECENT_ACTIVITIES_LIMIT),
     recentTickets, // Milestone 7 — ตั๋วล่าสุดที่ตัวเองแจ้ง (ไม่ใช่ภาพรวมองค์กร)
+    recentAuditLogs: [], // Milestone 9 — EMPLOYEE ไม่มีสิทธิ์ดู audit log เลย (เหมือน routes/audit.js: 403)
   }
 }
 

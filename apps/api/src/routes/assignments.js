@@ -22,6 +22,7 @@ import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.
 import { optionalText, optionalDate, optionalEnum } from '../utils/zodHelpers.js'
 import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
 import { ASSET_CONDITIONS } from './assets.js'
+import { logAudit, auditContext } from '../utils/auditLog.js'
 
 const router = Router()
 
@@ -164,6 +165,13 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
     data: { assetId, userId, assignedById: req.user.id, ...rest },
     ...WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'ASSIGN', entityType: 'Assignment', entityId: assignment.id,
+    description: `มอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name} ให้ ${assignment.user.name || assignment.user.email}`,
+    newValues: { assetId, userId, ...rest },
+  })
+
   ok(res, assignment, 201)
 }))
 
@@ -188,6 +196,14 @@ router.put('/:id', manageAssignments, asyncHandler(async (req, res) => {
     data: parsed.data,
     ...WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'UPDATE', entityType: 'Assignment', entityId: assignment.id,
+    description: `แก้ไขรายละเอียดการมอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name}`,
+    oldValues: Object.fromEntries(Object.keys(parsed.data).map((k) => [k, existing[k]])),
+    newValues: parsed.data,
+  })
+
   ok(res, assignment)
 }))
 
@@ -207,16 +223,26 @@ router.post('/:id/return', manageAssignments, asyncHandler(async (req, res) => {
     return fail(res, 400, message, [{ field: 'returnedAt', message }])
   }
 
+  const returnData = {
+    returnedAt,
+    status: parsed.data.status || 'RETURNED',
+    conditionAfter: parsed.data.conditionAfter,
+    remark: parsed.data.remark,
+  }
+
   const assignment = await prisma.assignment.update({
     where: { id: req.params.id },
-    data: {
-      returnedAt,
-      status: parsed.data.status || 'RETURNED',
-      conditionAfter: parsed.data.conditionAfter,
-      remark: parsed.data.remark,
-    },
+    data: returnData,
     ...WITH_RELATIONS,
   })
+
+  logAudit({
+    ...auditContext(req), action: 'RETURN', entityType: 'Assignment', entityId: assignment.id,
+    description: `รับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignment.user.name || assignment.user.email}`,
+    oldValues: { returnedAt: existing.returnedAt, status: existing.status, conditionAfter: existing.conditionAfter, remark: existing.remark },
+    newValues: returnData,
+  })
+
   ok(res, assignment)
 }))
 
