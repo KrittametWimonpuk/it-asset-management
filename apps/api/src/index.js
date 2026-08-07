@@ -4,6 +4,8 @@
 // ---------------------------------------------------------------------------
 import express from 'express'
 import cors from 'cors'
+import swaggerUi from 'swagger-ui-express'
+import { swaggerSpec } from './docs/openapi.js'
 import authRoutes from './routes/auth.js'
 import assetRoutes from './routes/assets.js'
 import categoryRoutes from './routes/categories.js'
@@ -28,6 +30,9 @@ app.use(express.json())    // แปลง request body ที่เป็น JS
 const health = (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() })
 app.get('/health', health)
 app.get('/api/health', health)
+
+// ---- Milestone 8.1: เอกสาร API (Swagger UI) — ดูรายละเอียดที่ src/docs/ ----
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 // ---- รวม route ----
 app.use('/api/auth', authRoutes)

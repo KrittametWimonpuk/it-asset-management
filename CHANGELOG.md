@@ -5,6 +5,61 @@
 
 ---
 
+## [v0.8.1] — Milestone 8.1: OpenAPI Documentation
+
+Milestone เอกสารล้วน ๆ — ไม่มีการเปลี่ยน business logic, ไม่มีการแก้ database schema, ไม่มี endpoint ใหม่
+เพิ่มขึ้นมาจริง (มีแค่ `/docs` ซึ่งเป็นหน้าเอกสารเอง ไม่ใช่ resource endpoint)
+
+### Added
+- `GET /docs` — Swagger UI แบบ interactive (`swagger-ui-express`) ครอบคลุมทั้ง 49 endpoint จริงของระบบ
+  จัดกลุ่มตาม tag: Authentication, Users, Assets, Assignments, Dashboard, Master Data, Tickets, Reports, Health
+- `apps/api/src/docs/openapi.js` — swagger-jsdoc config หลัก: `info`, `servers`, security scheme
+  `bearerAuth` (JWT), และ `components.schemas` ที่ใช้ซ้ำได้ทั้งหมด (`User`, `Asset`, `Assignment`, `Ticket`,
+  `MasterDataItem`, `Vendor`, `DashboardResponse`, schema รายงานทั้ง 6 แบบ, `ErrorResponse`,
+  `ValidationError`, `Pagination` และ request-body schema ของทุก create/update/resolve/close operation)
+- `apps/api/src/docs/paths/*.js` (9 ไฟล์ — 1 ต่อ module) — คอมเมนต์ `@openapi` ล้วน ๆ อธิบายทุก endpoint:
+  summary, description, การยืนยันตัวตน/สิทธิ์ (RBAC) ที่ต้องใช้, path/query parameters, request body,
+  response ทุก status code (รวม validation error และ permission error), ตัวอย่าง request/response จริงจาก
+  ข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
+- หัวข้อ "📘 API Documentation (Swagger)" ใน README — วิธีเปิด `/docs`, วิธี Authorize ด้วย JWT, และ
+  โครงสร้างของเอกสาร
+
+### Changed
+- `apps/api/src/index.js` — เพิ่ม `import swaggerUi`/`swaggerSpec` และ mount `app.use('/docs', ...)`
+  เท่านั้น (ไม่แตะ route/middleware/business logic เดิมแม้แต่บรรทัดเดียว)
+- `apps/api/package.json` — เพิ่ม dependency ใหม่: `swagger-jsdoc`, `swagger-ui-express`
+
+### Fixed
+- swagger-jsdoc ใช้ `glob` ภายในเพื่อหาไฟล์ตาม `apis` pattern ที่กำหนด ซึ่งไม่รองรับ backslash ของ Windows
+  path (`path.join` บน Windows คืนค่าเป็น `C:\...\paths\*.js` ทำให้หาไฟล์ไม่เจอเลยสักไฟล์ — spec ว่างเปล่า
+  แต่ไม่ error) แก้โดยแปลงเป็น forward slash เสมอก่อนส่งให้ swagger-jsdoc (`.split(path.sep).join('/')`)
+
+### Design Decisions
+- เอกสารทั้งหมดแยกไว้ที่ `apps/api/src/docs/` ไม่ใช่คอมเมนต์แนบในไฟล์ route จริง — เพื่อรับประกันว่า
+  route file ที่มีอยู่แล้วทุกไฟล์ไม่ถูกแก้แม้แต่บรรทัดเดียว (สอดคล้องกับข้อกำหนด "ห้ามแก้ business logic"
+  อย่างเข้มงวดที่สุด) เอกสารอ้างอิงพฤติกรรมจริงของ route/validation/response ที่มีอยู่แล้วเท่านั้น
+- Schema ที่ตอบโครงสร้างเดียวกันซ้ำ ๆ (response envelope, pagination, error) ใช้ `$ref`/`allOf` อ้างอิงกลับ
+  schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ (ตามข้อกำหนด "avoid duplicated schema definitions")
+
+### Testing
+- `swagger-jsdoc` โหลด spec สำเร็จ: 30 path items / 39 reusable schemas ไม่มี JSDoc parse error
+- Backend start สำเร็จ ไม่มี error ตอน boot (`node src/index.js`)
+- ตรวจผ่านเบราว์เซอร์: `/docs` โหลดได้, endpoint ทั้ง 9 tag แสดงครบพร้อม description ภาษาไทย, "Try it out"
+  ของ `POST /api/auth/login` ส่ง request จริงไปที่ backend ได้ถูกต้อง (พารามิเตอร์/body ตรงกับที่กำหนดไว้ใน
+  schema, ตัวอย่างค่าที่ pre-fill มาใช้ข้อมูล seed จริง) และ response ที่ตอบกลับ (รวม error response) render
+  ถูกต้องตาม schema ที่ประกาศไว้
+- ปุ่ม "Authorize" ใช้งานได้ (ใส่ JWT ครั้งเดียว endpoint ที่ต้องล็อกอินแนบ header ให้อัตโนมัติ)
+
+### Known Limitations
+- ไม่มีการ sync อัตโนมัติระหว่างเอกสารกับโค้ดจริง — ถ้า route ถูกแก้ในอนาคต ต้องอัปเดตไฟล์ใน `src/docs/`
+  ประกอบด้วยตนเอง
+- ทดสอบ "Try It Out" แบบ end-to-end กับฐานข้อมูลจริงไม่สำเร็จในสภาพแวดล้อมทดสอบนี้ (local PostgreSQL
+  service ที่ตั้งค่าไว้ใน `.env` เชื่อมต่อไม่ได้ — เป็นปัญหาการตั้งค่าฐานข้อมูลของเครื่องทดสอบ ไม่เกี่ยวกับ
+  โค้ด/เอกสารที่เพิ่มเข้ามาใน milestone นี้) ยืนยันแล้วว่า request/response ที่ Swagger UI สร้างและแสดงผล
+  ถูกต้องตรงตาม schema ที่ประกาศไว้
+
+---
+
 ## [v0.8.0] — Milestone 8: Reports & Export
 
 ### Added

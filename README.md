@@ -6,7 +6,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.8.0` (Milestone 8 — Reports & Export)
+**เวอร์ชันปัจจุบัน:** `v0.8.1` (Milestone 8.1 — OpenAPI Documentation)
 
 ---
 
@@ -23,6 +23,7 @@
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 49 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
 
@@ -91,8 +92,9 @@ webapp-starter/
 │   │   └── src/
 │   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/reports/...)
 │   │       ├── middleware/     requireAuth / requireRole
-│   │       └── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope,
-│   │                            ticketHelpers, reportHelpers — filter parsing + CSV/Excel/PDF writers)
+│   │       ├── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope,
+│   │       │                    ticketHelpers, reportHelpers — filter parsing + CSV/Excel/PDF writers)
+│   │       └── docs/           OpenAPI/Swagger config + คอมเมนต์เอกสาร endpoint (paths/*.js) — ไม่แตะ route file
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
 │           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/Reports/...)
@@ -219,10 +221,54 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
+## 📘 API Documentation (Swagger)
+
+เอกสาร API แบบ interactive อยู่ที่ **`/docs`** (เช่น `http://localhost:4000/docs` ตอน dev หรือ
+`http://localhost:8080/docs` ผ่าน nginx proxy ตอนรันด้วย Docker Compose) สร้างจาก [OpenAPI 3.1](https://www.openapis.org/)
+ด้วย [swagger-jsdoc](https://github.com/Surnet/swagger-jsdoc) + [swagger-ui-express](https://github.com/scottie1984/swagger-ui-express)
+
+### วิธีเปิด
+1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
+2. เปิดเบราว์เซอร์ไปที่ `/docs`
+3. Endpoint ทั้งหมด (49 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Assets, Assignments,
+   Dashboard, Master Data, Tickets, Reports, Health — แต่ละอันมี summary, description, พารามิเตอร์,
+   request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
+
+### วิธี Authorize (ทดลองยิง endpoint ที่ต้องล็อกอิน)
+1. เรียก **POST `/api/auth/login`** ก่อน (กด "Try it out" → ใส่ email/password → "Execute") คัดลอกค่า
+   `data.token` จาก response ที่ได้กลับมา
+2. กดปุ่ม **"Authorize"** (มุมขวาบนของหน้า `/docs`, รูปกุญแจ)
+3. วาง token ที่คัดลอกมาลงในช่อง (ไม่ต้องพิมพ์คำว่า `Bearer` นำหน้า — Swagger UI ใส่ให้อัตโนมัติตาม
+   `bearerFormat: JWT` ที่กำหนดไว้) แล้วกด "Authorize" → "Close"
+4. จากนี้ทุก endpoint ที่มีรูปกุญแจ (ต้องล็อกอิน) จะแนบ header `Authorization: Bearer <token>` ให้อัตโนมัติ
+   ตอนกด "Try it out" → "Execute" — authorize ครั้งเดียวใช้ได้ทุก endpoint จนกว่าจะ refresh หน้า
+
+### สถาปัตยกรรมของเอกสาร
+- เอกสารทั้งหมดอยู่แยกที่ `apps/api/src/docs/` (`openapi.js` = config หลัก + schema ที่ใช้ซ้ำได้,
+  `paths/*.js` = คอมเมนต์ `@openapi` ล้วน ๆ 1 ไฟล์ต่อ 1 module) **ไม่มีการแก้ route file ใด ๆ เลยแม้แต่บรรทัดเดียว**
+  — เอกสารอ่าน route/validation/response จริงจากซอร์สโค้ดที่มีอยู่แล้วเท่านั้น ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง
+- Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Asset`, `Assignment`, `Ticket`, `MasterDataItem`,
+  `Vendor`, `DashboardResponse`, รายงานทั้ง 6 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
+  ทุก endpoint ที่ตอบโครงสร้างเดียวกัน (เช่น response envelope `{success, data}` / `{success, message, errors}`)
+  อ้างอิง (`$ref`) กลับไปที่ schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ
+- JWT Bearer authentication ประกาศเป็น reusable security scheme (`components.securitySchemes.bearerAuth`)
+  endpoint ที่ต้องล็อกอินถูก mark ด้วย security requirement นี้ให้ตรงกับ middleware `requireAuth`/`requireRole`
+  ที่ใช้จริงในแต่ละ route
+
+### 📸 Screenshots
+
+> _ยังไม่มีภาพหน้าจอในเอกสารชุดนี้ — เพิ่มได้โดยวางไฟล์ภาพไว้ที่ `docs/screenshots/` แล้วอ้างอิงที่นี่_
+
+- หน้า `/docs` ภาพรวม — รายการ endpoint จัดกลุ่มตาม tag
+- ตัวอย่างการ Authorize ด้วย JWT
+- ตัวอย่างการ Try It Out ของ endpoint หนึ่งตัว พร้อม response ที่ได้กลับมา
+
+---
+
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.7.0`, ปัจจุบัน `v0.8.0`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.8.0`, ปัจจุบัน `v0.8.1`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -305,6 +351,9 @@ cd deploy
   ควบ/เครื่องหมายซับซ้อนเกินกว่านี้ยังไม่ได้ทดสอบครบทุกกรณี
 - **Department/Vendor Summary ไม่มี date range ที่กรอง "ใบแจ้งซ่อม"/"การมอบหมาย" โดยตรง** — ตัวกรองช่วงวันที่
   ใน 2 รายงานนี้มีผลกับ "วันที่ซื้อครุภัณฑ์" เท่านั้น (จำนวนตั๋ว/การมอบหมายที่นับเป็นยอดสะสม ไม่ได้กรองตามช่วงวันที่)
+- **เอกสาร Swagger เขียนแยกจาก route file ทั้งหมด** (`apps/api/src/docs/`) ตั้งใจให้ Milestone 8.1 ไม่แตะ
+  business logic แม้แต่บรรทัดเดียว — หมายความว่าถ้า route จริงถูกแก้ในอนาคต (เพิ่ม field/เปลี่ยน validation)
+  ต้องอัปเดตไฟล์เอกสารคู่กันด้วยตนเอง ไม่มีการ sync อัตโนมัติจากโค้ดจริงไปเอกสาร
 
 ---
 
