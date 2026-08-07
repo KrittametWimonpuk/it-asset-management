@@ -5,6 +5,71 @@
 
 ---
 
+## [v1.0.0-rc1] — Milestone 10: CI/CD & Release Engineering
+
+Milestone ด้าน engineering quality ล้วน ๆ — ไม่มีการเปลี่ยน business logic, ไม่มีการแก้ database schema,
+ไม่มี application feature ใหม่ ทุกอย่างในรอบนี้คือ tooling/CI/documentation
+
+### Added
+- `.github/workflows/ci.yml` — GitHub Actions workflow "Continuous Integration" รันทุก `push`/`pull_request`
+  เข้า `master` และ `feature/*` — 1 job เดียว รันตามลำดับ: checkout → setup Node.js (Active LTS จาก `.nvmrc`
+  + npm cache) → `npm ci` (backend+frontend แยกกัน) → `prisma validate` (ตรวจ schema syntax เท่านั้น ไม่
+  migrate/เชื่อมต่อ DB จริง) → lint backend → lint frontend → build backend (`prisma generate`) → build
+  frontend (`vite build`) → success summary (เขียนลง `$GITHUB_STEP_SUMMARY`) ล้มเหลว step ไหนหยุดทันที
+  (ไม่มี `continue-on-error` ที่ไหนเลย) ใช้ `actions/checkout@v4` และ `actions/setup-node@v4` (official,
+  maintained version ปัจจุบัน)
+- ESLint สำหรับทั้งสอง app (flat config, ESLint v10):
+  - `apps/api/eslint.config.js` — Node/ESM, ใช้ `@eslint/js` recommended + `no-unused-vars` (warn)
+  - `apps/web/eslint.config.js` — React, ใช้ `@eslint/js` recommended + เฉพาะ `react-hooks/rules-of-hooks`
+    (error) และ `react-hooks/exhaustive-deps` (warn) จาก `eslint-plugin-react-hooks` v7 — ตั้งใจไม่ใช้
+    `configs.recommended` ทั้งชุดของเวอร์ชันนี้ เพราะรวม rule ชุด "React Compiler" ใหม่ (เช่น
+    `set-state-in-effect`, `immutability`) ที่จะ flag pattern ปกติที่ใช้อยู่ทั่วโปรเจกต์ (เช่น
+    `setPage(1)` ใน `useEffect` ตอนรีเซ็ตหน้าเวลาตัวกรองเปลี่ยน) การแก้ตาม rule เหล่านั้นจะกลายเป็นการ
+    เปลี่ยน business logic ซึ่งอยู่นอกขอบเขตของ milestone นี้
+  - `"lint"` script เพิ่มในทั้งสอง `package.json`
+- `apps/api/package.json`: เพิ่ม `"validate": "prisma validate"` และ `"build": "prisma generate"` script
+  (backend ไม่มีขั้นตอน compile/bundle เหมือน frontend — "build" ในที่นี้คือการ generate Prisma Client
+  ซึ่งเป็น artifact เดียวที่จำเป็นก่อนรันแอปได้จริง)
+- `.nvmrc` — pin Node.js เวอร์ชัน 24 (Active LTS ปัจจุบัน) ให้ทั้ง local dev และ CI ใช้ตัวเลขเดียวกัน
+- `.editorconfig` — บังคับ indent 2 space, LF line ending, UTF-8, trim trailing whitespace ให้ทุก editor
+  ใช้กติกาเดียวกัน (ตรงกับ code style ที่ใช้อยู่แล้วทั้งโปรเจกต์)
+- `.gitattributes` — normalize line ending เป็น LF สำหรับไฟล์ text ทั้งหมด (กัน diff แปลกข้าม OS) และ mark
+  ไฟล์ binary (`.woff`, รูปภาพ, `.pdf`) ให้ Git ไม่ไป normalize ทับจนไฟล์เสีย
+- `.prettierignore` — ระบุ path ที่ไม่ควร format (migration SQL ที่ Prisma generate เอง, lock files,
+  `node_modules`, `dist`) เผื่อผู้พัฒนาเปิด Prettier ใน editor ของตัวเอง (โปรเจกต์นี้ยังไม่ได้ตั้ง Prettier
+  เป็น dependency บังคับ)
+
+### Changed
+- `.gitignore` — เพิ่ม entry ใหม่เท่านั้น ไม่ลบของเดิม: `.vscode/`, `.idea/`, `.eslintcache`, `coverage/`
+- `apps/api/src/middleware/auth.js` — เปลี่ยน `catch (err)` เป็น `catch` เฉย ๆ (optional catch binding) —
+  `err` ไม่เคยถูกใช้ เป็น dead code ที่ ESLint เจอ ไม่กระทบ behavior ใด ๆ
+- `apps/api/src/routes/auth.js` — เอา `auditContext` ที่ import มาแต่ไม่เคยเรียกใช้ออก (register/login ยังคง
+  เรียก `logAudit()` เหมือนเดิมทุกประการ แค่ประกอบ context เองตรง ๆ เพราะ `req.user` ยังไม่ถูกตั้งค่าตอนนั้น)
+- `apps/api/src/routes/reports.js` — เอา `fail` (import แต่ไม่เคยเรียกใช้ในไฟล์นี้เลย) และ
+  `TICKET_CATEGORY_LABELS` (นิยามไว้แต่ไม่เคยถูกอ้างอิงที่ไหน) ที่เป็น dead code ออก — ไม่มี endpoint ไหน
+  เปลี่ยนพฤติกรรม
+- README.md — เพิ่ม CI badge, ส่วน "🟢 Build Status", "⚙️ CI/CD Pipeline" (อธิบายว่า CI รันตอนไหน/ขั้นตอน
+  อะไรบ้าง/เกิดอะไรขึ้นถ้าล้มเหลว/วิธี reproduce ในเครื่องตัวเอง), ขยาย "🌿 Git Workflow" ด้วย Branch
+  Strategy / Contribution Workflow / Project Structure, เพิ่ม "🔍 Quality Checks" (คำสั่งเดียวกับที่ CI รัน)
+
+### Testing
+- Syntax ของ `.github/workflows/ci.yml` ตรวจผ่าน YAML parser (js-yaml) — โครงสร้าง `on`/`jobs`/`steps` ถูกต้อง
+- รันทุก step ของ CI ซ้ำในเครื่องจริง (ไม่ใช่แค่บน GitHub): `npm ci` (backend+frontend), `prisma validate`
+  (พร้อม `DATABASE_URL` หลอกตามที่ CI ใช้), `npm run lint` ทั้งสอง app, `npm run build` ทั้งสอง app — ผ่านหมด
+- Backend lint: 0 error, 0 warning (แก้ dead code ทั้งหมดที่เจอแล้ว)
+- Frontend lint: 0 error, 12 warning (ทั้งหมดเป็น pattern ที่ตั้งใจไว้อยู่แล้ว — `exhaustive-deps` ที่ตั้งใจ
+  ไม่ใส่ `load` ใน dependency array ของ 6 หน้าจอ list, และ `react-refresh/only-export-components` ของไฟล์
+  form ที่ export ทั้ง component และ option array ร่วมกัน — ไม่แก้เพราะจะกลายเป็นการเปลี่ยน business logic)
+- ไม่มี regression: backend/frontend ยังรันได้ปกติ, endpoint และหน้าจอทั้งหมดไม่เปลี่ยนพฤติกรรม
+
+### Not Implemented (ตั้งใจเว้นไว้ ตามขอบเขต Milestone 10)
+- Automated test suite / step "Test" ใน CI — โปรเจกต์นี้ยังไม่มี test suite เลย (ดู Roadmap ใน README)
+- Deploy step อัตโนมัติจาก CI (เช่น auto-deploy ขึ้น AWS เมื่อ merge เข้า `master`) — ปัจจุบัน deploy ยังเป็น
+  ขั้นตอนแยกที่รันมือผ่านสคริปต์ใน `deploy/` (ดูหัวข้อ Deploy ใน README)
+- Prettier เป็น dependency บังคับ + step "Format check" ใน CI — มีแค่ `.prettierignore` เผื่อผู้พัฒนาเปิดใช้เอง
+
+---
+
 ## [v0.9.0] — Milestone 9: Audit Log
 
 ### Added

@@ -21,7 +21,7 @@
 import { Router } from 'express'
 import { prisma } from '../db.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
-import { ok, fail } from '../utils/response.js'
+import { ok } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
 import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE } from '../utils/assignmentHelpers.js'
@@ -55,7 +55,6 @@ const ASSET_CONDITION_LABELS = { NEW: 'ใหม่', GOOD: 'สภาพดี'
 const ASSIGNMENT_STATUS_LABELS = { ASSIGNED: 'กำลังถือครอง', RETURNED: 'คืนแล้ว', LOST: 'สูญหาย', DAMAGED: 'เสียหาย' }
 const TICKET_PRIORITY_LABELS = { LOW: 'ต่ำ', MEDIUM: 'ปานกลาง', HIGH: 'สูง', CRITICAL: 'วิกฤต' }
 const TICKET_STATUS_LABELS = { OPEN: 'เปิดใหม่', IN_PROGRESS: 'กำลังดำเนินการ', ON_HOLD: 'พักงาน', RESOLVED: 'แก้ไขสำเร็จ', CLOSED: 'ปิดงานแล้ว' }
-const TICKET_CATEGORY_LABELS = { HARDWARE: 'ฮาร์ดแวร์', SOFTWARE: 'ซอฟต์แวร์', NETWORK: 'เครือข่าย', PRINTER: 'เครื่องพิมพ์', ACCOUNT: 'บัญชีผู้ใช้', OTHER: 'อื่น ๆ' }
 
 // ตัด T + เวลาออก เหลือแค่ yyyy-mm-dd — เพียงพอสำหรับรายงาน (export ไม่จำเป็นต้องมีเวลาละเอียดระดับวินาที)
 function fmtDate(v) {

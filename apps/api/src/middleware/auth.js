@@ -23,7 +23,7 @@ export function requireAuth(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET)
     req.user = { id: payload.sub, email: payload.email, role: payload.role }
     next()
-  } catch (err) {
+  } catch {
     return fail(res, 401, 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง')
   }
 }

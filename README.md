@@ -1,12 +1,22 @@
 # 🚀 ระบบจัดการครุภัณฑ์ IT (IT Asset Management)
 
+[![Continuous Integration](https://github.com/KrittametWimonpuk/it-asset-management/actions/workflows/ci.yml/badge.svg)](https://github.com/KrittametWimonpuk/it-asset-management/actions/workflows/ci.yml)
+
 เว็บแอประบบจัดการครุภัณฑ์ IT แบบครบวงจร — ตั้งแต่ทะเบียนครุภัณฑ์, สิทธิ์การใช้งานตาม role,
 การมอบหมาย/รับคืนครุภัณฑ์, แดชบอร์ดสรุปภาพรวม, ระบบ Helpdesk แจ้งซ่อม/ปัญหาครุภัณฑ์, ไปจนถึงรายงาน
 และส่งออกข้อมูลเป็น CSV/Excel/PDF พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.9.0` (Milestone 9 — Audit Log)
+**เวอร์ชันปัจจุบัน:** `v1.0.0-rc1` (Milestone 10 — CI/CD & Release Engineering)
+
+---
+
+## 🟢 Build Status
+
+ทุก push และ pull request เข้า `master` หรือ `feature/*` ถูกตรวจสอบอัตโนมัติผ่าน [GitHub Actions](.github/workflows/ci.yml)
+— ดูรายละเอียดที่หัวข้อ [⚙️ CI/CD Pipeline](#️-cicd-pipeline) ด้านล่าง badge ด้านบนจะเป็นสีเขียวก็ต่อเมื่อ
+push ล่าสุดของ `master` ผ่านทุกขั้นตอน (validate schema + lint backend/frontend + build backend/frontend)
 
 ---
 
@@ -26,6 +36,7 @@
 | **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 49 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
+| **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint backend/frontend, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
 | **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
 
 ---
@@ -313,10 +324,88 @@ server console โดยไม่กระทบผู้ใช้
 
 ## 🌿 Git Workflow
 
-- Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.8.1`, ปัจจุบัน `v0.9.0`)
+- Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.9.0`, ปัจจุบัน `v1.0.0-rc1`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
+
+### 🌳 Branch Strategy
+
+| Branch | ใช้ทำอะไร |
+|--------|-----------|
+| `master` | โค้ดที่ผ่านการตรวจสอบแล้ว พร้อม deploy เสมอ — merge เข้าได้ก็ต่อเมื่อ CI ผ่านทุกขั้นตอนเท่านั้น |
+| `feature/*` | หนึ่ง branch ต่อหนึ่ง milestone/งาน เช่น `feature/asset-assignment`, `feature/ci-cd` — CI รันอัตโนมัติทุก push เหมือนกับ `master` |
+
+### 🤝 Contribution Workflow
+
+1. แตก branch ใหม่จาก `master` ที่อัปเดตล่าสุด: `git checkout master && git pull && git checkout -b feature/ชื่องาน`
+2. ทำงาน + commit เป็นระยะ (ข้อความ commit อธิบาย "ทำไม" ไม่ใช่แค่ "ทำอะไร")
+3. รัน [Quality Checks](#-quality-checks) ในเครื่องตัวเองก่อน push เสมอ — กัน CI แดงโดยไม่จำเป็น
+4. `git push origin feature/ชื่องาน` แล้วเปิด Pull Request เข้า `master`
+5. รอ [CI](#️-cicd-pipeline) ผ่านทุกขั้นตอน (สีเขียว) ก่อน merge — ห้าม merge ถ้า CI ยังแดงอยู่
+6. หนึ่ง milestone ที่เสร็จสมบูรณ์ = หนึ่ง annotated tag (ดูรูปแบบใน [CHANGELOG.md](CHANGELOG.md))
+
+### 📁 Project Structure
+
+โครงสร้างโฟลเดอร์แบบเต็มอยู่ที่หัวข้อ [🏗️ Architecture Overview](#️-architecture-overview) ด้านบน — สรุปสั้น ๆ:
+
+```
+webapp-starter/
+├── .github/workflows/   CI pipeline (GitHub Actions)
+├── apps/api/            Backend — Express + Prisma + PostgreSQL
+├── apps/web/            Frontend — React + Vite
+├── deploy/              สคริปต์ deploy ขึ้น AWS ECS
+└── docker-compose.yml   รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว
+```
+
+---
+
+## ⚙️ CI/CD Pipeline
+
+โปรเจกต์นี้ใช้ [GitHub Actions](https://docs.github.com/en/actions) ตรวจสอบคุณภาพโค้ดอัตโนมัติทุกครั้งที่
+push หรือเปิด/อัปเดต pull request — ดู workflow เต็มที่ [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+### เมื่อไรที่ CI รัน
+- ทุกครั้งที่ `push` เข้า `master` หรือ `feature/*`
+- ทุกครั้งที่เปิดหรืออัปเดต pull request ที่มี `master` หรือ `feature/*` เป็น target branch
+
+### ขั้นตอนของ CI (รันตามลำดับ ล้มเหลวจุดไหนหยุดทันที)
+
+| ลำดับ | ขั้นตอน | ทำอะไร |
+|-------|---------|--------|
+| 1 | Checkout | ดึงโค้ดจาก commit ที่ trigger workflow |
+| 2 | Setup Node.js | ติดตั้ง Node.js เวอร์ชัน Active LTS (อ่านจาก [.nvmrc](.nvmrc)) พร้อมเปิด npm cache |
+| 3 | Install dependencies | `npm ci` ทั้ง `apps/api` และ `apps/web` แยกกัน (clean install จาก package-lock.json) |
+| 4 | Validate Prisma schema | `prisma validate` — ตรวจ syntax ของ `schema.prisma` เท่านั้น **ไม่ migrate/เชื่อมต่อฐานข้อมูลจริง** |
+| 5 | Lint | ESLint ทั้ง backend และ frontend แยกกัน |
+| 6 | Build Backend | `prisma generate` — สร้าง Prisma Client (ยืนยันว่า schema ใช้งานได้จริง) |
+| 7 | Build Frontend | `vite build` — build production bundle |
+| 8 | Success summary | สรุปผลลัพธ์ทั้งหมดใน GitHub Actions job summary (แสดงเฉพาะตอนทุกขั้นตอนผ่าน) |
+
+### เกิดอะไรขึ้นเมื่อ CI ล้มเหลว
+- Job หยุดทันทีที่ step แรกที่ error (ไม่มี step ไหนตั้ง `continue-on-error` — ตาม design ที่ตั้งใจให้ "fail fast")
+- Commit/Pull Request จะขึ้นเครื่องหมาย ❌ พร้อม log ของ step ที่ล้มเหลวให้ดูใน tab "Actions" ของ GitHub
+- Badge ที่หัวไฟล์นี้จะเปลี่ยนเป็นสีแดงถ้า push ล่าสุดของ `master` ไม่ผ่าน
+- ต้องแก้ปัญหาแล้ว push ใหม่ (หรือแก้ commit แล้ว force-push เฉพาะ branch ของตัวเอง ที่ยังไม่ merge) — CI จะรันซ้ำอัตโนมัติ
+
+### 🔍 Quality Checks
+
+รันคำสั่งเดียวกับที่ CI รันได้ในเครื่องตัวเองก่อน push เสมอ (กัน CI แดงโดยไม่จำเป็น):
+
+```bash
+# Backend (จาก apps/api)
+npm run validate    # ตรวจ schema.prisma (เหมือน step 4 ใน CI)
+npm run lint        # ESLint (เหมือน step 5)
+npm run build        # prisma generate (เหมือน step 6)
+
+# Frontend (จาก apps/web)
+npm run lint         # ESLint (เหมือน step 5)
+npm run build         # vite build (เหมือน step 7)
+```
+
+**หมายเหตุ:** `prisma validate`/`prisma generate` ต้องมี `DATABASE_URL` อยู่ใน environment (แค่ต้อง "ตั้งค่าไว้"
+ไม่จำเป็นต้องเชื่อมต่อได้จริง) — ถ้ามี `apps/api/.env` อยู่แล้ว (ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที))
+ก็ใช้ค่านั้นได้เลยโดยไม่ต้องตั้งอะไรเพิ่ม
 
 ---
 
@@ -410,6 +499,11 @@ cd deploy
   หน่วง response ของ business action หลัก) หมายความว่าในกรณีที่หายากมาก ๆ (เช่น DB connection หลุดพอดีตอนนั้น)
   business action อาจสำเร็จแต่ audit record เขียนไม่สำเร็จ (log error ไว้ที่ server console เท่านั้น) — ไม่มี
   retry queue หรือ dead-letter mechanism ในตอนนี้
+- **CI ไม่มีขั้นตอนรัน automated test** — เพราะโปรเจกต์นี้ยังไม่มี test suite เลย (ดู Roadmap) `ci.yml` จึงตรวจแค่
+  schema validity + lint + build เท่านั้น เมื่อมี test suite ในอนาคต ควรเพิ่ม step "Test" ต่อจาก Lint ก่อน Build
+- **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` ไม่เชื่อมต่อ
+  ฐานข้อมูลจริงเลย (ตามที่ milestone นี้ระบุ "Do not migrate database") จึงตรวจจับได้แค่ปัญหาระดับ syntax/
+  compile-time เท่านั้น ไม่ใช่ปัญหาที่เกิดตอน runtime จริงกับข้อมูลจริง
 
 ---
 
@@ -420,7 +514,8 @@ cd deploy
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
 - [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request
 - [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
-- [ ] Automated test suite (unit + integration) สำหรับ backend routes
+- [ ] Automated test suite (unit + integration) สำหรับ backend routes — โครง CI (`.github/workflows/ci.yml`)
+  พร้อมรับ step "Test" อยู่แล้ว แค่ยังไม่มี test ให้รัน
 - [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที
 - [ ] router library (เช่น react-router-dom) เมื่อแอปโตขึ้นจนต้องการ deep-link
 

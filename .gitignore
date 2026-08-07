@@ -19,5 +19,13 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# editor
+.vscode/
+.idea/
+
+# lint/tooling caches (Milestone 10 — CI/CD & Release Engineering)
+.eslintcache
+coverage/
+
 # Claude Code session-local files (not project source)
 .claude/

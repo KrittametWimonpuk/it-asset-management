@@ -9,7 +9,10 @@
     "generate": "prisma generate",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "lint": "eslint .",
+    "validate": "prisma validate",
+    "build": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -28,5 +31,10 @@
     "@prisma/client@5.22.0": true,
     "@prisma/engines@5.22.0": true,
     "prisma@5.22.0": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0"
   }
 }

@@ -9,7 +9,7 @@ import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { logAudit, auditContext } from '../utils/auditLog.js'
+import { logAudit } from '../utils/auditLog.js'
 
 const router = Router()
 
