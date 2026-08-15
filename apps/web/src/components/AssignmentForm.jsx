@@ -135,20 +135,21 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
         <form onSubmit={submit} noValidate>
           {isEdit ? (
             <>
-              <label>ครุภัณฑ์</label>
-              <p className="muted">{assignment.asset?.assetTag} — {assignment.asset?.name}</p>
-              <label>พนักงาน</label>
-              <p className="muted">{assignment.user?.name || assignment.user?.email}</p>
+              <label htmlFor="assignment-asset">ครุภัณฑ์</label>
+              <p className="muted" id="assignment-asset">{assignment.asset?.assetTag} — {assignment.asset?.name}</p>
+              <label htmlFor="assignment-employee">พนักงาน</label>
+              <p className="muted" id="assignment-employee">{assignment.user?.name || assignment.user?.email}</p>
             </>
           ) : (
             <>
-              <label>ครุภัณฑ์ *</label>
+              <label htmlFor="assignment-asset-select">ครุภัณฑ์ *</label>
               {!assetOptions ? (
-                <p className="muted">กำลังโหลดตัวเลือก...</p>
+                <p className="muted" id="assignment-asset-select">กำลังโหลดตัวเลือก...</p>
               ) : assetOptions.length === 0 ? (
-                <p className="muted">ไม่มีครุภัณฑ์ที่ว่างให้มอบหมาย (ทุกชิ้นมีผู้ถือครองอยู่แล้ว)</p>
+                <p className="muted" id="assignment-asset-select">ไม่มีครุภัณฑ์ที่ว่างให้มอบหมาย (ทุกชิ้นมีผู้ถือครองอยู่แล้ว)</p>
               ) : (
                 <select
+                  id="assignment-asset-select"
                   ref={firstInputRef}
                   value={form.assetId}
                   onChange={(e) => update('assetId', e.target.value)}
@@ -162,11 +163,12 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
               )}
               {fieldErrors.assetId && <p className="field-error">{fieldErrors.assetId}</p>}
 
-              <label>พนักงาน *</label>
+              <label htmlFor="assignment-user-select">พนักงาน *</label>
               {!userOptions ? (
-                <p className="muted">กำลังโหลดตัวเลือก...</p>
+                <p className="muted" id="assignment-user-select">กำลังโหลดตัวเลือก...</p>
               ) : (
                 <select
+                  id="assignment-user-select"
                   value={form.userId}
                   onChange={(e) => update('userId', e.target.value)}
                   className={fieldErrors.userId ? 'invalid' : ''}
@@ -185,8 +187,9 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
 
           <div className="row">
             <div className="grow">
-              <label>วันที่มอบหมาย{!isEdit && ' *'}</label>
+              <label htmlFor="assignment-assignedAt">วันที่มอบหมาย{!isEdit && ' *'}</label>
               <input
+                id="assignment-assignedAt"
                 ref={isEdit ? firstInputRef : undefined}
                 type="date"
                 value={form.assignedAt}
@@ -197,8 +200,9 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
               {fieldErrors.assignedAt && <p className="field-error">{fieldErrors.assignedAt}</p>}
             </div>
             <div className="grow">
-              <label>วันที่คาดว่าจะคืน</label>
+              <label htmlFor="assignment-expectedReturnDate">วันที่คาดว่าจะคืน</label>
               <input
+                id="assignment-expectedReturnDate"
                 type="date"
                 value={form.expectedReturnDate}
                 onChange={(e) => update('expectedReturnDate', e.target.value)}
@@ -208,16 +212,17 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
             </div>
           </div>
 
-          <label>สภาพก่อนมอบหมาย</label>
-          <select value={form.conditionBefore} onChange={(e) => update('conditionBefore', e.target.value)}>
+          <label htmlFor="assignment-conditionBefore">สภาพก่อนมอบหมาย</label>
+          <select id="assignment-conditionBefore" value={form.conditionBefore} onChange={(e) => update('conditionBefore', e.target.value)}>
             <option value="">ไม่ระบุ</option>
             {CONDITION_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
 
-          <label>หมายเหตุ</label>
+          <label htmlFor="assignment-remark">หมายเหตุ</label>
           <textarea
+            id="assignment-remark"
             rows={2}
             value={form.remark}
             onChange={(e) => update('remark', e.target.value)}

@@ -5,6 +5,94 @@
 
 ---
 
+## [v1.0.0-rc2] — Release Candidate 2: Production Hardening
+
+Milestone ด้าน production readiness ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มีการแก้ database schema,
+ไม่มี API endpoint ใหม่/redesign เดิม (ยกเว้นค่า response ที่ upgrade ของ `/health`), maintain backward
+compatibility กับพฤติกรรมเดิมทุกจุดที่ไม่ได้ตั้งใจเปลี่ยน — ตอบสนอง 11 findings จาก RC1 production readiness
+review (Critical/High severity ทั้งหมด)
+
+### Added
+- `apps/api/src/middleware/rateLimit.js` — จำกัดจำนวนครั้ง `POST /api/auth/login`/`POST /api/auth/register`
+  ต่อ IP (ใช้ [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit)) ปรับได้ผ่าน
+  `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` (default 10 ครั้ง/15 นาที) เกินโควตาตอบ `429` ด้วย
+  response envelope เดียวกับ error อื่นทั้งระบบ — ไม่แตะ logic ตรวจสอบ credential/สมัครสมาชิกเดิมเลย
+- `apps/api/src/middleware/requestLogger.js` — log แบบ structured (JSON) ทุก request: requestId (`crypto.randomUUID()`),
+  method, path, status, durationMs, ip — ไม่ log request body/header ใด ๆ (กัน password/JWT หลุดเข้า log)
+  แนบ `X-Request-Id` ไปกับ response header ด้วย
+- `apps/api/src/utils/corsOptions.js` — สร้าง CORS options จาก `CORS_ORIGIN` env var แทนการเปิดกว้างทุก
+  origin แบบเดิม (`cors()` เฉย ๆ) — ไม่ตั้งค่า + dev = reflect origin (เหมือนเดิม), ไม่ตั้งค่า + production =
+  fail closed
+- Graceful shutdown ใน `apps/api/src/index.js` — ดัก `SIGTERM`/`SIGINT`: หยุดรับ connection ใหม่
+  (`server.close()`) → request ที่ค้างอยู่ทำงานจนจบตามปกติ → `prisma.$disconnect()` → `process.exit()` ด้วย
+  status code ที่เหมาะสม พร้อม timer บังคับปิดถ้ารอนานเกินไป (10 วินาที) — log ทุกขั้นตอน
+- `/health`, `/api/health` อัปเกรด — เช็ก `SELECT 1` ผ่าน Prisma จริง ตอบ `200 {status:"ok", database:"connected"}`
+  เมื่อต่อ DB ได้, ตอบ `503 {status:"error", database:"disconnected"}` เมื่อต่อไม่ได้ (เดิมตอบ `200` เสมอ
+  ไม่เช็กอะไรเลย)
+- Helmet middleware — security header มาตรฐาน (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Strict-Transport-Security` ฯลฯ) ปิดเฉพาะ `contentSecurityPolicy` (จะบล็อก inline script/style ที่
+  Swagger UI ต้องใช้) header อื่นทั้งหมดเปิดใช้งานตามปกติ
+- Environment variables ใหม่ (ทุกตัวไม่บังคับ มี default ที่ backward-compatible): `NODE_ENV`, `CORS_ORIGIN`,
+  `AUTH_RATE_LIMIT_WINDOW_MS`, `AUTH_RATE_LIMIT_MAX` — เพิ่มใน `.env.example` และ README
+
+### Changed
+- `apps/api/src/index.js` — เพิ่ม helmet/cors(ใหม่)/requestLogger middleware, upgrade health handler,
+  เปลี่ยน `app.listen()` ให้เก็บ `server` reference สำหรับ graceful shutdown — ลำดับ route/error handler
+  เดิมไม่เปลี่ยน
+- `apps/api/src/routes/auth.js` — เพิ่ม `authRateLimit` เป็น middleware ตัวแรกของ `POST /register` และ
+  `POST /login` (ก่อนถึง validation/business logic เดิมทั้งหมด) และเปลี่ยน `registerSchema.password` จาก
+  `min(6)` เป็น `min(8)` (ข้อความ error ปรับเลขให้ตรงกัน) — ไม่แตะ logic ส่วนอื่นเลย
+- `apps/api/src/docs/openapi.js` — อัปเดต `RegisterRequest.password.minLength` จาก 6 เป็น 8 ให้ตรงกับ
+  validation จริง
+- `apps/web/src/pages/Register.jsx` — ป้ายกำกับรหัสผ่านเปลี่ยนจาก "(อย่างน้อย 6 ตัว)" เป็น "(อย่างน้อย 8 ตัว)"
+- `apps/web/src/components/{AssetForm,AssignmentForm,MasterDataForm,ReturnAssignmentForm}.jsx` — เพิ่ม
+  `htmlFor`/`id` ให้ทุกคู่ label-input ที่ขาดอยู่ (screen reader อ่านชื่อฟิลด์ถูกต้อง, กด label แล้ว focus ที่
+  input ได้) — ไม่เปลี่ยน layout/behavior ใด ๆ
+- `apps/api/Dockerfile` — `node:20` → `node:24` (ตรงกับ `.nvmrc`/CI), `npm install` → `npm ci` (ต้อง copy
+  `package-lock.json` เข้าไปด้วย), เพิ่ม `USER node` ก่อน `CMD` (รันเป็น non-root — ใช้ user `node` ที่มีอยู่
+  แล้วในตัว official image ไม่ต้องสร้างเอง)
+- `apps/web/Dockerfile` — `node:20-alpine` → `node:24-alpine`, `npm install` → `npm ci` (ต้อง copy
+  `package-lock.json` เข้าไปด้วย) เฉพาะ build stage (stage สุดท้ายเป็น nginx ไม่มี npm)
+- `deploy/task-def-api.json` — เพิ่ม `NODE_ENV=production` เข้า environment array ของ container API
+- `deploy/config.example.sh` — เพิ่มคอมเมนต์อธิบาย `CORS_ORIGIN`/`AUTH_RATE_LIMIT_*` (เป็นตัวอย่างที่ปิดไว้
+  ไม่บังคับตั้ง — ค่า default ในโค้ดใช้งานได้โดยไม่ต้องตั้งอะไรเพิ่ม)
+- `.env.example`, README.md — เพิ่มเอกสารตัวแปรใหม่ทั้งหมด + หัวข้อ "🛡️ Production Hardening (RC2)" อธิบาย
+  rate limiting/graceful shutdown/health endpoint/logging/security headers/CORS/Docker
+
+### Testing
+- Backend/frontend lint: 0 error (เหมือนเดิม, ไม่มี regression จากการแก้ accessibility)
+- `prisma validate`/`prisma generate`: ผ่าน
+- Docker build ทั้งสอง image สำเร็จด้วย `node:24`; ยืนยัน backend container รันเป็น `node` (non-root, UID 1000)
+  ด้วย `docker run --rm <image> whoami`/`id`
+- Container จริง (ผ่าน docker, ต่อ Postgres จริง): migration รันสำเร็จเป็น non-root user, `/health` ตอบ `200`
+  ตอน DB ต่อได้ และ `503` ทันทีที่ DB ถูก stop (ทดสอบจริงด้วยการ stop/start container ฐานข้อมูล)
+- Rate limit: ยิง `POST /api/auth/login` รัว ๆ 12 ครั้ง — 10 ครั้งแรกผ่าน (401 ตามที่ credential ผิดจริง) ครั้งที่
+  11-12 ได้ `429` พร้อมข้อความที่ตั้งใจไว้
+- Password policy: สมัครด้วยรหัสผ่าน 7 ตัวอักษร → `400` พร้อม field error ที่ถูกต้อง, 8 ตัวอักษร → `201` สำเร็จ
+- Graceful shutdown: `docker stop` (ส่ง `SIGTERM`) → log ครบทั้ง 4 ขั้นตอนตามลำดับที่ตั้งใจ, exit code `0`
+- Request logging: ยืนยัน log JSON มี requestId/method/path/status/durationMs/ip ครบ ไม่มี body/header ปน
+- CORS: request ที่มี `Origin` header (ไม่ได้ตั้ง `CORS_ORIGIN`, ไม่ได้ตั้ง `NODE_ENV`) ได้
+  `Access-Control-Allow-Origin` reflect กลับมาตามเดิม (backward compatible กับ dev workflow)
+- Helmet: header มาตรฐานครบ (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`
+  ฯลฯ) ยืนยันไม่มี `Content-Security-Policy` header (ปิดไว้ตามตั้งใจ)
+- Swagger UI (`/docs`): โหลดหน้าได้ปกติ (HTTP 200, title ถูกต้อง) และ asset ทั้ง 4 ไฟล์
+  (`swagger-ui.css`/`swagger-ui-bundle.js`/`swagger-ui-standalone-preset.js`/`swagger-ui-init.js`) โหลด
+  สำเร็จทุกไฟล์ (ไม่ถูก Helmet บล็อก)
+- Browser regression: login ผ่าน Vite dev server ทำงานปกติ, เปิดฟอร์ม "เพิ่มครุภัณฑ์ใหม่" แล้วทุกช่อง input
+  มี accessible name ที่ถูกต้อง (ยืนยันผ่าน accessibility tree, ตรงกับ label ที่ผูกด้วย `htmlFor`/`id` ใหม่)
+  ไม่มี error ใน console
+
+### Known Limitations
+- Rate limit เก็บ state ในหน่วยความจำต่อ instance ไม่ใช่ distributed store — ถ้า deploy มากกว่า 1 instance
+  พร้อมกันในอนาคต โควตาจะไม่ถูกนับรวมข้าม instance (ปัจจุบัน `desired-count` ยังเป็น 1 จึงไม่กระทบจริง)
+- ยังไม่มี email verification หรือ account lockout ถาวรหลังพยายามผิดหลายครั้ง — rate limit ชะลอการโจมตีได้
+  แต่ไม่ใช่กลไกล็อกบัญชีแบบถาวร
+- `/health` เช็กแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้เช็กว่า schema ตรงกับ migration ล่าสุด
+- `CORS_ORIGIN` ไม่ได้ผูกเข้า ECS task definition โดยตรง (ไม่จำเป็นสำหรับ deployment topology ปัจจุบันที่ ALB
+  route แบบ same-origin อยู่แล้ว) — ถ้ามี client ข้าม origin จริงในอนาคตต้องตั้งค่าด้วยตนเอง
+
+---
+
 ## [v1.0.0-rc1] — Milestone 10: CI/CD & Release Engineering
 
 Milestone ด้าน engineering quality ล้วน ๆ — ไม่มีการเปลี่ยน business logic, ไม่มีการแก้ database schema,

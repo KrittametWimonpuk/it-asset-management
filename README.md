@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v1.0.0-rc1` (Milestone 10 — CI/CD & Release Engineering)
+**เวอร์ชันปัจจุบัน:** `v1.0.0-rc2` (Release Candidate 2 — Production Hardening)
 
 ---
 
@@ -202,9 +202,92 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `DATABASE_URL` | connection string ของ PostgreSQL | `postgresql://postgres:postgres@localhost:5432/appdb?schema=public` |
 | `JWT_SECRET` | กุญแจเซ็น/ตรวจสอบ JWT — **ห้ามใช้ค่าตัวอย่างในระบบจริง** สร้างด้วย `openssl rand -hex 32` | `change-me-to-a-long-random-string` |
 | `PORT` | พอร์ตที่ backend จะรัน | `4000` |
+| `NODE_ENV` | `development` (ค่าเริ่มต้น) หรือ `production` — กำหนดพฤติกรรม default ของ CORS เวลาไม่ได้ตั้ง `CORS_ORIGIN` (RC2) | `development` |
+| `CORS_ORIGIN` | origin ที่อนุญาตให้เรียก API ข้าม origin ได้ (คั่นด้วยจุลภาคถ้ามีหลายตัว) — ไม่บังคับ ดูรายละเอียดที่หัวข้อ [🌐 CORS](#-cors) ด้านล่าง (RC2) | `http://localhost:5173,https://asset.example.com` |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ความยาวหน้าต่างเวลานับจำนวนครั้ง login/register ต่อ IP (ms) — ไม่บังคับ ค่า default 900000 (15 นาที) (RC2) | `900000` |
+| `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
 
 Frontend ไม่ต้องตั้งค่า environment variable ใด ๆ ตอน dev (Vite proxy `/api` ให้อัตโนมัติ) ส่วนตอน build
 ขึ้น production ตัวแปร `API_UPSTREAM` ใน `docker-compose.yml` บอก nginx ว่าจะ proxy `/api` ไปที่ service ไหน
+
+---
+
+## 🛡️ Production Hardening (Release Candidate 2)
+
+RC2 เพิ่มความพร้อมด้าน reliability/security/operational readiness ให้ backend — ไม่มีการเปลี่ยน business
+logic, database schema, หรือ API endpoint ใด ๆ เลย (ดู [CHANGELOG](CHANGELOG.md) สำหรับรายละเอียดทุกจุดที่แก้)
+
+### 🚦 Rate Limiting
+
+`POST /api/auth/login` และ `POST /api/auth/register` จำกัดจำนวนครั้งต่อ IP ในหน้าต่างเวลาเดียวกัน (ใช้
+[express-rate-limit](https://github.com/express-rate-limit/express-rate-limit)) กัน brute-force รหัสผ่าน
+และสแปมสร้างบัญชี — ปรับได้ผ่าน `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` (ดู Environment Variables
+ด้านบน) เกินโควตาแล้วตอบ **HTTP 429** ด้วย response envelope เดียวกับ error อื่นทั้งระบบ:
+```json
+{ "success": false, "message": "พยายามเข้าสู่ระบบ/สมัครสมาชิกบ่อยเกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" }
+```
+login และ register ใช้โควตาร่วมกัน (นับรวมต่อ IP ไม่แยกตาม endpoint) — ตั้งใจ กันไม่ให้สลับไปมาระหว่างสอง
+endpoint เพื่อหลบ limit ได้ ไม่แตะ logic การตรวจสอบ credential/สมัครสมาชิกเดิมเลยแม้แต่บรรทัดเดียว
+
+### 🔌 Graceful Shutdown
+
+Backend ดักสัญญาณ `SIGTERM` และ `SIGINT` (ที่ ECS/Docker/Ctrl+C ส่งมาก่อนฆ่า process จริง) แล้วปิดตัวแบบ
+เรียบร้อยตามลำดับ: (1) เลิกรับ connection ใหม่ แต่ request ที่ค้างอยู่ทำงานจนจบตามปกติก่อน (2) ปิดการเชื่อมต่อ
+ฐานข้อมูล (`prisma.$disconnect()`) (3) exit ด้วย status code ที่เหมาะสม (0 = ปิดสำเร็จ, 1 = มีปัญหาระหว่างปิด)
+มี timer บังคับปิดถ้ารอนานเกินไป (10 วินาที) กัน process ค้าง แต่ละขั้นตอนถูก log ไว้ชัดเจน — ผลคือ deploy/
+scale-in บน ECS ไม่ทำให้ request ที่กำลังทำงานอยู่ถูกตัดกลางคันอีกต่อไป
+
+### ❤️ Health Endpoint
+
+`/health` และ `/api/health` เดิมตอบ 200 เสมอโดยไม่เช็กอะไรเลย — ตอนนี้เช็กการเชื่อมต่อฐานข้อมูลจริงด้วย
+(`SELECT 1` ผ่าน Prisma):
+
+| สถานะ | HTTP Status | Response |
+|-------|-------------|----------|
+| ฐานข้อมูลเชื่อมต่อได้ | `200` | `{ "status": "ok", "time": "...", "database": "connected" }` |
+| ฐานข้อมูลเชื่อมต่อไม่ได้ | `503` | `{ "status": "error", "time": "...", "database": "disconnected" }` |
+
+ALB ใช้ endpoint นี้ตัดสินใจว่าจะส่ง traffic ไปที่ instance ไหน — instance ที่ต่อ DB ไม่ได้ตอนนี้จะถูกเอาออก
+จาก rotation โดยอัตโนมัติ (เดิมตอบ 200 เสมอแม้ DB ล่ม ทำให้ ALB ยังส่ง traffic ไปเรื่อย ๆ)
+
+### 📝 Request Logging
+
+ทุก request เขียน log แบบ structured (JSON บรรทัดเดียว) ออก stdout หลัง response จบ — ให้ log collector ของ
+production (เช่น CloudWatch Logs ที่ ECS ส่งเข้าไปอยู่แล้ว) เก็บไปวิเคราะห์ได้:
+```json
+{"requestId":"...", "method":"GET", "path":"/api/assets", "status":200, "durationMs":12.4, "ip":"..."}
+```
+**ไม่ log สิ่งที่อ่อนไหวโดยเจตนา**: ไม่มี request body (มี password ตอน login/register), ไม่มี header ใด ๆ
+(มี `Authorization: Bearer <JWT>`), ไม่มี query string — `X-Request-Id` แนบมาที่ response header ด้วย ใช้
+อ้างอิงตอน debug/แจ้งปัญหาได้
+
+### 🔒 Security Headers
+
+ใช้ [Helmet](https://helmetjs.github.io/) ใส่ security header มาตรฐานให้อัตโนมัติ (`X-Content-Type-Options`,
+`X-Frame-Options`, `Strict-Transport-Security` ฯลฯ) ปิดเฉพาะ `contentSecurityPolicy` เพราะค่า default จะบล็อก
+inline script/style ที่ Swagger UI (`/docs`) ต้องใช้ — header อื่นทั้งหมดยังเปิดใช้งานตามปกติ
+
+### 🌐 CORS
+
+เดิมใช้ `cors()` เฉย ๆ (อนุญาตทุก origin) — ตอนนี้อ่านจาก `CORS_ORIGIN` env var แทน (ไม่ hardcode origin ไว้
+ในโค้ด):
+- ตั้งค่า `CORS_ORIGIN` ไว้ → อนุญาตเฉพาะ origin ที่ระบุ (คั่นด้วยจุลภาคได้หลายตัว)
+- ไม่ได้ตั้งค่า + `NODE_ENV=development` (ค่าเริ่มต้น) → reflect origin ที่ขอมา เหมือนพฤติกรรมเดิมก่อน RC2
+  ทุกประการ (สะดวกตอน dev ที่ frontend/backend คนละพอร์ต)
+- ไม่ได้ตั้งค่า + `NODE_ENV=production` → ปิดรับ cross-origin request ทั้งหมด (fail closed เพื่อความปลอดภัย)
+
+ในทางปฏิบัติ production จริงของโปรเจกต์นี้ (AWS ECS) ไม่ได้รับผลกระทบจากค่านี้เลย เพราะ ALB route ทั้ง
+`/` และ `/api/*` อยู่ใต้ origin เดียวกัน (path-based routing — ดู `deploy/02-infra.sh`) จึงไม่ถือเป็น
+cross-origin request ตั้งแต่ต้น ตั้งค่านี้มีผลจริงเฉพาะกรณีมี client อื่นเรียก API ข้าม origin จริง ๆ
+
+### 🐳 Docker
+
+- ทั้งสอง image เปลี่ยนจาก `node:20`/`node:20-alpine` เป็น `node:24`/`node:24-alpine` ให้ตรงกับ `.nvmrc` และ
+  CI (เดิม Docker image กับ CI/dev ใช้ Node คนละเวอร์ชันกัน)
+- `npm install` เปลี่ยนเป็น `npm ci` ทั้งสอง Dockerfile — ติดตั้ง dependency ตรงกับ `package-lock.json` เป๊ะ ๆ
+  เหมือนที่ CI ทดสอบผ่าน กัน dependency drift ระหว่างสิ่งที่ CI ทดสอบกับสิ่งที่ image จริงมี
+- Backend container รันเป็น non-root user (`node`, UID 1000 — user ที่มีอยู่แล้วในตัว official image) แทนที่
+  จะรันเป็น root เหมือนเดิม — least privilege ตาม container security baseline
 
 ---
 
@@ -504,6 +587,16 @@ cd deploy
 - **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` ไม่เชื่อมต่อ
   ฐานข้อมูลจริงเลย (ตามที่ milestone นี้ระบุ "Do not migrate database") จึงตรวจจับได้แค่ปัญหาระดับ syntax/
   compile-time เท่านั้น ไม่ใช่ปัญหาที่เกิดตอน runtime จริงกับข้อมูลจริง
+- **Rate limit เก็บสถานะไว้ในหน่วยความจำของแต่ละ instance (ไม่ใช่ distributed)** — ถ้า deploy หลาย instance
+  พร้อมกัน (`desired-count` > 1) โควตาจะนับแยกอิสระต่อ instance ไม่รวมกัน (เช่น ตั้ง max 10 ครั้ง แต่มี
+  2 instance = ผู้โจมตีมีโอกาสยิงได้จริงสูงสุด ~20 ครั้งถ้ากระจาย request ไปสองฝั่งพอดี) ปัจจุบัน deploy
+  script ตั้ง `desired-count` ไว้ที่ 1 เท่านั้น (ดูหัวข้อ Deploy) จึงยังไม่กระทบจริง — ถ้าในอนาคต scale เกิน
+  1 instance ควรย้ายไปใช้ store แบบ shared (เช่น Redis) แทน
+- **ไม่มี email verification หรือ account lockout ถาวร** — rate limit ชะลอการ brute-force ได้ แต่ไม่ได้ล็อก
+  บัญชีถาวรหลังพยายามผิดหลายครั้ง และไม่มีการยืนยันอีเมลตอนสมัครสมาชิก
+- **Health check ตรวจแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้ตรวจว่า schema ตรงกับ migration ล่าสุดหรือไม่** — ถ้า
+  migration ค้าง (เช่น deploy image ใหม่ก่อนรัน migration) endpoint นี้จะยังตอบ "ok" อยู่ แม้ query บางอย่าง
+  จะพังเพราะ column/table ไม่ตรงกับโค้ดจริงก็ตาม
 
 ---
 

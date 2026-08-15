@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { authRateLimit } from '../middleware/rateLimit.js'
 import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { logAudit } from '../utils/auditLog.js'
@@ -19,7 +20,7 @@ const router = Router()
 // กันการยกระดับสิทธิ์ตัวเอง แม้ client จะยัด { role: "ADMIN" } มาใน body ก็ถูกตัดทิ้งโดย zod อัตโนมัติ
 const registerSchema = z.object({
   email: z.string().trim().email('อีเมลไม่ถูกต้อง'),
-  password: z.string().min(6, 'รหัสผ่านอย่างน้อย 6 ตัวอักษร'),
+  password: z.string().min(8, 'รหัสผ่านอย่างน้อย 8 ตัวอักษร'),
   name: z.string().trim().min(1).optional(),
 })
 
@@ -40,7 +41,8 @@ function signToken(user) {
 }
 
 // ---- สมัครสมาชิก ----
-router.post('/register', asyncHandler(async (req, res) => {
+// authRateLimit (RC2) กันสแปมสร้างบัญชี — อยู่นอกสุด ก่อนถึง validation/business logic เดิมทั้งหมด
+router.post('/register', authRateLimit, asyncHandler(async (req, res) => {
   const parsed = registerSchema.safeParse(req.body)
   if (!parsed.success) {
     return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
@@ -73,7 +75,8 @@ router.post('/register', asyncHandler(async (req, res) => {
 }))
 
 // ---- เข้าสู่ระบบ ----
-router.post('/login', asyncHandler(async (req, res) => {
+// authRateLimit (RC2) กัน brute-force รหัสผ่าน — อยู่นอกสุด ก่อนถึง validation/business logic เดิมทั้งหมด
+router.post('/login', authRateLimit, asyncHandler(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) {
     return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))

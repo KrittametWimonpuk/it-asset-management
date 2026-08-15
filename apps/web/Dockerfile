@@ -6,10 +6,12 @@
 # ---------------------------------------------------------------------------
 
 # ---- ขั้นที่ 1: build ----
-FROM node:20-alpine AS build
+# เลข 24 ต้องตรงกับ .nvmrc และ .github/workflows/ci.yml เสมอ (RC2 — Node Version Consistency)
+FROM node:24-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+# npm ci แทน npm install — ติดตั้งตรงกับ package-lock.json เป๊ะ ๆ เหมือนที่ CI ใช้ทดสอบ (RC2 — Docker Build)
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npm run build          # ได้ผลลัพธ์อยู่ในโฟลเดอร์ dist/
 

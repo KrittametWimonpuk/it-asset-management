@@ -33,3 +33,15 @@ export JWT_SECRET="CHANGE-ME-to-a-long-random-secret"
 # 256 = 0.25 vCPU, 512 = 0.5 GB RAM  (ค่าต่ำสุด ประหยัดสุด)
 export TASK_CPU="256"
 export TASK_MEMORY="512"
+
+# ---- Production Hardening (RC2) ----
+# NODE_ENV ของ container API ถูกตั้งเป็น "production" ไว้ตรงใน task-def-api.json แล้วเสมอ (ไม่ต้อง
+# ตั้งที่นี่) — ผลคือถ้าไม่ได้ตั้ง CORS_ORIGIN ไว้ API จะปิดรับ cross-origin request ทั้งหมด (fail closed)
+# ในทางปฏิบัติไม่กระทบอะไร เพราะ ALB route ทั้ง / และ /api/* อยู่ใต้ origin เดียวกันอยู่แล้ว (ดู
+# 02-infra.sh) จึงไม่ถือเป็น cross-origin request ตั้งแต่ต้น — ตั้งค่านี้เฉพาะถ้ามี client อื่นที่ต้อง
+# เรียก API ข้าม origin จริง ๆ (เช่น mobile app, frontend ที่ deploy แยกที่อื่น)
+#   ตัวอย่าง: export CORS_ORIGIN="https://asset.example.com,https://admin.example.com"
+
+# ตัวจำกัดจำนวนครั้ง login/register ต่อ IP — ไม่ต้องตั้งก็ได้ (ค่าเริ่มต้นในโค้ดคือ 10 ครั้ง/15 นาที)
+#   export AUTH_RATE_LIMIT_WINDOW_MS="900000"
+#   export AUTH_RATE_LIMIT_MAX="10"
