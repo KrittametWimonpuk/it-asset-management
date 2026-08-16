@@ -82,7 +82,7 @@ if [ -z "${DATABASE_URL:-}" ]; then
       --db-subnet-group-name "${APP_NAME}-subnets" \
       --vpc-security-group-ids "$RDS_SG" \
       --no-publicly-accessible \
-      --backup-retention-period 1 >/dev/null
+      --backup-retention-period 7 >/dev/null
   fi
 
   log "รอ RDS พร้อมใช้งาน..."

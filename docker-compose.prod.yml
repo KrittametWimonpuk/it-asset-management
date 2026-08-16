@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# docker-compose — Production (RC3: Production Deployment & Operations)
+#
+# สำหรับ self-hosted deployment บนเครื่อง/VPS ของตัวเอง (ทางเลือกคู่ขนานกับการ deploy ขึ้น AWS ECS
+# ผ่าน deploy/ — ดู README: วิธี Deploy ขึ้น AWS ECS) — docker-compose.yml (ตัวเดิมสำหรับ dev) ไม่ถูก
+# แก้ไขเลยแม้แต่บรรทัดเดียว ไฟล์นี้เป็นไฟล์แยกต่างหากทั้งหมด
+#
+# วิธีใช้ (ดูรายละเอียดเต็มที่ docs/DEPLOYMENT.md):
+#   cp .env.production.example .env.production   # แล้วแก้ค่าให้เป็นของจริง
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# ต่างจาก docker-compose.yml (dev) ตรงไหนบ้าง:
+#   - restart: always ทุก service (dev ไม่ตั้งไว้ — container ตายแล้วไม่ auto-restart)
+#   - db/api ไม่ publish port ออกนอกเครื่องเลย (dev เปิด 5432/4000 ให้ต่อตรงได้เพื่อ debug สะดวก) —
+#     เข้าถึงได้จากใน docker network เดียวกันเท่านั้น ลด attack surface
+#   - แยก network เป็น 2 วง (frontend-net/backend-net) — db คุยกับ web ตรง ๆ ไม่ได้เลย ต้องผ่าน api เท่านั้น
+#   - nginx ใช้ nginx.prod.conf (gzip/cache header/security header/HSTS/proxy timeout) แทน nginx.conf ปกติ
+#   - ค่าทุกตัว (password/secret) มาจาก .env.production ไม่ hardcode ไว้ในไฟล์นี้เลย
+# ---------------------------------------------------------------------------
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db-data-prod:/var/lib/postgresql/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # ไม่ publish port ออกนอกเครื่องโดยตั้งใจ — ต้อง exec เข้า container หรือผ่าน api เท่านั้น
+
+  api:
+    build: ./apps/api
+    restart: always
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: ${NODE_ENV}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      AUTH_RATE_LIMIT_WINDOW_MS: ${AUTH_RATE_LIMIT_WINDOW_MS}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX}
+      PORT: ${PORT}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend-net
+      - frontend-net
+    # ไม่ publish port ออกนอกเครื่อง — เข้าถึงได้ผ่าน web (nginx reverse proxy) เท่านั้น
+    # HEALTHCHECK ที่ประกาศไว้ใน apps/api/Dockerfile ใช้ค่า default อยู่แล้ว ไม่ต้อง override ที่นี่
+
+  web:
+    build: ./apps/web
+    restart: always
+    environment:
+      # ให้ nginx รู้ว่าจะ proxy /api ไปที่ service ไหน (ดู apps/web/nginx.prod.conf)
+      API_UPSTREAM: "api:4000"
+    volumes:
+      # ทับ config เดิมที่ build เข้า image ด้วย production config (gzip/cache/security header/HSTS) —
+      # read-only กันไม่ให้ container แก้ไฟล์นี้เองได้
+      - ./apps/web/nginx.prod.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - frontend-net
+
+networks:
+  # แยกวง network — db อยู่ backend-net เท่านั้น (web เข้าไม่ถึงโดยตรง) api อยู่ทั้งสองวง (เป็นสะพานเดียว)
+  frontend-net:
+  backend-net:
+
+volumes:
+  db-data-prod:

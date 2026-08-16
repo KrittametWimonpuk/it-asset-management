@@ -6,6 +6,11 @@
 # เลข 24 ต้องตรงกับ .nvmrc และ .github/workflows/ci.yml เสมอ (RC2 — Node Version Consistency)
 FROM node:24
 
+# ---- RC3: Image labels (OCI standard) — metadata สำหรับ registry/scanner ไม่กระทบการทำงานของ image ----
+LABEL org.opencontainers.image.title="it-asset-management-api" \
+      org.opencontainers.image.description="Backend API — Express + Prisma + PostgreSQL" \
+      org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 # 1) ติดตั้ง dependency ก่อน (คัดลอก package.json + package-lock.json เพื่อให้ Docker cache ได้)
@@ -29,6 +34,12 @@ RUN chmod +x docker-entrypoint.sh
 # permission ปกติของ COPY (ไม่ต้องเขียนไฟล์ใด ๆ ตอน runtime — PDF/Excel export เขียนตรงไปที่ HTTP
 # response ไม่ใช่ดิสก์ และ migration/query ต่อฐานข้อมูลผ่าน network ไม่ใช่ local filesystem)
 USER node
+
+# ---- RC3: Healthcheck — ใช้ Node ที่มีอยู่แล้วในตัว image ยิงเข้า /health เอง ไม่ติดตั้ง curl/wget
+# เพิ่ม (ลด attack surface — น้อย package ติดตั้งเท่ากับพื้นที่ให้โจมตีน้อยลง) start-period ยาวหน่อยเผื่อ
+# เวลารัน migration (docker-entrypoint.sh) ก่อน server จะเริ่มฟัง request จริง
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 EXPOSE 4000
 CMD ["./docker-entrypoint.sh"]

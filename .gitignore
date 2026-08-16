@@ -8,6 +8,7 @@ apps/web/dist/
 # env & secrets  — ห้าม commit ไฟล์เหล่านี้เด็ดขาด
 .env
 .env.local
+.env.production
 deploy/config.sh
 deploy/.state.sh
 

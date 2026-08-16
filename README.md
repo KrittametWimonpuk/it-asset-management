@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v1.0.0-rc2` (Release Candidate 2 — Production Hardening)
+**เวอร์ชันปัจจุบัน:** `v1.0.0-rc3` (Release Candidate 3 — Production Deployment & Operations)
 
 ---
 
@@ -37,7 +37,7 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint backend/frontend, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
-| **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
+| **Deploy** | สอง production path: (1) Docker Compose self-hosted (`docker-compose.prod.yml` — nginx reverse proxy + security headers + gzip) หรือ (2) สคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB — ดู [🚀 Production Deployment & Operations](#-production-deployment--operations-release-candidate-3) |
 
 ---
 
@@ -123,8 +123,13 @@ webapp-starter/
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
 ├── deploy/                     สคริปต์ deploy ขึ้น AWS ECS (00 → 03, และ 99-destroy)
-├── docs/
-├── docker-compose.yml          รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว
+├── docs/                       DEPLOYMENT / BACKUP_RECOVERY / ROLLBACK / PRODUCTION_CHECKLIST (RC3)
+├── .github/                    CI workflow + issue/PR templates (RC3)
+├── docker-compose.yml          รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว (dev)
+├── docker-compose.prod.yml     รัน production แบบ self-hosted (RC3 — ไฟล์แยกจาก dev ทั้งหมด)
+├── .env.production.example     ต้นแบบตัวแปร environment สำหรับ docker-compose.prod.yml (RC3)
+├── CONTRIBUTING.md             วิธี contribute เข้าโปรเจกต์ (RC3)
+├── CODEOWNERS                  ผู้ต้อง review ก่อน merge (RC3)
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -291,6 +296,106 @@ cross-origin request ตั้งแต่ต้น ตั้งค่านี�
 
 ---
 
+## 🚀 Production Deployment & Operations (Release Candidate 3)
+
+RC3 เพิ่มโครงสร้างและเอกสารสำหรับ deploy ระบบขึ้น production จริง — **ไม่มีการเพิ่ม business feature,
+เปลี่ยน API, หรือแก้ database schema ใด ๆ เลย** (ยกเว้นปรับ RDS backup retention 1→7 วัน) ดูรายละเอียด
+ทุกจุดที่แก้ไขได้ที่ [CHANGELOG](CHANGELOG.md)
+
+### 🐳 Production Docker Images
+
+Dockerfile ทั้งสองตัว (`apps/api/Dockerfile`, `apps/web/Dockerfile`) เดิมของ RC2 ยังใช้เหมือนเดิมทุก
+ประการ (ไม่ได้แยกไฟล์ใหม่) เพิ่มเข้ามาเฉพาะ:
+- **HEALTHCHECK**: backend เช็ก `/health` ด้วย Node's built-in `http` module (ไม่ติดตั้ง curl เพิ่ม —
+  minimal attack surface), frontend เช็กด้วย `wget` ที่มีอยู่แล้วใน `nginx:alpine` base image
+- **OCI image labels** (`org.opencontainers.image.title/description/licenses`) — metadata มาตรฐานสำหรับ
+  registry/scanning tools ไม่มีผลต่อพฤติกรรมรันไทม์
+
+### 🗺️ สอง Deployment Path
+
+| Path | ใช้เมื่อไร | ไฟล์หลัก |
+|------|-----------|----------|
+| **A. AWS ECS Fargate** (เดิมจาก Milestone ก่อน RC3) | ต้องการ managed infra, auto-scaling, ALB, RDS managed | `deploy/*.sh` |
+| **B. Self-hosted Docker Compose** (ใหม่ใน RC3) | มีเซิร์ฟเวอร์/VPS ของตัวเอง ต้องการควบคุมเต็มรูปแบบ | `docker-compose.prod.yml` + `.env.production` |
+
+`docker-compose.yml` (dev) **ไม่ถูกแก้แม้แต่บรรทัดเดียว** — `docker-compose.prod.yml` เป็นไฟล์แยกต่างหาก
+ทั้งหมด ต่างจาก dev ตรงที่: `restart: always` ทุก service, `db`/`api` ไม่ publish port ออก host เลย
+(ลด attack surface — เข้าถึงได้เฉพาะใน docker network เดียวกัน), แยก network เป็น 2 วง
+(`frontend-net`/`backend-net` — `db` คุยกับ `web` ตรง ๆ ไม่ได้), และ nginx ใช้
+[`apps/web/nginx.prod.conf`](apps/web/nginx.prod.conf) (gzip, cache header, security header, HSTS,
+proxy timeout) แทน config เดิม
+
+วิธีใช้ทาง B:
+```bash
+cp .env.production.example .env.production   # แก้ค่าทุกตัวที่มี CHANGE-ME
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+รายละเอียดเต็ม (server requirements, build, startup, migration, log locations, troubleshooting) อยู่ที่
+[**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md)
+
+### 🌐 Nginx Reverse Proxy (Production)
+
+`nginx.prod.conf` เพิ่มจาก config เดิมของ dev:
+- **gzip** compression (comp_level 6) สำหรับ text/css/json/js/xml/svg — **Brotli ยังไม่เปิดใช้งาน**
+  (`nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ต้องใช้ custom image — เว้นไว้เพื่อลดความเสี่ยง ดู
+  Known Limitations)
+- **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `X-XSS-Protection`, `Strict-Transport-Security` (HSTS — **มีผลจริงเฉพาะตอนใช้ผ่าน HTTPS เท่านั้น** — compose
+  ไฟล์นี้ไม่มี TLS termination ในตัว ดู Known Limitations)
+- **Static asset caching**: ไฟล์ที่ผ่าน content-hash แล้ว (`/assets/*-[hash].js`) cache 1 ปีแบบ
+  `immutable`, ส่วน `index.html` ใช้ `no-cache` เสมอ (กันเสิร์ฟ entry point เก่าที่ชี้ asset ที่ถูกลบไปแล้ว)
+- **Proxy timeout**: `proxy_read_timeout 120s` (นานกว่า default) รองรับ export PDF/Excel รายงานใหญ่ที่ใช้เวลานาน
+
+### ⚙️ Environment Variables (Production)
+
+ทาง B ใช้ [`.env.production.example`](.env.production.example) เป็นต้นแบบ (แยกจาก `.env.example` ที่ใช้ตอน dev):
+
+| ตัวแปร | ความหมาย |
+|--------|----------|
+| `DB_USER`/`DB_PASSWORD`/`DB_NAME` | สร้าง Postgres container ใน `docker-compose.prod.yml` |
+| `DATABASE_URL` | connection string ที่ backend ใช้จริง — host เป็นชื่อ service `db` (ไม่ใช่ `localhost`) |
+| `JWT_SECRET` | สร้างด้วย `openssl rand -hex 32` — **ห้ามใช้ค่าตัวอย่าง** |
+| `NODE_ENV` | ต้องเป็น `production` เสมอสำหรับไฟล์นี้ |
+| `CORS_ORIGIN` | ปกติปล่อยว่างได้ — topology มาตรฐานของ compose นี้เป็น same-origin ผ่าน nginx อยู่แล้ว |
+| `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` | ค่า default ใช้งานได้เลย ไม่บังคับตั้ง |
+| `PORT` | พอร์ตภายใน container ของ backend (default `4000`) |
+
+ทาง A (AWS ECS) ยังใช้ `deploy/config.sh` เหมือนเดิม (ดู `deploy/config.example.sh`) — ไม่เกี่ยวกับ
+`.env.production` ไฟล์นี้เลย
+
+### 💾 Backup & Recovery
+
+RDS automated backup retention ปรับจาก 1 วัน → **7 วัน** (`deploy/02-infra.sh`) สำหรับทาง A — ทาง B
+(self-hosted) ต้องตั้ง scheduled backup เอง (`pg_dump` ผ่าน cron) เพราะแต่ละ host มีเครื่องมือ scheduling
+ต่างกัน ไม่ได้ทำให้อัตโนมัติในโค้ดโดยตั้งใจ ขั้นตอน backup/restore/disaster recovery เต็มรูปแบบอยู่ที่
+[**docs/BACKUP_RECOVERY.md**](docs/BACKUP_RECOVERY.md)
+
+### ⏪ Rollback Strategy
+
+ครอบคลุม application rollback (ECS task definition revision / git tag + rebuild), database migration
+rollback (เขียน SQL ย้อนกลับด้วยมือ หรือ restore จาก backup — Prisma ไม่มี down-migration อัตโนมัติ),
+Docker image rollback, และ health verification หลัง rollback — รายละเอียดเต็มที่
+[**docs/ROLLBACK.md**](docs/ROLLBACK.md)
+
+### 📋 Production Checklist
+
+Checklist ก่อน deploy จริงครอบคลุม Infrastructure/Deployment/Security/Monitoring/Recovery/
+Documentation/Operations/Release process — ดู
+[**docs/PRODUCTION_CHECKLIST.md**](docs/PRODUCTION_CHECKLIST.md)
+
+### 📚 เอกสารที่เกี่ยวข้องทั้งหมด (RC3)
+
+| เอกสาร | เนื้อหา |
+|--------|---------|
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | คู่มือ deploy เต็มรูปแบบ ทั้งสอง path |
+| [docs/BACKUP_RECOVERY.md](docs/BACKUP_RECOVERY.md) | backup, retention, restore, disaster recovery |
+| [docs/ROLLBACK.md](docs/ROLLBACK.md) | rollback โค้ด/migration/Docker image |
+| [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md) | checklist ก่อน deploy จริง |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | วิธี contribute เข้าโปรเจกต์ |
+
+---
+
 ## 📊 Reports & Export
 
 หน้า "รายงาน" มีการ์ดให้เลือก 6 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
@@ -434,11 +539,13 @@ server console โดยไม่กระทบผู้ใช้
 
 ```
 webapp-starter/
-├── .github/workflows/   CI pipeline (GitHub Actions)
-├── apps/api/            Backend — Express + Prisma + PostgreSQL
-├── apps/web/            Frontend — React + Vite
-├── deploy/              สคริปต์ deploy ขึ้น AWS ECS
-└── docker-compose.yml   รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว
+├── .github/workflows/     CI pipeline (GitHub Actions)
+├── apps/api/              Backend — Express + Prisma + PostgreSQL
+├── apps/web/              Frontend — React + Vite
+├── deploy/                สคริปต์ deploy ขึ้น AWS ECS
+├── docs/                  คู่มือ deployment/backup/rollback/checklist (RC3)
+├── docker-compose.yml     รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว (dev)
+└── docker-compose.prod.yml   รัน production แบบ self-hosted (RC3)
 ```
 
 ---
@@ -597,6 +704,14 @@ cd deploy
 - **Health check ตรวจแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้ตรวจว่า schema ตรงกับ migration ล่าสุดหรือไม่** — ถ้า
   migration ค้าง (เช่น deploy image ใหม่ก่อนรัน migration) endpoint นี้จะยังตอบ "ok" อยู่ แม้ query บางอย่าง
   จะพังเพราะ column/table ไม่ตรงกับโค้ดจริงก็ตาม
+- **`docker-compose.prod.yml` ไม่มี TLS termination ในตัว** (RC3) — เปิดแค่ port 80 (HTTP) เท่านั้น
+  `Strict-Transport-Security` header ที่ตั้งไว้ใน `nginx.prod.conf` จะไม่มีผลจริงจนกว่าจะมี HTTPS จริง —
+  ผู้ดูแลระบบต้องเพิ่มเอง (เช่น วาง reverse proxy อีกชั้นที่มี TLS อยู่หน้าสุด หรือใช้ certbot/Let's Encrypt)
+- **Brotli compression ยังไม่เปิดใช้งาน** (RC3) — `nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ปัจจุบันใช้
+  gzip เท่านั้น เปิด Brotli ได้ในอนาคตด้วยการ build custom nginx image
+- **ไม่มี scheduled backup อัตโนมัติสำหรับทาง B (self-hosted)** (RC3) — เอกสารมีขั้นตอน backup/restore ให้
+  ครบ (`docs/BACKUP_RECOVERY.md`) แต่ผู้ดูแลระบบต้องตั้ง cron/scheduler เองตามสภาพแวดล้อมของตัวเอง (ทาง A
+  ผ่าน AWS ECS ใช้ RDS automated backup ที่มีอยู่แล้วโดยไม่ต้องตั้งอะไรเพิ่ม)
 
 ---
 

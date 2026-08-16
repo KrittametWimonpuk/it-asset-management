@@ -5,6 +5,75 @@
 
 ---
 
+## [v1.0.0-rc3] — Release Candidate 3: Production Deployment & Operations
+
+Milestone ด้าน production deployment/operations ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มี API/schema
+เปลี่ยนแปลง (ยกเว้น RDS backup retention 1→7 วัน), development compose (`docker-compose.yml`) ไม่ถูกแก้
+แม้แต่บรรทัดเดียว มุ่งเน้น infrastructure/deployment/operations/recovery/เอกสารล้วน ๆ
+
+### Added
+- `apps/web/nginx.prod.conf` — production nginx reverse proxy config: gzip compression, static asset
+  caching (`immutable` 1 ปีสำหรับไฟล์ที่ผ่าน content-hash, `no-cache` สำหรับ `index.html`), security
+  headers (`X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy`/`X-XSS-Protection`/
+  `Strict-Transport-Security`), proxy timeout ยาวขึ้น (`proxy_read_timeout 120s`) รองรับ export รายงานใหญ่
+- `docker-compose.prod.yml` — compose file แยกต่างหากสำหรับ self-hosted production: `restart: always`
+  ทุก service, `db`/`api` ไม่ publish port ออก host, แยก network เป็น 2 วง (`frontend-net`/`backend-net`),
+  ใช้ `nginx.prod.conf` แทน config เดิม
+- `.env.production.example` — ต้นแบบตัวแปร environment สำหรับ `docker-compose.prod.yml` (แยกจาก
+  `.env.example` ที่ใช้ตอน dev)
+- HEALTHCHECK directive ใน `apps/api/Dockerfile` (Node `http` module เช็ก `/health`) และ
+  `apps/web/Dockerfile` (`wget` เช็ก `/`) — ไม่ติดตั้ง dependency ใหม่ทั้งคู่ (minimal attack surface)
+- OCI image labels (`org.opencontainers.image.title/description/licenses`) ในทั้งสอง Dockerfile
+- `docs/DEPLOYMENT.md` — คู่มือ deploy เต็มรูปแบบ ครอบคลุมทั้งสอง path (AWS ECS + self-hosted Docker
+  Compose): server requirements, build, startup, migration, health verification, log locations,
+  troubleshooting
+- `docs/BACKUP_RECOVERY.md` — retention policy, backup (RDS automated + `pg_dump` manual), restore
+  procedure, disaster recovery checklist (documentation only — ไม่มี scheduled backup อัตโนมัติในโค้ด)
+- `docs/ROLLBACK.md` — application rollback (ECS task definition revision / git tag + rebuild),
+  database migration rollback (SQL ย้อนกลับด้วยมือ หรือ restore จาก backup), Docker image rollback,
+  health verification หลัง rollback
+- `docs/PRODUCTION_CHECKLIST.md` — checklist ก่อน deploy จริง ครอบคลุม Infrastructure/Deployment/
+  Security/Monitoring/Recovery/Documentation/Operations/Release process
+- `CONTRIBUTING.md`, `CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`,
+  `.github/ISSUE_TEMPLATE/{bug_report,feature_request}.md` — repository hygiene files ที่ยังขาดอยู่
+  (ไม่มีไฟล์เดิมถูกทับ — `LICENSE` ที่มีอยู่แล้วไม่ถูกแตะ)
+
+### Changed
+- `deploy/02-infra.sh` — RDS `--backup-retention-period` จาก `1` เป็น `7` วัน (บรรทัดเดียว ตอบสนอง finding
+  จาก RC1 review)
+- `.gitignore` — เพิ่ม `.env.production` เข้ากลุ่ม env/secrets ที่ห้าม commit
+- README.md — เพิ่มหัวข้อ "🚀 Production Deployment & Operations (RC3)" (Docker images, deployment paths,
+  nginx, environment variables, backup/rollback/checklist พร้อมลิงก์ไปเอกสารเต็ม), อัปเดต Known
+  Limitations (TLS termination ไม่มีในตัว, Brotli ยังไม่เปิด, ไม่มี scheduled backup อัตโนมัติสำหรับทาง
+  self-hosted), อัปเดต project structure diagram
+
+### Testing
+- `docker build` ทั้งสอง image สำเร็จพร้อม HEALTHCHECK/LABEL directive ใหม่ — ยืนยัน non-root execution
+  (RC2) ยังคงอยู่ (`docker run --rm <image> whoami` → `node`)
+- `docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build` — ทุก service
+  ขึ้นสถานะ `healthy`, migration รันสำเร็จอัตโนมัติผ่าน entrypoint เดิม
+- Nginx routing: `/` เสิร์ฟ SPA (fallback ไป `index.html`), `/api/*` proxy ไปที่ backend ถูกต้อง, gzip
+  header (`Content-Encoding: gzip`) ปรากฏบน response ที่เข้าเงื่อนไข, security headers ครบตามที่ตั้งไว้
+- `GET /api/health` ตอบ `200 {status:"ok", database:"connected"}` ผ่าน nginx proxy
+- Swagger UI (`/api/docs/`) เข้าถึงได้ผ่าน nginx proxy เหมือนตอน dev
+- Graceful shutdown (RC2) ยืนยันซ้ำว่ายังทำงานถูกต้องภายใต้ topology ใหม่ (`docker compose stop api` →
+  log ครบ 3 ขั้นตอน → exit `0`)
+- ยืนยัน `docker-compose.yml` (dev) ไม่มีการเปลี่ยนแปลงใด ๆ (`git diff --stat docker-compose.yml` ว่างเปล่า)
+- Security review: ไม่พบ secret ใด ๆ ใน git history หรือ tracked files, `contentSecurityPolicy: false`
+  (RC2) ยังคงเปิดให้ Swagger UI ใช้งานได้, error handler ไม่รั่ว stack trace ดิบออกไปหา client, CORS
+  fail-closed behavior (RC2) ไม่เปลี่ยน
+
+### Known Limitations
+- `docker-compose.prod.yml` ไม่มี TLS termination ในตัว — `Strict-Transport-Security` header จะไม่มีผลจริง
+  จนกว่าจะมี HTTPS จริง (ต้องเพิ่มเอง)
+- Brotli compression ยังไม่เปิดใช้งาน (`nginx:alpine` ไม่มี `ngx_brotli` module ในตัว) — ใช้ gzip เท่านั้น
+- ไม่มี scheduled backup อัตโนมัติสำหรับทาง self-hosted — ต้องตั้ง cron/scheduler เอง (เอกสารมีขั้นตอนให้
+  ครบใน `docs/BACKUP_RECOVERY.md`)
+- Prisma ไม่มีกลไก "down migration" อัตโนมัติ — rollback migration ที่ทำลายข้อมูลต้อง restore จาก backup
+  หรือเขียน SQL ย้อนกลับด้วยมือ (ดู `docs/ROLLBACK.md`)
+
+---
+
 ## [v1.0.0-rc2] — Release Candidate 2: Production Hardening
 
 Milestone ด้าน production readiness ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มีการแก้ database schema,
