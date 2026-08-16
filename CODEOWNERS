@@ -1,0 +1,22 @@
+# CODEOWNERS — กำหนดผู้ต้อง review ก่อน merge เข้า master
+# ดู https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# กติกา: entry ที่อยู่ล่างสุดที่ match จะชนะ (เหมือน .gitignore)
+
+# Default — ทุกไฟล์ในโปรเจกต์
+* @kaykan1191
+
+# Backend
+/apps/api/ @kaykan1191
+
+# Frontend
+/apps/web/ @kaykan1191
+
+# Infrastructure & Deployment (RC3)
+/deploy/ @kaykan1191
+/docker-compose.yml @kaykan1191
+/docker-compose.prod.yml @kaykan1191
+/docs/ @kaykan1191
+
+# CI/CD
+/.github/ @kaykan1191

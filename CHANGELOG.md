@@ -5,6 +5,228 @@
 
 ---
 
+## [v1.0.0-rc3] — Release Candidate 3: Production Deployment & Operations
+
+Milestone ด้าน production deployment/operations ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มี API/schema
+เปลี่ยนแปลง (ยกเว้น RDS backup retention 1→7 วัน), development compose (`docker-compose.yml`) ไม่ถูกแก้
+แม้แต่บรรทัดเดียว มุ่งเน้น infrastructure/deployment/operations/recovery/เอกสารล้วน ๆ
+
+### Added
+- `apps/web/nginx.prod.conf` — production nginx reverse proxy config: gzip compression, static asset
+  caching (`immutable` 1 ปีสำหรับไฟล์ที่ผ่าน content-hash, `no-cache` สำหรับ `index.html`), security
+  headers (`X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy`/`X-XSS-Protection`/
+  `Strict-Transport-Security`), proxy timeout ยาวขึ้น (`proxy_read_timeout 120s`) รองรับ export รายงานใหญ่
+- `docker-compose.prod.yml` — compose file แยกต่างหากสำหรับ self-hosted production: `restart: always`
+  ทุก service, `db`/`api` ไม่ publish port ออก host, แยก network เป็น 2 วง (`frontend-net`/`backend-net`),
+  ใช้ `nginx.prod.conf` แทน config เดิม
+- `.env.production.example` — ต้นแบบตัวแปร environment สำหรับ `docker-compose.prod.yml` (แยกจาก
+  `.env.example` ที่ใช้ตอน dev)
+- HEALTHCHECK directive ใน `apps/api/Dockerfile` (Node `http` module เช็ก `/health`) และ
+  `apps/web/Dockerfile` (`wget` เช็ก `/`) — ไม่ติดตั้ง dependency ใหม่ทั้งคู่ (minimal attack surface)
+- OCI image labels (`org.opencontainers.image.title/description/licenses`) ในทั้งสอง Dockerfile
+- `docs/DEPLOYMENT.md` — คู่มือ deploy เต็มรูปแบบ ครอบคลุมทั้งสอง path (AWS ECS + self-hosted Docker
+  Compose): server requirements, build, startup, migration, health verification, log locations,
+  troubleshooting
+- `docs/BACKUP_RECOVERY.md` — retention policy, backup (RDS automated + `pg_dump` manual), restore
+  procedure, disaster recovery checklist (documentation only — ไม่มี scheduled backup อัตโนมัติในโค้ด)
+- `docs/ROLLBACK.md` — application rollback (ECS task definition revision / git tag + rebuild),
+  database migration rollback (SQL ย้อนกลับด้วยมือ หรือ restore จาก backup), Docker image rollback,
+  health verification หลัง rollback
+- `docs/PRODUCTION_CHECKLIST.md` — checklist ก่อน deploy จริง ครอบคลุม Infrastructure/Deployment/
+  Security/Monitoring/Recovery/Documentation/Operations/Release process
+- `CONTRIBUTING.md`, `CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`,
+  `.github/ISSUE_TEMPLATE/{bug_report,feature_request}.md` — repository hygiene files ที่ยังขาดอยู่
+  (ไม่มีไฟล์เดิมถูกทับ — `LICENSE` ที่มีอยู่แล้วไม่ถูกแตะ)
+
+### Changed
+- `deploy/02-infra.sh` — RDS `--backup-retention-period` จาก `1` เป็น `7` วัน (บรรทัดเดียว ตอบสนอง finding
+  จาก RC1 review)
+- `.gitignore` — เพิ่ม `.env.production` เข้ากลุ่ม env/secrets ที่ห้าม commit
+- README.md — เพิ่มหัวข้อ "🚀 Production Deployment & Operations (RC3)" (Docker images, deployment paths,
+  nginx, environment variables, backup/rollback/checklist พร้อมลิงก์ไปเอกสารเต็ม), อัปเดต Known
+  Limitations (TLS termination ไม่มีในตัว, Brotli ยังไม่เปิด, ไม่มี scheduled backup อัตโนมัติสำหรับทาง
+  self-hosted), อัปเดต project structure diagram
+
+### Testing
+- `docker build` ทั้งสอง image สำเร็จพร้อม HEALTHCHECK/LABEL directive ใหม่ — ยืนยัน non-root execution
+  (RC2) ยังคงอยู่ (`docker run --rm <image> whoami` → `node`)
+- `docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build` — ทุก service
+  ขึ้นสถานะ `healthy`, migration รันสำเร็จอัตโนมัติผ่าน entrypoint เดิม
+- Nginx routing: `/` เสิร์ฟ SPA (fallback ไป `index.html`), `/api/*` proxy ไปที่ backend ถูกต้อง, gzip
+  header (`Content-Encoding: gzip`) ปรากฏบน response ที่เข้าเงื่อนไข, security headers ครบตามที่ตั้งไว้
+- `GET /api/health` ตอบ `200 {status:"ok", database:"connected"}` ผ่าน nginx proxy
+- Swagger UI (`/api/docs/`) เข้าถึงได้ผ่าน nginx proxy เหมือนตอน dev
+- Graceful shutdown (RC2) ยืนยันซ้ำว่ายังทำงานถูกต้องภายใต้ topology ใหม่ (`docker compose stop api` →
+  log ครบ 3 ขั้นตอน → exit `0`)
+- ยืนยัน `docker-compose.yml` (dev) ไม่มีการเปลี่ยนแปลงใด ๆ (`git diff --stat docker-compose.yml` ว่างเปล่า)
+- Security review: ไม่พบ secret ใด ๆ ใน git history หรือ tracked files, `contentSecurityPolicy: false`
+  (RC2) ยังคงเปิดให้ Swagger UI ใช้งานได้, error handler ไม่รั่ว stack trace ดิบออกไปหา client, CORS
+  fail-closed behavior (RC2) ไม่เปลี่ยน
+
+### Known Limitations
+- `docker-compose.prod.yml` ไม่มี TLS termination ในตัว — `Strict-Transport-Security` header จะไม่มีผลจริง
+  จนกว่าจะมี HTTPS จริง (ต้องเพิ่มเอง)
+- Brotli compression ยังไม่เปิดใช้งาน (`nginx:alpine` ไม่มี `ngx_brotli` module ในตัว) — ใช้ gzip เท่านั้น
+- ไม่มี scheduled backup อัตโนมัติสำหรับทาง self-hosted — ต้องตั้ง cron/scheduler เอง (เอกสารมีขั้นตอนให้
+  ครบใน `docs/BACKUP_RECOVERY.md`)
+- Prisma ไม่มีกลไก "down migration" อัตโนมัติ — rollback migration ที่ทำลายข้อมูลต้อง restore จาก backup
+  หรือเขียน SQL ย้อนกลับด้วยมือ (ดู `docs/ROLLBACK.md`)
+
+---
+
+## [v1.0.0-rc2] — Release Candidate 2: Production Hardening
+
+Milestone ด้าน production readiness ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มีการแก้ database schema,
+ไม่มี API endpoint ใหม่/redesign เดิม (ยกเว้นค่า response ที่ upgrade ของ `/health`), maintain backward
+compatibility กับพฤติกรรมเดิมทุกจุดที่ไม่ได้ตั้งใจเปลี่ยน — ตอบสนอง 11 findings จาก RC1 production readiness
+review (Critical/High severity ทั้งหมด)
+
+### Added
+- `apps/api/src/middleware/rateLimit.js` — จำกัดจำนวนครั้ง `POST /api/auth/login`/`POST /api/auth/register`
+  ต่อ IP (ใช้ [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit)) ปรับได้ผ่าน
+  `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` (default 10 ครั้ง/15 นาที) เกินโควตาตอบ `429` ด้วย
+  response envelope เดียวกับ error อื่นทั้งระบบ — ไม่แตะ logic ตรวจสอบ credential/สมัครสมาชิกเดิมเลย
+- `apps/api/src/middleware/requestLogger.js` — log แบบ structured (JSON) ทุก request: requestId (`crypto.randomUUID()`),
+  method, path, status, durationMs, ip — ไม่ log request body/header ใด ๆ (กัน password/JWT หลุดเข้า log)
+  แนบ `X-Request-Id` ไปกับ response header ด้วย
+- `apps/api/src/utils/corsOptions.js` — สร้าง CORS options จาก `CORS_ORIGIN` env var แทนการเปิดกว้างทุก
+  origin แบบเดิม (`cors()` เฉย ๆ) — ไม่ตั้งค่า + dev = reflect origin (เหมือนเดิม), ไม่ตั้งค่า + production =
+  fail closed
+- Graceful shutdown ใน `apps/api/src/index.js` — ดัก `SIGTERM`/`SIGINT`: หยุดรับ connection ใหม่
+  (`server.close()`) → request ที่ค้างอยู่ทำงานจนจบตามปกติ → `prisma.$disconnect()` → `process.exit()` ด้วย
+  status code ที่เหมาะสม พร้อม timer บังคับปิดถ้ารอนานเกินไป (10 วินาที) — log ทุกขั้นตอน
+- `/health`, `/api/health` อัปเกรด — เช็ก `SELECT 1` ผ่าน Prisma จริง ตอบ `200 {status:"ok", database:"connected"}`
+  เมื่อต่อ DB ได้, ตอบ `503 {status:"error", database:"disconnected"}` เมื่อต่อไม่ได้ (เดิมตอบ `200` เสมอ
+  ไม่เช็กอะไรเลย)
+- Helmet middleware — security header มาตรฐาน (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Strict-Transport-Security` ฯลฯ) ปิดเฉพาะ `contentSecurityPolicy` (จะบล็อก inline script/style ที่
+  Swagger UI ต้องใช้) header อื่นทั้งหมดเปิดใช้งานตามปกติ
+- Environment variables ใหม่ (ทุกตัวไม่บังคับ มี default ที่ backward-compatible): `NODE_ENV`, `CORS_ORIGIN`,
+  `AUTH_RATE_LIMIT_WINDOW_MS`, `AUTH_RATE_LIMIT_MAX` — เพิ่มใน `.env.example` และ README
+
+### Changed
+- `apps/api/src/index.js` — เพิ่ม helmet/cors(ใหม่)/requestLogger middleware, upgrade health handler,
+  เปลี่ยน `app.listen()` ให้เก็บ `server` reference สำหรับ graceful shutdown — ลำดับ route/error handler
+  เดิมไม่เปลี่ยน
+- `apps/api/src/routes/auth.js` — เพิ่ม `authRateLimit` เป็น middleware ตัวแรกของ `POST /register` และ
+  `POST /login` (ก่อนถึง validation/business logic เดิมทั้งหมด) และเปลี่ยน `registerSchema.password` จาก
+  `min(6)` เป็น `min(8)` (ข้อความ error ปรับเลขให้ตรงกัน) — ไม่แตะ logic ส่วนอื่นเลย
+- `apps/api/src/docs/openapi.js` — อัปเดต `RegisterRequest.password.minLength` จาก 6 เป็น 8 ให้ตรงกับ
+  validation จริง
+- `apps/web/src/pages/Register.jsx` — ป้ายกำกับรหัสผ่านเปลี่ยนจาก "(อย่างน้อย 6 ตัว)" เป็น "(อย่างน้อย 8 ตัว)"
+- `apps/web/src/components/{AssetForm,AssignmentForm,MasterDataForm,ReturnAssignmentForm}.jsx` — เพิ่ม
+  `htmlFor`/`id` ให้ทุกคู่ label-input ที่ขาดอยู่ (screen reader อ่านชื่อฟิลด์ถูกต้อง, กด label แล้ว focus ที่
+  input ได้) — ไม่เปลี่ยน layout/behavior ใด ๆ
+- `apps/api/Dockerfile` — `node:20` → `node:24` (ตรงกับ `.nvmrc`/CI), `npm install` → `npm ci` (ต้อง copy
+  `package-lock.json` เข้าไปด้วย), เพิ่ม `USER node` ก่อน `CMD` (รันเป็น non-root — ใช้ user `node` ที่มีอยู่
+  แล้วในตัว official image ไม่ต้องสร้างเอง)
+- `apps/web/Dockerfile` — `node:20-alpine` → `node:24-alpine`, `npm install` → `npm ci` (ต้อง copy
+  `package-lock.json` เข้าไปด้วย) เฉพาะ build stage (stage สุดท้ายเป็น nginx ไม่มี npm)
+- `deploy/task-def-api.json` — เพิ่ม `NODE_ENV=production` เข้า environment array ของ container API
+- `deploy/config.example.sh` — เพิ่มคอมเมนต์อธิบาย `CORS_ORIGIN`/`AUTH_RATE_LIMIT_*` (เป็นตัวอย่างที่ปิดไว้
+  ไม่บังคับตั้ง — ค่า default ในโค้ดใช้งานได้โดยไม่ต้องตั้งอะไรเพิ่ม)
+- `.env.example`, README.md — เพิ่มเอกสารตัวแปรใหม่ทั้งหมด + หัวข้อ "🛡️ Production Hardening (RC2)" อธิบาย
+  rate limiting/graceful shutdown/health endpoint/logging/security headers/CORS/Docker
+
+### Testing
+- Backend/frontend lint: 0 error (เหมือนเดิม, ไม่มี regression จากการแก้ accessibility)
+- `prisma validate`/`prisma generate`: ผ่าน
+- Docker build ทั้งสอง image สำเร็จด้วย `node:24`; ยืนยัน backend container รันเป็น `node` (non-root, UID 1000)
+  ด้วย `docker run --rm <image> whoami`/`id`
+- Container จริง (ผ่าน docker, ต่อ Postgres จริง): migration รันสำเร็จเป็น non-root user, `/health` ตอบ `200`
+  ตอน DB ต่อได้ และ `503` ทันทีที่ DB ถูก stop (ทดสอบจริงด้วยการ stop/start container ฐานข้อมูล)
+- Rate limit: ยิง `POST /api/auth/login` รัว ๆ 12 ครั้ง — 10 ครั้งแรกผ่าน (401 ตามที่ credential ผิดจริง) ครั้งที่
+  11-12 ได้ `429` พร้อมข้อความที่ตั้งใจไว้
+- Password policy: สมัครด้วยรหัสผ่าน 7 ตัวอักษร → `400` พร้อม field error ที่ถูกต้อง, 8 ตัวอักษร → `201` สำเร็จ
+- Graceful shutdown: `docker stop` (ส่ง `SIGTERM`) → log ครบทั้ง 4 ขั้นตอนตามลำดับที่ตั้งใจ, exit code `0`
+- Request logging: ยืนยัน log JSON มี requestId/method/path/status/durationMs/ip ครบ ไม่มี body/header ปน
+- CORS: request ที่มี `Origin` header (ไม่ได้ตั้ง `CORS_ORIGIN`, ไม่ได้ตั้ง `NODE_ENV`) ได้
+  `Access-Control-Allow-Origin` reflect กลับมาตามเดิม (backward compatible กับ dev workflow)
+- Helmet: header มาตรฐานครบ (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`
+  ฯลฯ) ยืนยันไม่มี `Content-Security-Policy` header (ปิดไว้ตามตั้งใจ)
+- Swagger UI (`/docs`): โหลดหน้าได้ปกติ (HTTP 200, title ถูกต้อง) และ asset ทั้ง 4 ไฟล์
+  (`swagger-ui.css`/`swagger-ui-bundle.js`/`swagger-ui-standalone-preset.js`/`swagger-ui-init.js`) โหลด
+  สำเร็จทุกไฟล์ (ไม่ถูก Helmet บล็อก)
+- Browser regression: login ผ่าน Vite dev server ทำงานปกติ, เปิดฟอร์ม "เพิ่มครุภัณฑ์ใหม่" แล้วทุกช่อง input
+  มี accessible name ที่ถูกต้อง (ยืนยันผ่าน accessibility tree, ตรงกับ label ที่ผูกด้วย `htmlFor`/`id` ใหม่)
+  ไม่มี error ใน console
+
+### Known Limitations
+- Rate limit เก็บ state ในหน่วยความจำต่อ instance ไม่ใช่ distributed store — ถ้า deploy มากกว่า 1 instance
+  พร้อมกันในอนาคต โควตาจะไม่ถูกนับรวมข้าม instance (ปัจจุบัน `desired-count` ยังเป็น 1 จึงไม่กระทบจริง)
+- ยังไม่มี email verification หรือ account lockout ถาวรหลังพยายามผิดหลายครั้ง — rate limit ชะลอการโจมตีได้
+  แต่ไม่ใช่กลไกล็อกบัญชีแบบถาวร
+- `/health` เช็กแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้เช็กว่า schema ตรงกับ migration ล่าสุด
+- `CORS_ORIGIN` ไม่ได้ผูกเข้า ECS task definition โดยตรง (ไม่จำเป็นสำหรับ deployment topology ปัจจุบันที่ ALB
+  route แบบ same-origin อยู่แล้ว) — ถ้ามี client ข้าม origin จริงในอนาคตต้องตั้งค่าด้วยตนเอง
+
+---
+
+## [v1.0.0-rc1] — Milestone 10: CI/CD & Release Engineering
+
+Milestone ด้าน engineering quality ล้วน ๆ — ไม่มีการเปลี่ยน business logic, ไม่มีการแก้ database schema,
+ไม่มี application feature ใหม่ ทุกอย่างในรอบนี้คือ tooling/CI/documentation
+
+### Added
+- `.github/workflows/ci.yml` — GitHub Actions workflow "Continuous Integration" รันทุก `push`/`pull_request`
+  เข้า `master` และ `feature/*` — 1 job เดียว รันตามลำดับ: checkout → setup Node.js (Active LTS จาก `.nvmrc`
+  + npm cache) → `npm ci` (backend+frontend แยกกัน) → `prisma validate` (ตรวจ schema syntax เท่านั้น ไม่
+  migrate/เชื่อมต่อ DB จริง) → lint backend → lint frontend → build backend (`prisma generate`) → build
+  frontend (`vite build`) → success summary (เขียนลง `$GITHUB_STEP_SUMMARY`) ล้มเหลว step ไหนหยุดทันที
+  (ไม่มี `continue-on-error` ที่ไหนเลย) ใช้ `actions/checkout@v4` และ `actions/setup-node@v4` (official,
+  maintained version ปัจจุบัน)
+- ESLint สำหรับทั้งสอง app (flat config, ESLint v10):
+  - `apps/api/eslint.config.js` — Node/ESM, ใช้ `@eslint/js` recommended + `no-unused-vars` (warn)
+  - `apps/web/eslint.config.js` — React, ใช้ `@eslint/js` recommended + เฉพาะ `react-hooks/rules-of-hooks`
+    (error) และ `react-hooks/exhaustive-deps` (warn) จาก `eslint-plugin-react-hooks` v7 — ตั้งใจไม่ใช้
+    `configs.recommended` ทั้งชุดของเวอร์ชันนี้ เพราะรวม rule ชุด "React Compiler" ใหม่ (เช่น
+    `set-state-in-effect`, `immutability`) ที่จะ flag pattern ปกติที่ใช้อยู่ทั่วโปรเจกต์ (เช่น
+    `setPage(1)` ใน `useEffect` ตอนรีเซ็ตหน้าเวลาตัวกรองเปลี่ยน) การแก้ตาม rule เหล่านั้นจะกลายเป็นการ
+    เปลี่ยน business logic ซึ่งอยู่นอกขอบเขตของ milestone นี้
+  - `"lint"` script เพิ่มในทั้งสอง `package.json`
+- `apps/api/package.json`: เพิ่ม `"validate": "prisma validate"` และ `"build": "prisma generate"` script
+  (backend ไม่มีขั้นตอน compile/bundle เหมือน frontend — "build" ในที่นี้คือการ generate Prisma Client
+  ซึ่งเป็น artifact เดียวที่จำเป็นก่อนรันแอปได้จริง)
+- `.nvmrc` — pin Node.js เวอร์ชัน 24 (Active LTS ปัจจุบัน) ให้ทั้ง local dev และ CI ใช้ตัวเลขเดียวกัน
+- `.editorconfig` — บังคับ indent 2 space, LF line ending, UTF-8, trim trailing whitespace ให้ทุก editor
+  ใช้กติกาเดียวกัน (ตรงกับ code style ที่ใช้อยู่แล้วทั้งโปรเจกต์)
+- `.gitattributes` — normalize line ending เป็น LF สำหรับไฟล์ text ทั้งหมด (กัน diff แปลกข้าม OS) และ mark
+  ไฟล์ binary (`.woff`, รูปภาพ, `.pdf`) ให้ Git ไม่ไป normalize ทับจนไฟล์เสีย
+- `.prettierignore` — ระบุ path ที่ไม่ควร format (migration SQL ที่ Prisma generate เอง, lock files,
+  `node_modules`, `dist`) เผื่อผู้พัฒนาเปิด Prettier ใน editor ของตัวเอง (โปรเจกต์นี้ยังไม่ได้ตั้ง Prettier
+  เป็น dependency บังคับ)
+
+### Changed
+- `.gitignore` — เพิ่ม entry ใหม่เท่านั้น ไม่ลบของเดิม: `.vscode/`, `.idea/`, `.eslintcache`, `coverage/`
+- `apps/api/src/middleware/auth.js` — เปลี่ยน `catch (err)` เป็น `catch` เฉย ๆ (optional catch binding) —
+  `err` ไม่เคยถูกใช้ เป็น dead code ที่ ESLint เจอ ไม่กระทบ behavior ใด ๆ
+- `apps/api/src/routes/auth.js` — เอา `auditContext` ที่ import มาแต่ไม่เคยเรียกใช้ออก (register/login ยังคง
+  เรียก `logAudit()` เหมือนเดิมทุกประการ แค่ประกอบ context เองตรง ๆ เพราะ `req.user` ยังไม่ถูกตั้งค่าตอนนั้น)
+- `apps/api/src/routes/reports.js` — เอา `fail` (import แต่ไม่เคยเรียกใช้ในไฟล์นี้เลย) และ
+  `TICKET_CATEGORY_LABELS` (นิยามไว้แต่ไม่เคยถูกอ้างอิงที่ไหน) ที่เป็น dead code ออก — ไม่มี endpoint ไหน
+  เปลี่ยนพฤติกรรม
+- README.md — เพิ่ม CI badge, ส่วน "🟢 Build Status", "⚙️ CI/CD Pipeline" (อธิบายว่า CI รันตอนไหน/ขั้นตอน
+  อะไรบ้าง/เกิดอะไรขึ้นถ้าล้มเหลว/วิธี reproduce ในเครื่องตัวเอง), ขยาย "🌿 Git Workflow" ด้วย Branch
+  Strategy / Contribution Workflow / Project Structure, เพิ่ม "🔍 Quality Checks" (คำสั่งเดียวกับที่ CI รัน)
+
+### Testing
+- Syntax ของ `.github/workflows/ci.yml` ตรวจผ่าน YAML parser (js-yaml) — โครงสร้าง `on`/`jobs`/`steps` ถูกต้อง
+- รันทุก step ของ CI ซ้ำในเครื่องจริง (ไม่ใช่แค่บน GitHub): `npm ci` (backend+frontend), `prisma validate`
+  (พร้อม `DATABASE_URL` หลอกตามที่ CI ใช้), `npm run lint` ทั้งสอง app, `npm run build` ทั้งสอง app — ผ่านหมด
+- Backend lint: 0 error, 0 warning (แก้ dead code ทั้งหมดที่เจอแล้ว)
+- Frontend lint: 0 error, 12 warning (ทั้งหมดเป็น pattern ที่ตั้งใจไว้อยู่แล้ว — `exhaustive-deps` ที่ตั้งใจ
+  ไม่ใส่ `load` ใน dependency array ของ 6 หน้าจอ list, และ `react-refresh/only-export-components` ของไฟล์
+  form ที่ export ทั้ง component และ option array ร่วมกัน — ไม่แก้เพราะจะกลายเป็นการเปลี่ยน business logic)
+- ไม่มี regression: backend/frontend ยังรันได้ปกติ, endpoint และหน้าจอทั้งหมดไม่เปลี่ยนพฤติกรรม
+
+### Not Implemented (ตั้งใจเว้นไว้ ตามขอบเขต Milestone 10)
+- Automated test suite / step "Test" ใน CI — โปรเจกต์นี้ยังไม่มี test suite เลย (ดู Roadmap ใน README)
+- Deploy step อัตโนมัติจาก CI (เช่น auto-deploy ขึ้น AWS เมื่อ merge เข้า `master`) — ปัจจุบัน deploy ยังเป็น
+  ขั้นตอนแยกที่รันมือผ่านสคริปต์ใน `deploy/` (ดูหัวข้อ Deploy ใน README)
+- Prettier เป็น dependency บังคับ + step "Format check" ใน CI — มีแค่ `.prettierignore` เผื่อผู้พัฒนาเปิดใช้เอง
+
+---
+
 ## [v0.9.0] — Milestone 9: Audit Log
 
 ### Added

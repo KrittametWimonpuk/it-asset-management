@@ -34,7 +34,7 @@ export default function Register({ onAuthed, goLogin }) {
           <label htmlFor="register-email">อีเมล</label>
           <input id="register-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
-          <label htmlFor="register-password">รหัสผ่าน (อย่างน้อย 6 ตัว)</label>
+          <label htmlFor="register-password">รหัสผ่าน (อย่างน้อย 8 ตัว)</label>
           <input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
           {error && <p className="error">{error}</p>}

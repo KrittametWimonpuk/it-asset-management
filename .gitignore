@@ -8,6 +8,7 @@ apps/web/dist/
 # env & secrets  — ห้าม commit ไฟล์เหล่านี้เด็ดขาด
 .env
 .env.local
+.env.production
 deploy/config.sh
 deploy/.state.sh
 
@@ -18,6 +19,14 @@ npm-debug.log*
 # os
 .DS_Store
 Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# lint/tooling caches (Milestone 10 — CI/CD & Release Engineering)
+.eslintcache
+coverage/
 
 # Claude Code session-local files (not project source)
 .claude/

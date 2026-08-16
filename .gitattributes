@@ -1,0 +1,25 @@
+# บังคับ line ending เป็น LF เสมอในตัว repository (checkout ยังปรับตาม core.autocrlf ของแต่ละเครื่องได้ตามปกติ)
+# กัน diff แปลก ๆ จาก CRLF/LF ปนกันข้าม OS (Windows/Mac/Linux ทำงานร่วมกันในโปรเจกต์นี้)
+* text=auto eol=lf
+
+# ไฟล์ source code หลัก — เป็น text แน่นอน
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.css text
+*.html text
+*.yml text
+*.yaml text
+*.sql text
+*.prisma text
+*.sh text eol=lf
+
+# ไฟล์ binary — ห้าม normalize line ending (จะทำให้ไฟล์เสีย)
+*.woff binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

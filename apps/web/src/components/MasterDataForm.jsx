@@ -91,11 +91,13 @@ export default function MasterDataForm({ title, fields, item, onSubmit, onCancel
                 </label>
               )
             }
+            const fieldId = `masterdata-${f.name}`
             return (
               <div key={f.name}>
-                <label>{f.label}{f.required && ' *'}</label>
+                <label htmlFor={fieldId}>{f.label}{f.required && ' *'}</label>
                 {f.type === 'textarea' ? (
                   <textarea
+                    id={fieldId}
                     ref={idx === 0 ? firstInputRef : undefined}
                     rows={3}
                     value={form[f.name] || ''}
@@ -104,6 +106,7 @@ export default function MasterDataForm({ title, fields, item, onSubmit, onCancel
                   />
                 ) : (
                   <input
+                    id={fieldId}
                     ref={idx === 0 ? firstInputRef : undefined}
                     type={f.type === 'email' ? 'email' : 'text'}
                     value={form[f.name] || ''}

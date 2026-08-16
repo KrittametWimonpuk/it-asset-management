@@ -14,7 +14,8 @@
       "environment": [
         { "name": "DATABASE_URL", "value": "${DB_URL_FINAL}" },
         { "name": "JWT_SECRET", "value": "${JWT_SECRET}" },
-        { "name": "PORT", "value": "4000" }
+        { "name": "PORT", "value": "4000" },
+        { "name": "NODE_ENV", "value": "production" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

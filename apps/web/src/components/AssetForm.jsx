@@ -181,20 +181,21 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
   // ---- dropdown master data ตัวหนึ่ง: ปกติ (มีตัวเลือก) / ว่างเปล่า (ให้ลิงก์ไปสร้างก่อน) / กำลังโหลด ----
   function renderMasterDataField(f) {
+    const fieldId = `asset-${f.key}`
     const list = options?.[f.key]
     if (!options) {
       return (
         <div key={f.key} className="grow">
-          <label>{f.label}{f.required && ' *'}</label>
-          <p className="muted">กำลังโหลดตัวเลือก...</p>
+          <label htmlFor={fieldId}>{f.label}{f.required && ' *'}</label>
+          <p className="muted" id={fieldId}>กำลังโหลดตัวเลือก...</p>
         </div>
       )
     }
     if (list.length === 0) {
       return (
         <div key={f.key} className="grow">
-          <label>{f.label}{f.required && ' *'}</label>
-          <div className="empty-dropdown">
+          <label htmlFor={fieldId}>{f.label}{f.required && ' *'}</label>
+          <div className="empty-dropdown" id={fieldId}>
             <p className="muted">ยังไม่มี{f.label}ในระบบ</p>
             {onNavigateToMaster && (
               <button type="button" className="link" onClick={() => goCreateMaster(f.navTarget)}>
@@ -207,8 +208,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
     }
     return (
       <div key={f.key} className="grow">
-        <label>{f.label}{f.required && ' *'}</label>
+        <label htmlFor={fieldId}>{f.label}{f.required && ' *'}</label>
         <select
+          id={fieldId}
           value={form[f.key] || ''}
           onChange={(e) => update(f.key, e.target.value)}
           className={fieldErrors[f.key] ? 'invalid' : ''}
@@ -225,10 +227,12 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
   // ---- ช่อง input ธรรมดา (text/number/date) ตัวหนึ่ง — ใช้ซ้ำกับฟิลด์รายละเอียดของ Milestone 3 ----
   function renderInput(key, label, { type = 'text', placeholder, step, min } = {}) {
+    const fieldId = `asset-${key}`
     return (
       <div className="grow">
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         <input
+          id={fieldId}
           type={type}
           value={form[key] || ''}
           placeholder={placeholder}
@@ -244,10 +248,12 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
   // ---- ช่อง textarea เต็มความกว้าง — ใช้กับ description/remark ----
   function renderTextarea(key, label) {
+    const fieldId = `asset-${key}`
     return (
       <>
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         <textarea
+          id={fieldId}
           rows={2}
           value={form[key] || ''}
           onChange={(e) => update(key, e.target.value)}
@@ -264,8 +270,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
         <h2>{isEdit ? 'แก้ไขครุภัณฑ์' : 'เพิ่มครุภัณฑ์ใหม่'}</h2>
         <form onSubmit={submit} noValidate>
           <h3 className="form-section-title">ข้อมูลทั่วไป</h3>
-          <label>เลขทะเบียนครุภัณฑ์ (Asset Tag)</label>
+          <label htmlFor="asset-assetTag">เลขทะเบียนครุภัณฑ์ (Asset Tag)</label>
           <input
+            id="asset-assetTag"
             ref={firstInputRef}
             type="text"
             value={form.assetTag}
@@ -274,8 +281,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
           />
           {fieldErrors.assetTag && <p className="field-error">{fieldErrors.assetTag}</p>}
 
-          <label>ชื่ออุปกรณ์</label>
+          <label htmlFor="asset-name">ชื่ออุปกรณ์</label>
           <input
+            id="asset-name"
             type="text"
             value={form.name}
             onChange={(e) => update('name', e.target.value)}
@@ -285,8 +293,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
           <div className="row">
             <div className="grow">
-              <label>ยี่ห้อ</label>
+              <label htmlFor="asset-brand">ยี่ห้อ</label>
               <input
+                id="asset-brand"
                 type="text"
                 value={form.brand}
                 onChange={(e) => update('brand', e.target.value)}
@@ -295,8 +304,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
               {fieldErrors.brand && <p className="field-error">{fieldErrors.brand}</p>}
             </div>
             <div className="grow">
-              <label>รุ่น</label>
+              <label htmlFor="asset-model">รุ่น</label>
               <input
+                id="asset-model"
                 type="text"
                 value={form.model}
                 onChange={(e) => update('model', e.target.value)}
@@ -306,8 +316,9 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
             </div>
           </div>
 
-          <label>Serial Number (ถ้ามี)</label>
+          <label htmlFor="asset-serialNumber">Serial Number (ถ้ามี)</label>
           <input
+            id="asset-serialNumber"
             type="text"
             value={form.serialNumber || ''}
             onChange={(e) => update('serialNumber', e.target.value)}
@@ -315,8 +326,8 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
           />
           {fieldErrors.serialNumber && <p className="field-error">{fieldErrors.serialNumber}</p>}
 
-          <label>สถานะ</label>
-          <select value={form.status} onChange={(e) => update('status', e.target.value)}>
+          <label htmlFor="asset-status">สถานะ</label>
+          <select id="asset-status" value={form.status} onChange={(e) => update('status', e.target.value)}>
             {STATUS_OPTIONS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
@@ -359,8 +370,8 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
           <div className="row">
             {renderInput('monitorSize', 'ขนาดหน้าจอ')}
             <div className="grow">
-              <label>สภาพครุภัณฑ์</label>
-              <select value={form.assetCondition || ''} onChange={(e) => update('assetCondition', e.target.value)}>
+              <label htmlFor="asset-assetCondition">สภาพครุภัณฑ์</label>
+              <select id="asset-assetCondition" value={form.assetCondition || ''} onChange={(e) => update('assetCondition', e.target.value)}>
                 <option value="">ไม่ระบุ</option>
                 {CONDITION_OPTIONS.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>

@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Continuous Integration — Milestone 10: CI/CD & Release Engineering
+#
+# ตรวจสอบคุณภาพโค้ดอัตโนมัติทุกครั้งที่ push หรือเปิด/อัปเดต pull request เข้า master หรือ feature/*
+# ไม่มีขั้นตอนไหน migrate/เชื่อมต่อฐานข้อมูลจริง — "Prisma validation" ตรวจแค่ syntax ของ schema.prisma
+# เท่านั้น (ไม่ใช่ "Test" — โปรเจกต์นี้ยังไม่มี automated test suite ดู README: Known Limitations)
+#
+# ทุก step รันตามลำดับในจ็อบเดียว ล้มเหลว step ไหนหยุดทันที (ไม่มี continue-on-error ที่ไหนเลย)
+# ---------------------------------------------------------------------------
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+      - 'feature/*'
+  pull_request:
+    branches:
+      - master
+      - 'feature/*'
+
+jobs:
+  ci:
+    name: Build, Lint & Validate
+    runs-on: ubuntu-latest
+
+    # DATABASE_URL ใส่ค่าหลอกไว้เท่านั้น — Prisma อ่านค่านี้ตอน parse schema (env("DATABASE_URL"))
+    # แต่ไม่มี step ไหนเชื่อมต่อฐานข้อมูลจริงเลย (validate/generate ไม่ query DB)
+    env:
+      DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci_placeholder?schema=public'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (Active LTS, from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            apps/web/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Validate Prisma schema
+        working-directory: apps/api
+        run: npm run validate
+
+      - name: Lint backend
+        working-directory: apps/api
+        run: npm run lint
+
+      - name: Lint frontend
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Build backend (generate Prisma Client)
+        working-directory: apps/api
+        run: npm run build
+
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm run build
+
+      - name: Success summary
+        if: success()
+        run: |
+          echo "## ✅ CI passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All quality checks completed successfully:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Prisma schema validated" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend lint passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend lint passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend build succeeded (Prisma Client generated)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend build succeeded (Vite production bundle)" >> "$GITHUB_STEP_SUMMARY"

@@ -60,8 +60,9 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
         </div>
 
         <form onSubmit={submit} noValidate>
-          <label>วันที่คืน</label>
+          <label htmlFor="return-returnedAt">วันที่คืน</label>
           <input
+            id="return-returnedAt"
             type="date"
             value={returnedAt}
             onChange={(e) => setReturnedAt(e.target.value)}
@@ -69,23 +70,23 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
           />
           {fieldErrors.returnedAt && <p className="field-error">{fieldErrors.returnedAt}</p>}
 
-          <label>สถานะ</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <label htmlFor="return-status">สถานะ</label>
+          <select id="return-status" value={status} onChange={(e) => setStatus(e.target.value)}>
             {RETURN_STATUS_OPTIONS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
 
-          <label>สภาพหลังคืน</label>
-          <select value={conditionAfter} onChange={(e) => setConditionAfter(e.target.value)}>
+          <label htmlFor="return-conditionAfter">สภาพหลังคืน</label>
+          <select id="return-conditionAfter" value={conditionAfter} onChange={(e) => setConditionAfter(e.target.value)}>
             <option value="">ไม่ระบุ</option>
             {CONDITION_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
 
-          <label>หมายเหตุ</label>
-          <textarea rows={2} value={remark} onChange={(e) => setRemark(e.target.value)} />
+          <label htmlFor="return-remark">หมายเหตุ</label>
+          <textarea id="return-remark" rows={2} value={remark} onChange={(e) => setRemark(e.target.value)} />
 
           {error && <p className="error">{error}</p>}
 

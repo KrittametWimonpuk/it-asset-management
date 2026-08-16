@@ -9,7 +9,10 @@
     "generate": "prisma generate",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "lint": "eslint .",
+    "validate": "prisma validate",
+    "build": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -17,6 +20,8 @@
     "cors": "^2.8.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "pdfkit": "^0.19.1",
     "prisma": "^5.22.0",
@@ -28,5 +33,10 @@
     "@prisma/client@5.22.0": true,
     "@prisma/engines@5.22.0": true,
     "prisma@5.22.0": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0"
   }
 }

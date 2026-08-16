@@ -1,0 +1,18 @@
+# ไม่ format ไฟล์ที่ generate อัตโนมัติ หรือไม่ใช่ source code ที่ควรจัดรูปแบบ
+node_modules/
+dist/
+apps/web/dist/
+
+# Prisma migration SQL — generate อัตโนมัติ ห้ามแก้มือ (รวมถึงห้าม format ทับ)
+apps/api/prisma/migrations/
+
+# lock files — มีรูปแบบเฉพาะของ npm เอง ไม่ควรให้ prettier ไปแตะ
+package-lock.json
+
+# env & secrets
+.env
+.env.local
+
+# ไฟล์ที่ไม่ใช่ source code
+*.log
+LICENSE.txt

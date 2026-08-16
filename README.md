@@ -1,12 +1,22 @@
 # 🚀 ระบบจัดการครุภัณฑ์ IT (IT Asset Management)
 
+[![Continuous Integration](https://github.com/KrittametWimonpuk/it-asset-management/actions/workflows/ci.yml/badge.svg)](https://github.com/KrittametWimonpuk/it-asset-management/actions/workflows/ci.yml)
+
 เว็บแอประบบจัดการครุภัณฑ์ IT แบบครบวงจร — ตั้งแต่ทะเบียนครุภัณฑ์, สิทธิ์การใช้งานตาม role,
 การมอบหมาย/รับคืนครุภัณฑ์, แดชบอร์ดสรุปภาพรวม, ระบบ Helpdesk แจ้งซ่อม/ปัญหาครุภัณฑ์, ไปจนถึงรายงาน
 และส่งออกข้อมูลเป็น CSV/Excel/PDF พร้อม **deploy ขึ้น AWS ECS ได้จริง** ด้วยสคริปต์เดียว
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v0.9.0` (Milestone 9 — Audit Log)
+**เวอร์ชันปัจจุบัน:** `v1.0.0` (Stable Release)
+
+---
+
+## 🟢 Build Status
+
+ทุก push และ pull request เข้า `master` หรือ `feature/*` ถูกตรวจสอบอัตโนมัติผ่าน [GitHub Actions](.github/workflows/ci.yml)
+— ดูรายละเอียดที่หัวข้อ [⚙️ CI/CD Pipeline](#️-cicd-pipeline) ด้านล่าง badge ด้านบนจะเป็นสีเขียวก็ต่อเมื่อ
+push ล่าสุดของ `master` ผ่านทุกขั้นตอน (validate schema + lint backend/frontend + build backend/frontend)
 
 ---
 
@@ -26,7 +36,8 @@
 | **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 49 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
-| **Deploy** | Docker Compose (รันเครื่องตัวเอง) และสคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB |
+| **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint backend/frontend, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
+| **Deploy** | สอง production path: (1) Docker Compose self-hosted (`docker-compose.prod.yml` — nginx reverse proxy + security headers + gzip) หรือ (2) สคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB — ดู [🚀 Production Deployment & Operations](#-production-deployment--operations-release-candidate-3) |
 
 ---
 
@@ -112,8 +123,13 @@ webapp-starter/
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
 ├── deploy/                     สคริปต์ deploy ขึ้น AWS ECS (00 → 03, และ 99-destroy)
-├── docs/
-├── docker-compose.yml          รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว
+├── docs/                       DEPLOYMENT / BACKUP_RECOVERY / ROLLBACK / PRODUCTION_CHECKLIST (RC3)
+├── .github/                    CI workflow + issue/PR templates (RC3)
+├── docker-compose.yml          รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว (dev)
+├── docker-compose.prod.yml     รัน production แบบ self-hosted (RC3 — ไฟล์แยกจาก dev ทั้งหมด)
+├── .env.production.example     ต้นแบบตัวแปร environment สำหรับ docker-compose.prod.yml (RC3)
+├── CONTRIBUTING.md             วิธี contribute เข้าโปรเจกต์ (RC3)
+├── CODEOWNERS                  ผู้ต้อง review ก่อน merge (RC3)
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -191,9 +207,192 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `DATABASE_URL` | connection string ของ PostgreSQL | `postgresql://postgres:postgres@localhost:5432/appdb?schema=public` |
 | `JWT_SECRET` | กุญแจเซ็น/ตรวจสอบ JWT — **ห้ามใช้ค่าตัวอย่างในระบบจริง** สร้างด้วย `openssl rand -hex 32` | `change-me-to-a-long-random-string` |
 | `PORT` | พอร์ตที่ backend จะรัน | `4000` |
+| `NODE_ENV` | `development` (ค่าเริ่มต้น) หรือ `production` — กำหนดพฤติกรรม default ของ CORS เวลาไม่ได้ตั้ง `CORS_ORIGIN` (RC2) | `development` |
+| `CORS_ORIGIN` | origin ที่อนุญาตให้เรียก API ข้าม origin ได้ (คั่นด้วยจุลภาคถ้ามีหลายตัว) — ไม่บังคับ ดูรายละเอียดที่หัวข้อ [🌐 CORS](#-cors) ด้านล่าง (RC2) | `http://localhost:5173,https://asset.example.com` |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ความยาวหน้าต่างเวลานับจำนวนครั้ง login/register ต่อ IP (ms) — ไม่บังคับ ค่า default 900000 (15 นาที) (RC2) | `900000` |
+| `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
 
 Frontend ไม่ต้องตั้งค่า environment variable ใด ๆ ตอน dev (Vite proxy `/api` ให้อัตโนมัติ) ส่วนตอน build
 ขึ้น production ตัวแปร `API_UPSTREAM` ใน `docker-compose.yml` บอก nginx ว่าจะ proxy `/api` ไปที่ service ไหน
+
+---
+
+## 🛡️ Production Hardening (Release Candidate 2)
+
+RC2 เพิ่มความพร้อมด้าน reliability/security/operational readiness ให้ backend — ไม่มีการเปลี่ยน business
+logic, database schema, หรือ API endpoint ใด ๆ เลย (ดู [CHANGELOG](CHANGELOG.md) สำหรับรายละเอียดทุกจุดที่แก้)
+
+### 🚦 Rate Limiting
+
+`POST /api/auth/login` และ `POST /api/auth/register` จำกัดจำนวนครั้งต่อ IP ในหน้าต่างเวลาเดียวกัน (ใช้
+[express-rate-limit](https://github.com/express-rate-limit/express-rate-limit)) กัน brute-force รหัสผ่าน
+และสแปมสร้างบัญชี — ปรับได้ผ่าน `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` (ดู Environment Variables
+ด้านบน) เกินโควตาแล้วตอบ **HTTP 429** ด้วย response envelope เดียวกับ error อื่นทั้งระบบ:
+```json
+{ "success": false, "message": "พยายามเข้าสู่ระบบ/สมัครสมาชิกบ่อยเกินไป กรุณาลองใหม่อีกครั้งในภายหลัง" }
+```
+login และ register ใช้โควตาร่วมกัน (นับรวมต่อ IP ไม่แยกตาม endpoint) — ตั้งใจ กันไม่ให้สลับไปมาระหว่างสอง
+endpoint เพื่อหลบ limit ได้ ไม่แตะ logic การตรวจสอบ credential/สมัครสมาชิกเดิมเลยแม้แต่บรรทัดเดียว
+
+### 🔌 Graceful Shutdown
+
+Backend ดักสัญญาณ `SIGTERM` และ `SIGINT` (ที่ ECS/Docker/Ctrl+C ส่งมาก่อนฆ่า process จริง) แล้วปิดตัวแบบ
+เรียบร้อยตามลำดับ: (1) เลิกรับ connection ใหม่ แต่ request ที่ค้างอยู่ทำงานจนจบตามปกติก่อน (2) ปิดการเชื่อมต่อ
+ฐานข้อมูล (`prisma.$disconnect()`) (3) exit ด้วย status code ที่เหมาะสม (0 = ปิดสำเร็จ, 1 = มีปัญหาระหว่างปิด)
+มี timer บังคับปิดถ้ารอนานเกินไป (10 วินาที) กัน process ค้าง แต่ละขั้นตอนถูก log ไว้ชัดเจน — ผลคือ deploy/
+scale-in บน ECS ไม่ทำให้ request ที่กำลังทำงานอยู่ถูกตัดกลางคันอีกต่อไป
+
+### ❤️ Health Endpoint
+
+`/health` และ `/api/health` เดิมตอบ 200 เสมอโดยไม่เช็กอะไรเลย — ตอนนี้เช็กการเชื่อมต่อฐานข้อมูลจริงด้วย
+(`SELECT 1` ผ่าน Prisma):
+
+| สถานะ | HTTP Status | Response |
+|-------|-------------|----------|
+| ฐานข้อมูลเชื่อมต่อได้ | `200` | `{ "status": "ok", "time": "...", "database": "connected" }` |
+| ฐานข้อมูลเชื่อมต่อไม่ได้ | `503` | `{ "status": "error", "time": "...", "database": "disconnected" }` |
+
+ALB ใช้ endpoint นี้ตัดสินใจว่าจะส่ง traffic ไปที่ instance ไหน — instance ที่ต่อ DB ไม่ได้ตอนนี้จะถูกเอาออก
+จาก rotation โดยอัตโนมัติ (เดิมตอบ 200 เสมอแม้ DB ล่ม ทำให้ ALB ยังส่ง traffic ไปเรื่อย ๆ)
+
+### 📝 Request Logging
+
+ทุก request เขียน log แบบ structured (JSON บรรทัดเดียว) ออก stdout หลัง response จบ — ให้ log collector ของ
+production (เช่น CloudWatch Logs ที่ ECS ส่งเข้าไปอยู่แล้ว) เก็บไปวิเคราะห์ได้:
+```json
+{"requestId":"...", "method":"GET", "path":"/api/assets", "status":200, "durationMs":12.4, "ip":"..."}
+```
+**ไม่ log สิ่งที่อ่อนไหวโดยเจตนา**: ไม่มี request body (มี password ตอน login/register), ไม่มี header ใด ๆ
+(มี `Authorization: Bearer <JWT>`), ไม่มี query string — `X-Request-Id` แนบมาที่ response header ด้วย ใช้
+อ้างอิงตอน debug/แจ้งปัญหาได้
+
+### 🔒 Security Headers
+
+ใช้ [Helmet](https://helmetjs.github.io/) ใส่ security header มาตรฐานให้อัตโนมัติ (`X-Content-Type-Options`,
+`X-Frame-Options`, `Strict-Transport-Security` ฯลฯ) ปิดเฉพาะ `contentSecurityPolicy` เพราะค่า default จะบล็อก
+inline script/style ที่ Swagger UI (`/docs`) ต้องใช้ — header อื่นทั้งหมดยังเปิดใช้งานตามปกติ
+
+### 🌐 CORS
+
+เดิมใช้ `cors()` เฉย ๆ (อนุญาตทุก origin) — ตอนนี้อ่านจาก `CORS_ORIGIN` env var แทน (ไม่ hardcode origin ไว้
+ในโค้ด):
+- ตั้งค่า `CORS_ORIGIN` ไว้ → อนุญาตเฉพาะ origin ที่ระบุ (คั่นด้วยจุลภาคได้หลายตัว)
+- ไม่ได้ตั้งค่า + `NODE_ENV=development` (ค่าเริ่มต้น) → reflect origin ที่ขอมา เหมือนพฤติกรรมเดิมก่อน RC2
+  ทุกประการ (สะดวกตอน dev ที่ frontend/backend คนละพอร์ต)
+- ไม่ได้ตั้งค่า + `NODE_ENV=production` → ปิดรับ cross-origin request ทั้งหมด (fail closed เพื่อความปลอดภัย)
+
+ในทางปฏิบัติ production จริงของโปรเจกต์นี้ (AWS ECS) ไม่ได้รับผลกระทบจากค่านี้เลย เพราะ ALB route ทั้ง
+`/` และ `/api/*` อยู่ใต้ origin เดียวกัน (path-based routing — ดู `deploy/02-infra.sh`) จึงไม่ถือเป็น
+cross-origin request ตั้งแต่ต้น ตั้งค่านี้มีผลจริงเฉพาะกรณีมี client อื่นเรียก API ข้าม origin จริง ๆ
+
+### 🐳 Docker
+
+- ทั้งสอง image เปลี่ยนจาก `node:20`/`node:20-alpine` เป็น `node:24`/`node:24-alpine` ให้ตรงกับ `.nvmrc` และ
+  CI (เดิม Docker image กับ CI/dev ใช้ Node คนละเวอร์ชันกัน)
+- `npm install` เปลี่ยนเป็น `npm ci` ทั้งสอง Dockerfile — ติดตั้ง dependency ตรงกับ `package-lock.json` เป๊ะ ๆ
+  เหมือนที่ CI ทดสอบผ่าน กัน dependency drift ระหว่างสิ่งที่ CI ทดสอบกับสิ่งที่ image จริงมี
+- Backend container รันเป็น non-root user (`node`, UID 1000 — user ที่มีอยู่แล้วในตัว official image) แทนที่
+  จะรันเป็น root เหมือนเดิม — least privilege ตาม container security baseline
+
+---
+
+## 🚀 Production Deployment & Operations (Release Candidate 3)
+
+RC3 เพิ่มโครงสร้างและเอกสารสำหรับ deploy ระบบขึ้น production จริง — **ไม่มีการเพิ่ม business feature,
+เปลี่ยน API, หรือแก้ database schema ใด ๆ เลย** (ยกเว้นปรับ RDS backup retention 1→7 วัน) ดูรายละเอียด
+ทุกจุดที่แก้ไขได้ที่ [CHANGELOG](CHANGELOG.md)
+
+### 🐳 Production Docker Images
+
+Dockerfile ทั้งสองตัว (`apps/api/Dockerfile`, `apps/web/Dockerfile`) เดิมของ RC2 ยังใช้เหมือนเดิมทุก
+ประการ (ไม่ได้แยกไฟล์ใหม่) เพิ่มเข้ามาเฉพาะ:
+- **HEALTHCHECK**: backend เช็ก `/health` ด้วย Node's built-in `http` module (ไม่ติดตั้ง curl เพิ่ม —
+  minimal attack surface), frontend เช็กด้วย `wget` ที่มีอยู่แล้วใน `nginx:alpine` base image
+- **OCI image labels** (`org.opencontainers.image.title/description/licenses`) — metadata มาตรฐานสำหรับ
+  registry/scanning tools ไม่มีผลต่อพฤติกรรมรันไทม์
+
+### 🗺️ สอง Deployment Path
+
+| Path | ใช้เมื่อไร | ไฟล์หลัก |
+|------|-----------|----------|
+| **A. AWS ECS Fargate** (เดิมจาก Milestone ก่อน RC3) | ต้องการ managed infra, auto-scaling, ALB, RDS managed | `deploy/*.sh` |
+| **B. Self-hosted Docker Compose** (ใหม่ใน RC3) | มีเซิร์ฟเวอร์/VPS ของตัวเอง ต้องการควบคุมเต็มรูปแบบ | `docker-compose.prod.yml` + `.env.production` |
+
+`docker-compose.yml` (dev) **ไม่ถูกแก้แม้แต่บรรทัดเดียว** — `docker-compose.prod.yml` เป็นไฟล์แยกต่างหาก
+ทั้งหมด ต่างจาก dev ตรงที่: `restart: always` ทุก service, `db`/`api` ไม่ publish port ออก host เลย
+(ลด attack surface — เข้าถึงได้เฉพาะใน docker network เดียวกัน), แยก network เป็น 2 วง
+(`frontend-net`/`backend-net` — `db` คุยกับ `web` ตรง ๆ ไม่ได้), และ nginx ใช้
+[`apps/web/nginx.prod.conf`](apps/web/nginx.prod.conf) (gzip, cache header, security header, HSTS,
+proxy timeout) แทน config เดิม
+
+วิธีใช้ทาง B:
+```bash
+cp .env.production.example .env.production   # แก้ค่าทุกตัวที่มี CHANGE-ME
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+รายละเอียดเต็ม (server requirements, build, startup, migration, log locations, troubleshooting) อยู่ที่
+[**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md)
+
+### 🌐 Nginx Reverse Proxy (Production)
+
+`nginx.prod.conf` เพิ่มจาก config เดิมของ dev:
+- **gzip** compression (comp_level 6) สำหรับ text/css/json/js/xml/svg — **Brotli ยังไม่เปิดใช้งาน**
+  (`nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ต้องใช้ custom image — เว้นไว้เพื่อลดความเสี่ยง ดู
+  Known Limitations)
+- **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `X-XSS-Protection`, `Strict-Transport-Security` (HSTS — **มีผลจริงเฉพาะตอนใช้ผ่าน HTTPS เท่านั้น** — compose
+  ไฟล์นี้ไม่มี TLS termination ในตัว ดู Known Limitations)
+- **Static asset caching**: ไฟล์ที่ผ่าน content-hash แล้ว (`/assets/*-[hash].js`) cache 1 ปีแบบ
+  `immutable`, ส่วน `index.html` ใช้ `no-cache` เสมอ (กันเสิร์ฟ entry point เก่าที่ชี้ asset ที่ถูกลบไปแล้ว)
+- **Proxy timeout**: `proxy_read_timeout 120s` (นานกว่า default) รองรับ export PDF/Excel รายงานใหญ่ที่ใช้เวลานาน
+
+### ⚙️ Environment Variables (Production)
+
+ทาง B ใช้ [`.env.production.example`](.env.production.example) เป็นต้นแบบ (แยกจาก `.env.example` ที่ใช้ตอน dev):
+
+| ตัวแปร | ความหมาย |
+|--------|----------|
+| `DB_USER`/`DB_PASSWORD`/`DB_NAME` | สร้าง Postgres container ใน `docker-compose.prod.yml` |
+| `DATABASE_URL` | connection string ที่ backend ใช้จริง — host เป็นชื่อ service `db` (ไม่ใช่ `localhost`) |
+| `JWT_SECRET` | สร้างด้วย `openssl rand -hex 32` — **ห้ามใช้ค่าตัวอย่าง** |
+| `NODE_ENV` | ต้องเป็น `production` เสมอสำหรับไฟล์นี้ |
+| `CORS_ORIGIN` | ปกติปล่อยว่างได้ — topology มาตรฐานของ compose นี้เป็น same-origin ผ่าน nginx อยู่แล้ว |
+| `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` | ค่า default ใช้งานได้เลย ไม่บังคับตั้ง |
+| `PORT` | พอร์ตภายใน container ของ backend (default `4000`) |
+
+ทาง A (AWS ECS) ยังใช้ `deploy/config.sh` เหมือนเดิม (ดู `deploy/config.example.sh`) — ไม่เกี่ยวกับ
+`.env.production` ไฟล์นี้เลย
+
+### 💾 Backup & Recovery
+
+RDS automated backup retention ปรับจาก 1 วัน → **7 วัน** (`deploy/02-infra.sh`) สำหรับทาง A — ทาง B
+(self-hosted) ต้องตั้ง scheduled backup เอง (`pg_dump` ผ่าน cron) เพราะแต่ละ host มีเครื่องมือ scheduling
+ต่างกัน ไม่ได้ทำให้อัตโนมัติในโค้ดโดยตั้งใจ ขั้นตอน backup/restore/disaster recovery เต็มรูปแบบอยู่ที่
+[**docs/BACKUP_RECOVERY.md**](docs/BACKUP_RECOVERY.md)
+
+### ⏪ Rollback Strategy
+
+ครอบคลุม application rollback (ECS task definition revision / git tag + rebuild), database migration
+rollback (เขียน SQL ย้อนกลับด้วยมือ หรือ restore จาก backup — Prisma ไม่มี down-migration อัตโนมัติ),
+Docker image rollback, และ health verification หลัง rollback — รายละเอียดเต็มที่
+[**docs/ROLLBACK.md**](docs/ROLLBACK.md)
+
+### 📋 Production Checklist
+
+Checklist ก่อน deploy จริงครอบคลุม Infrastructure/Deployment/Security/Monitoring/Recovery/
+Documentation/Operations/Release process — ดู
+[**docs/PRODUCTION_CHECKLIST.md**](docs/PRODUCTION_CHECKLIST.md)
+
+### 📚 เอกสารที่เกี่ยวข้องทั้งหมด (RC3)
+
+| เอกสาร | เนื้อหา |
+|--------|---------|
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | คู่มือ deploy เต็มรูปแบบ ทั้งสอง path |
+| [docs/BACKUP_RECOVERY.md](docs/BACKUP_RECOVERY.md) | backup, retention, restore, disaster recovery |
+| [docs/ROLLBACK.md](docs/ROLLBACK.md) | rollback โค้ด/migration/Docker image |
+| [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md) | checklist ก่อน deploy จริง |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | วิธี contribute เข้าโปรเจกต์ |
 
 ---
 
@@ -313,10 +512,90 @@ server console โดยไม่กระทบผู้ใช้
 
 ## 🌿 Git Workflow
 
-- Branch หลักคือ `main` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.8.1`, ปัจจุบัน `v0.9.0`)
+- Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.9.0`, ปัจจุบัน `v1.0.0-rc1`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
+
+### 🌳 Branch Strategy
+
+| Branch | ใช้ทำอะไร |
+|--------|-----------|
+| `master` | โค้ดที่ผ่านการตรวจสอบแล้ว พร้อม deploy เสมอ — merge เข้าได้ก็ต่อเมื่อ CI ผ่านทุกขั้นตอนเท่านั้น |
+| `feature/*` | หนึ่ง branch ต่อหนึ่ง milestone/งาน เช่น `feature/asset-assignment`, `feature/ci-cd` — CI รันอัตโนมัติทุก push เหมือนกับ `master` |
+
+### 🤝 Contribution Workflow
+
+1. แตก branch ใหม่จาก `master` ที่อัปเดตล่าสุด: `git checkout master && git pull && git checkout -b feature/ชื่องาน`
+2. ทำงาน + commit เป็นระยะ (ข้อความ commit อธิบาย "ทำไม" ไม่ใช่แค่ "ทำอะไร")
+3. รัน [Quality Checks](#-quality-checks) ในเครื่องตัวเองก่อน push เสมอ — กัน CI แดงโดยไม่จำเป็น
+4. `git push origin feature/ชื่องาน` แล้วเปิด Pull Request เข้า `master`
+5. รอ [CI](#️-cicd-pipeline) ผ่านทุกขั้นตอน (สีเขียว) ก่อน merge — ห้าม merge ถ้า CI ยังแดงอยู่
+6. หนึ่ง milestone ที่เสร็จสมบูรณ์ = หนึ่ง annotated tag (ดูรูปแบบใน [CHANGELOG.md](CHANGELOG.md))
+
+### 📁 Project Structure
+
+โครงสร้างโฟลเดอร์แบบเต็มอยู่ที่หัวข้อ [🏗️ Architecture Overview](#️-architecture-overview) ด้านบน — สรุปสั้น ๆ:
+
+```
+webapp-starter/
+├── .github/workflows/     CI pipeline (GitHub Actions)
+├── apps/api/              Backend — Express + Prisma + PostgreSQL
+├── apps/web/              Frontend — React + Vite
+├── deploy/                สคริปต์ deploy ขึ้น AWS ECS
+├── docs/                  คู่มือ deployment/backup/rollback/checklist (RC3)
+├── docker-compose.yml     รันทั้งระบบบนเครื่องตัวเองด้วยคำสั่งเดียว (dev)
+└── docker-compose.prod.yml   รัน production แบบ self-hosted (RC3)
+```
+
+---
+
+## ⚙️ CI/CD Pipeline
+
+โปรเจกต์นี้ใช้ [GitHub Actions](https://docs.github.com/en/actions) ตรวจสอบคุณภาพโค้ดอัตโนมัติทุกครั้งที่
+push หรือเปิด/อัปเดต pull request — ดู workflow เต็มที่ [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+### เมื่อไรที่ CI รัน
+- ทุกครั้งที่ `push` เข้า `master` หรือ `feature/*`
+- ทุกครั้งที่เปิดหรืออัปเดต pull request ที่มี `master` หรือ `feature/*` เป็น target branch
+
+### ขั้นตอนของ CI (รันตามลำดับ ล้มเหลวจุดไหนหยุดทันที)
+
+| ลำดับ | ขั้นตอน | ทำอะไร |
+|-------|---------|--------|
+| 1 | Checkout | ดึงโค้ดจาก commit ที่ trigger workflow |
+| 2 | Setup Node.js | ติดตั้ง Node.js เวอร์ชัน Active LTS (อ่านจาก [.nvmrc](.nvmrc)) พร้อมเปิด npm cache |
+| 3 | Install dependencies | `npm ci` ทั้ง `apps/api` และ `apps/web` แยกกัน (clean install จาก package-lock.json) |
+| 4 | Validate Prisma schema | `prisma validate` — ตรวจ syntax ของ `schema.prisma` เท่านั้น **ไม่ migrate/เชื่อมต่อฐานข้อมูลจริง** |
+| 5 | Lint | ESLint ทั้ง backend และ frontend แยกกัน |
+| 6 | Build Backend | `prisma generate` — สร้าง Prisma Client (ยืนยันว่า schema ใช้งานได้จริง) |
+| 7 | Build Frontend | `vite build` — build production bundle |
+| 8 | Success summary | สรุปผลลัพธ์ทั้งหมดใน GitHub Actions job summary (แสดงเฉพาะตอนทุกขั้นตอนผ่าน) |
+
+### เกิดอะไรขึ้นเมื่อ CI ล้มเหลว
+- Job หยุดทันทีที่ step แรกที่ error (ไม่มี step ไหนตั้ง `continue-on-error` — ตาม design ที่ตั้งใจให้ "fail fast")
+- Commit/Pull Request จะขึ้นเครื่องหมาย ❌ พร้อม log ของ step ที่ล้มเหลวให้ดูใน tab "Actions" ของ GitHub
+- Badge ที่หัวไฟล์นี้จะเปลี่ยนเป็นสีแดงถ้า push ล่าสุดของ `master` ไม่ผ่าน
+- ต้องแก้ปัญหาแล้ว push ใหม่ (หรือแก้ commit แล้ว force-push เฉพาะ branch ของตัวเอง ที่ยังไม่ merge) — CI จะรันซ้ำอัตโนมัติ
+
+### 🔍 Quality Checks
+
+รันคำสั่งเดียวกับที่ CI รันได้ในเครื่องตัวเองก่อน push เสมอ (กัน CI แดงโดยไม่จำเป็น):
+
+```bash
+# Backend (จาก apps/api)
+npm run validate    # ตรวจ schema.prisma (เหมือน step 4 ใน CI)
+npm run lint        # ESLint (เหมือน step 5)
+npm run build        # prisma generate (เหมือน step 6)
+
+# Frontend (จาก apps/web)
+npm run lint         # ESLint (เหมือน step 5)
+npm run build         # vite build (เหมือน step 7)
+```
+
+**หมายเหตุ:** `prisma validate`/`prisma generate` ต้องมี `DATABASE_URL` อยู่ใน environment (แค่ต้อง "ตั้งค่าไว้"
+ไม่จำเป็นต้องเชื่อมต่อได้จริง) — ถ้ามี `apps/api/.env` อยู่แล้ว (ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที))
+ก็ใช้ค่านั้นได้เลยโดยไม่ต้องตั้งอะไรเพิ่ม
 
 ---
 
@@ -410,6 +689,29 @@ cd deploy
   หน่วง response ของ business action หลัก) หมายความว่าในกรณีที่หายากมาก ๆ (เช่น DB connection หลุดพอดีตอนนั้น)
   business action อาจสำเร็จแต่ audit record เขียนไม่สำเร็จ (log error ไว้ที่ server console เท่านั้น) — ไม่มี
   retry queue หรือ dead-letter mechanism ในตอนนี้
+- **CI ไม่มีขั้นตอนรัน automated test** — เพราะโปรเจกต์นี้ยังไม่มี test suite เลย (ดู Roadmap) `ci.yml` จึงตรวจแค่
+  schema validity + lint + build เท่านั้น เมื่อมี test suite ในอนาคต ควรเพิ่ม step "Test" ต่อจาก Lint ก่อน Build
+- **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` ไม่เชื่อมต่อ
+  ฐานข้อมูลจริงเลย (ตามที่ milestone นี้ระบุ "Do not migrate database") จึงตรวจจับได้แค่ปัญหาระดับ syntax/
+  compile-time เท่านั้น ไม่ใช่ปัญหาที่เกิดตอน runtime จริงกับข้อมูลจริง
+- **Rate limit เก็บสถานะไว้ในหน่วยความจำของแต่ละ instance (ไม่ใช่ distributed)** — ถ้า deploy หลาย instance
+  พร้อมกัน (`desired-count` > 1) โควตาจะนับแยกอิสระต่อ instance ไม่รวมกัน (เช่น ตั้ง max 10 ครั้ง แต่มี
+  2 instance = ผู้โจมตีมีโอกาสยิงได้จริงสูงสุด ~20 ครั้งถ้ากระจาย request ไปสองฝั่งพอดี) ปัจจุบัน deploy
+  script ตั้ง `desired-count` ไว้ที่ 1 เท่านั้น (ดูหัวข้อ Deploy) จึงยังไม่กระทบจริง — ถ้าในอนาคต scale เกิน
+  1 instance ควรย้ายไปใช้ store แบบ shared (เช่น Redis) แทน
+- **ไม่มี email verification หรือ account lockout ถาวร** — rate limit ชะลอการ brute-force ได้ แต่ไม่ได้ล็อก
+  บัญชีถาวรหลังพยายามผิดหลายครั้ง และไม่มีการยืนยันอีเมลตอนสมัครสมาชิก
+- **Health check ตรวจแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้ตรวจว่า schema ตรงกับ migration ล่าสุดหรือไม่** — ถ้า
+  migration ค้าง (เช่น deploy image ใหม่ก่อนรัน migration) endpoint นี้จะยังตอบ "ok" อยู่ แม้ query บางอย่าง
+  จะพังเพราะ column/table ไม่ตรงกับโค้ดจริงก็ตาม
+- **`docker-compose.prod.yml` ไม่มี TLS termination ในตัว** (RC3) — เปิดแค่ port 80 (HTTP) เท่านั้น
+  `Strict-Transport-Security` header ที่ตั้งไว้ใน `nginx.prod.conf` จะไม่มีผลจริงจนกว่าจะมี HTTPS จริง —
+  ผู้ดูแลระบบต้องเพิ่มเอง (เช่น วาง reverse proxy อีกชั้นที่มี TLS อยู่หน้าสุด หรือใช้ certbot/Let's Encrypt)
+- **Brotli compression ยังไม่เปิดใช้งาน** (RC3) — `nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ปัจจุบันใช้
+  gzip เท่านั้น เปิด Brotli ได้ในอนาคตด้วยการ build custom nginx image
+- **ไม่มี scheduled backup อัตโนมัติสำหรับทาง B (self-hosted)** (RC3) — เอกสารมีขั้นตอน backup/restore ให้
+  ครบ (`docs/BACKUP_RECOVERY.md`) แต่ผู้ดูแลระบบต้องตั้ง cron/scheduler เองตามสภาพแวดล้อมของตัวเอง (ทาง A
+  ผ่าน AWS ECS ใช้ RDS automated backup ที่มีอยู่แล้วโดยไม่ต้องตั้งอะไรเพิ่ม)
 
 ---
 
@@ -420,7 +722,8 @@ cd deploy
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
 - [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request
 - [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
-- [ ] Automated test suite (unit + integration) สำหรับ backend routes
+- [ ] Automated test suite (unit + integration) สำหรับ backend routes — โครง CI (`.github/workflows/ci.yml`)
+  พร้อมรับ step "Test" อยู่แล้ว แค่ยังไม่มี test ให้รัน
 - [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที
 - [ ] router library (เช่น react-router-dom) เมื่อแอปโตขึ้นจนต้องการ deep-link
 

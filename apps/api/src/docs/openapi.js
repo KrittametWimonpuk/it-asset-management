@@ -76,7 +76,7 @@ const userSchemas = {
     required: ['email', 'password'],
     properties: {
       email: { type: 'string', format: 'email', example: 'newuser@example.com' },
-      password: { type: 'string', format: 'password', minLength: 6, example: 'password123' },
+      password: { type: 'string', format: 'password', minLength: 8, example: 'password123' },
       name: { type: 'string', example: 'New Employee' },
     },
   },
