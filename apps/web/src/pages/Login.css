@@ -136,7 +136,6 @@
   display: block;
   aspect-ratio: 3 / 2;
   object-fit: cover;
-  mix-blend-mode: screen;
 }
 
 .login-visual-copy {

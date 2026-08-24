@@ -47,7 +47,7 @@ export default function Login({ onAuthed, goRegister }) {
         <div className="login-visual-content">
           <div className="login-illustration-frame">
             <img
-              src="/images/enterprise-asset-illustration.jpg"
+              src="/images/enterprise-asset-illustration.png"
               alt="ภาพประกอบระบบจัดการอุปกรณ์ไอที เครือข่าย เซิร์ฟเวอร์ และความปลอดภัย"
             />
           </div>
