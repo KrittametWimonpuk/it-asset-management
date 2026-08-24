@@ -402,8 +402,8 @@
 .assets-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 .assets-muted-value { color: #94a3b8; }
 
-.assets-actions-heading { position: sticky !important; right: 0; z-index: 5 !important; min-width: 166px; text-align: center !important; }
-.assets-row-actions { position: sticky; right: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 166px; background: inherit; box-shadow: -8px 0 16px rgb(15 23 42 / 3%); }
+.assets-actions-heading { position: sticky !important; right: auto; z-index: 3 !important; min-width: 166px; text-align: center !important; }
+.assets-row-actions { position: static; right: auto; z-index: auto; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 166px; background: inherit; box-shadow: none; }
 .assets-row-actions button { width: 31px; min-height: 31px; padding: 0; border-color: #e2e8f0; background: #fff; color: #64748b; }
 .assets-row-actions button:hover:not(:disabled) { border-color: #bfdbfe; background: #eff6ff; color: #2563eb; transform: translateY(-1px); }
 .assets-row-actions button.is-danger:hover:not(:disabled) { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
