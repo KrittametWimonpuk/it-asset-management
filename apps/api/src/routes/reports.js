@@ -45,6 +45,9 @@ import {
   SEARCHABLE_TICKET_FIELDS, SEARCHABLE_ASSET_FIELDS as TICKET_ASSET_SEARCH_FIELDS,
   scopeForRead as ticketScopeForRead,
 } from './tickets.js'
+import {
+  BORROW_REQUEST_RELATIONS, BORROW_REQUEST_STATUSES, borrowRequestScopeForAccount,
+} from '../utils/borrowRequestHelpers.js'
 
 const router = Router()
 
@@ -61,13 +64,16 @@ const ASSET_CONDITION_LABELS = { NEW: 'ใหม่', GOOD: 'สภาพดี'
 const ASSIGNMENT_STATUS_LABELS = { ASSIGNED: 'กำลังถือครอง', RETURNED: 'คืนแล้ว', LOST: 'สูญหาย', DAMAGED: 'เสียหาย' }
 const TICKET_PRIORITY_LABELS = { LOW: 'ต่ำ', MEDIUM: 'ปานกลาง', HIGH: 'สูง', CRITICAL: 'วิกฤต' }
 const TICKET_STATUS_LABELS = { OPEN: 'เปิดใหม่', IN_PROGRESS: 'กำลังดำเนินการ', ON_HOLD: 'พักงาน', RESOLVED: 'แก้ไขสำเร็จ', CLOSED: 'ปิดงานแล้ว' }
+const BORROW_REQUEST_STATUS_LABELS = {
+  PENDING: 'รออนุมัติ', APPROVED: 'อนุมัติแล้ว', REJECTED: 'ปฏิเสธ', CANCELLED: 'ยกเลิก', COMPLETED: 'ดำเนินการเสร็จสิ้น',
+}
 
 // ตัด T + เวลาออก เหลือแค่ yyyy-mm-dd — เพียงพอสำหรับรายงาน (export ไม่จำเป็นต้องมีเวลาละเอียดระดับวินาที)
 function fmtDate(v) {
   return v ? new Date(v).toISOString().slice(0, 10) : ''
 }
 
-// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 6 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
+// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 7 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
 // (เรียกก่อน sendExport เสมอ ไม่ await เพราะเป็น fire-and-forget — ไม่หน่วงการดาวน์โหลดไฟล์)
 function logReportExport(req, reportLabel, format) {
   logAudit({
@@ -374,6 +380,80 @@ router.get('/helpdesk', asyncHandler(async (req, res) => {
   const rows = await prisma.ticket.findMany({ where, orderBy: { openedAt: 'desc' }, ...HELPDESK_REPORT_INCLUDE })
   logReportExport(req, 'ใบแจ้งซ่อม', f.format)
   return sendExport(res, f.format, 'helpdesk-report', 'รายงานใบแจ้งซ่อม', HELPDESK_REPORT_COLUMNS, rows.map(shapeHelpdeskRow))
+}))
+
+// ---------------------------------------------------------------------------
+// รายงานคำขอยืม — จำกัดขอบเขต EMPLOYEE ให้เห็นเฉพาะคำขอของตัวเองเหมือนหน้าคำขอยืม
+// ---------------------------------------------------------------------------
+const BORROW_REQUEST_REPORT_COLUMNS = [
+  { key: 'requestNumber', label: 'เลขที่คำขอ' },
+  { key: 'employeeCode', label: 'รหัสพนักงาน' },
+  { key: 'employeeName', label: 'ชื่อพนักงาน' },
+  { key: 'department', label: 'แผนก' },
+  { key: 'position', label: 'ตำแหน่ง' },
+  { key: 'asset', label: 'ครุภัณฑ์' },
+  { key: 'requestedAt', label: 'วันที่ขอ' },
+  { key: 'expectedReturnDate', label: 'วันที่คาดว่าจะคืน' },
+  { key: 'status', label: 'สถานะ' },
+  { key: 'approvedBy', label: 'ผู้อนุมัติ' },
+  { key: 'approvedAt', label: 'วันที่อนุมัติ' },
+  { key: 'reason', label: 'เหตุผลที่ขอ' },
+  { key: 'rejectedReason', label: 'เหตุผลที่ปฏิเสธ' },
+  { key: 'remark', label: 'หมายเหตุ' },
+]
+const BORROW_REQUEST_REPORT_SORTABLE = ['requestNumber', 'requestedAt', 'expectedReturnDate', 'status', 'updatedAt']
+
+function shapeBorrowRequestRow(item) {
+  return {
+    requestNumber: item.requestNumber,
+    employeeCode: item.employee?.employeeCode || '-',
+    employeeName: item.employee?.fullName || 'Unknown Employee',
+    department: item.employee?.department?.name || '-',
+    position: item.employee?.position || '-',
+    asset: `${item.asset?.assetTag ?? ''} — ${item.asset?.name ?? ''}`,
+    requestedAt: fmtDate(item.requestedAt),
+    expectedReturnDate: fmtDate(item.expectedReturnDate),
+    status: BORROW_REQUEST_STATUS_LABELS[item.status] || item.status,
+    approvedBy: item.approvedByUser ? (item.approvedByUser.name || item.approvedByUser.email) : '-',
+    approvedAt: fmtDate(item.approvedAt),
+    reason: item.reason,
+    rejectedReason: item.rejectedReason || '',
+    remark: item.remark || '',
+  }
+}
+
+router.get('/borrow-requests', asyncHandler(async (req, res) => {
+  const f = parseReportQuery(req.query)
+  const constraints = []
+  const scope = borrowRequestScopeForAccount(req.user)
+  if (Object.keys(scope).length) constraints.push(scope)
+  if (f.search) constraints.push({ OR: [
+    { requestNumber: { contains: f.search, mode: 'insensitive' } },
+    { employee: { employeeCode: { contains: f.search, mode: 'insensitive' } } },
+    { employee: { fullName: { contains: f.search, mode: 'insensitive' } } },
+    { employee: { department: { name: { contains: f.search, mode: 'insensitive' } } } },
+    { asset: { assetTag: { contains: f.search, mode: 'insensitive' } } },
+    { asset: { name: { contains: f.search, mode: 'insensitive' } } },
+    { reason: { contains: f.search, mode: 'insensitive' } },
+    { remark: { contains: f.search, mode: 'insensitive' } },
+  ] })
+  const where = { deletedAt: null, ...dateRangeWhere('requestedAt', f.dateFrom, f.dateTo) }
+  if (constraints.length) where.AND = constraints
+  if (BORROW_REQUEST_STATUSES.includes(f.borrowRequestStatus)) where.status = f.borrowRequestStatus
+
+  if (!f.format) {
+    const pagination = parsePagination(req.query)
+    const orderBy = parseSort(req.query, BORROW_REQUEST_REPORT_SORTABLE, 'requestedAt')
+    const [items, totalItems] = await Promise.all([
+      prisma.borrowRequest.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...BORROW_REQUEST_RELATIONS }),
+      prisma.borrowRequest.count({ where }),
+    ])
+    return ok(res, { items: items.map(shapeBorrowRequestRow), ...buildPageMeta(pagination, totalItems) })
+  }
+
+  const rows = await prisma.borrowRequest.findMany({ where, orderBy: { requestedAt: 'desc' }, ...BORROW_REQUEST_RELATIONS })
+  logReportExport(req, 'คำขอยืมครุภัณฑ์', f.format)
+  return sendExport(res, f.format, 'borrow-request-report', 'รายงานคำขอยืมครุภัณฑ์', BORROW_REQUEST_REPORT_COLUMNS, rows.map(shapeBorrowRequestRow))
 }))
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,48 @@
 
 ---
 
+## [v1.1.0-alpha.3] — Borrow Request Workflow
+
+เฟส 3 เพิ่มขั้นตอนคำขอยืมก่อนสร้าง Assignment โดยยังคง User authentication/RBAC และสถาปัตยกรรม
+Assignment เดิมทั้งหมด Employee เป็นผู้ยืม และ User ของ ADMIN/IT_STAFF เป็นผู้อนุมัติหรือปฏิเสธ
+
+### Added
+- Prisma model/enum `BorrowRequest`/`BorrowRequestStatus` และ migration `0011_borrow_request_workflow`
+  พร้อมเลขคำขอ `BR-000001` จาก PostgreSQL sequence, foreign keys, indexes และ soft delete
+- REST workflow สำหรับ list/detail/create/approve/reject/cancel พร้อม pagination, sorting, status filter,
+  search, response envelope, Zod validation และ RBAC ตาม role
+- การ Approve ทำใน Serializable transaction: ตรวจ Employee ACTIVE และ active assignment ซ้ำอีกครั้ง,
+  สร้าง Assignment อัตโนมัติ แล้วจบคำขอเป็น `COMPLETED`
+- หน้า Borrow Request responsive: Employee request form/own history/cancel และ ADMIN/IT_STAFF approval
+  queue/approve/reject พร้อม status badges, loading/empty/error states และ dark mode
+- Dashboard summary: Pending Borrow Requests, Approved Today, Rejected Today
+- Borrow Request Report พร้อม Preview และ export CSV/Excel/PDF โดยคง data scope ตาม role
+- Audit actions `BORROW_REQUEST_CREATED`, `BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`,
+  `BORROW_REQUEST_CANCELLED` และ entity `BorrowRequest`
+- OpenAPI/Swagger schemas และ paths สำหรับ workflow/report ใหม่
+
+### Security & Compatibility
+- EMPLOYEE สร้าง/ดู/ยกเลิกได้เฉพาะคำขอของตนเองผ่าน Employee email mapping; ADMIN/IT_STAFF
+  ดูทั้งหมดและอนุมัติ/ปฏิเสธได้ แต่สร้างคำขอแทนไม่ได้
+- ไม่เปลี่ยน endpoint, relation, RBAC หรือพฤติกรรมเดิมของ Assignment; การมอบหมายโดยตรงยังทำงานเหมือนเดิม
+- conditional update ป้องกัน Reject/Cancel ซ้ำ และ partial unique index เดิมของ Assignment ร่วมกับ
+  Serializable transaction ป้องกันการอนุมัติครุภัณฑ์ชิ้นเดียวพร้อมกัน
+
+### Testing
+- Prisma validate/generate, backend lint/test (20/20), frontend lint/build ผ่าน
+- Migration `0011` apply สำเร็จบน PostgreSQL 16 และยืนยันสถานะครบ 11 migrations
+- Docker E2E ผ่าน Create/own scope/Cancel/Reject/Approve/automatic Assignment/RBAC 403/Report/Audit;
+  ล้างเฉพาะข้อมูลทดสอบด้วย marker หลังตรวจเสร็จ
+
+### Known Limitations
+- คำขอ `PENDING` ยังไม่ reserve ครุภัณฑ์ ผู้อนุมัติจึงอาจเห็นหลายคำขอสำหรับชิ้นเดียวกันได้; คำขอแรกที่
+  อนุมัติสำเร็จจะสร้าง Assignment ส่วนคำขอถัดไปตอบ 409 และต้องปฏิเสธภายหลัง
+- User ↔ Employee ยังเชื่อมด้วย case-insensitive email ตาม Phase 2; บัญชีที่ไม่พบ Employee ACTIVE ส่งคำขอไม่ได้
+- `APPROVED` เก็บไว้ใน enum สำหรับ workflow extension แต่ flow ปัจจุบันเปลี่ยนจาก PENDING เป็น COMPLETED
+  ภายใน transaction เดียวหลังสร้าง Assignment สำเร็จ
+
+---
+
 ## [v1.1.0-alpha.2] — Assignment Employee Integration
 
 เฟส 2 เปลี่ยน business identity ของผู้ถือครองครุภัณฑ์จากบัญชี `User` เป็น `Employee` แบบ incremental

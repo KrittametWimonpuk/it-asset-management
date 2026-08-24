@@ -16,11 +16,13 @@ export const AUDIT_ACTIONS = [
   'ASSIGN', 'RETURN',
   'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE',
   'LOGIN', 'EXPORT_REPORT',
+  'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED',
+  'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED',
 ]
 
 // entityType ที่รองรับ
 export const AUDIT_ENTITY_TYPES = [
-  'Asset', 'Assignment', 'Ticket', 'Employee',
+  'Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest',
   'Category', 'Department', 'Location', 'Vendor',
   'User', 'Report',
 ]

@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.2`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.3`
 
 ---
 
@@ -31,10 +31,11 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
 | **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
 | **Asset Assignment & Lifecycle** | Employee เป็น business identity ของผู้ถือครอง, User เป็นผู้ทำรายการและบัญชี RBAC; รองรับค้นหา/เลือก Employee, มอบหมาย/รับคืน และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
+| **Borrow Request Workflow (v1.1 Alpha 3)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธ โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว พร้อม Audit และ Report |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
-| **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 57 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **Reports & Export** | 7 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Borrow Request, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 65 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
@@ -113,7 +114,7 @@ webapp-starter/
 │   │   ├── assets/fonts/       ฟอนต์ Sarabun (SIL OFL) ที่ใช้ render ข้อความไทยใน PDF export
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
-│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0009)
+│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0011)
 │   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย+ใบแจ้งซ่อม)
 │   │   └── src/
 │   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/employees/tickets/reports/audit/...)
@@ -123,7 +124,7 @@ webapp-starter/
 │   │       └── docs/           OpenAPI/Swagger config + คอมเมนต์เอกสาร endpoint (paths/*.js) — ไม่แตะ route file
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
-│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Employees/Tickets/...)
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Employees/BorrowRequests/...)
 │           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
@@ -403,7 +404,7 @@ Documentation/Operations/Release process — ดู
 
 ## 📊 Reports & Export
 
-หน้า "รายงาน" มีการ์ดให้เลือก 6 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
+หน้า "รายงาน" มีการ์ดให้เลือก 7 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
 CSV / Excel / PDF ที่มุมขวาบนของตาราง ทุกรายงานอ่านจากตารางที่มีอยู่แล้วเท่านั้น ไม่มีการคำนวณ/เก็บข้อมูลใหม่
 
 | รายงาน | คอลัมน์ | ตัวกรองที่รองรับ | ขอบเขต EMPLOYEE |
@@ -435,7 +436,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
-## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.2)
+## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.3)
 
 Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` และเป็น business identity ของผู้ถือครองครุภัณฑ์
 หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
@@ -457,6 +458,27 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 
 ---
 
+## 📋 Borrow Request Workflow (v1.1.0-alpha.3)
+
+หน้า **คำขอยืม** เป็นขั้นตอนก่อน Assignment: Employee ที่เชื่อมกับทะเบียนพนักงานสถานะ ACTIVE เลือก
+ครุภัณฑ์ที่ไม่มีผู้ถือครอง ส่งเหตุผลและวันที่คาดว่าจะคืน จากนั้น ADMIN/IT_STAFF ตรวจคิวอนุมัติ
+
+| Action | EMPLOYEE | ADMIN | IT_STAFF |
+|--------|----------|-------|----------|
+| ดูรายการ | เฉพาะของตนเอง | ทั้งหมด | ทั้งหมด |
+| สร้างคำขอ | ได้ | 403 | 403 |
+| ยกเลิก | เฉพาะของตนเองที่ PENDING | 403 | 403 |
+| อนุมัติ / ปฏิเสธ | 403 | ได้ | ได้ |
+
+การอนุมัติใช้ Serializable transaction: ตรวจ Employee ACTIVE และ active assignment ซ้ำ, สร้าง Assignment
+โดย Employee เป็นผู้ถือครองและ User ปัจจุบันเป็น operator, จากนั้นตั้งคำขอเป็น `COMPLETED` หากมีการอนุมัติ
+พร้อมกันสำหรับครุภัณฑ์ชิ้นเดียว partial unique index เดิมจะทำให้มีเพียงรายการเดียวสำเร็จ ส่วนอีกคำขอตอบ 409
+
+Dashboard แสดง Pending/Approved Today/Rejected Today และ Reports มี Borrow Request Report พร้อม Preview กับ
+export CSV/Excel/PDF โดย EMPLOYEE ยังคงเห็นเฉพาะข้อมูลของตนเอง
+
+---
+
 ## 📘 API Documentation (Swagger)
 
 เอกสาร API แบบ interactive อยู่ที่ **`/docs`** (เช่น `http://localhost:4000/docs` ตอน dev หรือ
@@ -466,8 +488,8 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (57 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
-   Assignments, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
+3. Endpoint ทั้งหมด (65 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+   Assignments, Borrow Requests, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
 ### วิธี Authorize (ทดลองยิง endpoint ที่ต้องล็อกอิน)
@@ -483,8 +505,8 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 - เอกสารทั้งหมดอยู่แยกที่ `apps/api/src/docs/` (`openapi.js` = config หลัก + schema ที่ใช้ซ้ำได้,
   `paths/*.js` = คอมเมนต์ `@openapi` ล้วน ๆ 1 ไฟล์ต่อ 1 module) **ไม่มีการแก้ route file ใด ๆ เลยแม้แต่บรรทัดเดียว**
   — เอกสารอ่าน route/validation/response จริงจากซอร์สโค้ดที่มีอยู่แล้วเท่านั้น ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง
-- Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Employee`, `Asset`, `Assignment`, `Ticket`, `MasterDataItem`,
-  `Vendor`, `DashboardResponse`, รายงานทั้ง 6 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
+- Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Employee`, `Asset`, `Assignment`, `BorrowRequest`, `Ticket`, `MasterDataItem`,
+  `Vendor`, `DashboardResponse`, รายงานทั้ง 7 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
   ทุก endpoint ที่ตอบโครงสร้างเดียวกัน (เช่น response envelope `{success, data}` / `{success, message, errors}`)
   อ้างอิง (`$ref`) กลับไปที่ schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ
 - JWT Bearer authentication ประกาศเป็น reusable security scheme (`components.securitySchemes.bearerAuth`)
@@ -508,10 +530,11 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 (`oldValues`/`newValues`) เป็น JSON ที่จัดรูปแบบอ่านง่าย เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable) — ไม่มี
 endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้แต่ตัวเดียว
 
-**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Employee, Category, Department, Location, Vendor, User, Report
+**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Employee, BorrowRequest, Category, Department, Location, Vendor, User, Report
 
 **Actions ที่รองรับ:** `CREATE`, `UPDATE`, `DELETE`, `ASSIGN`, `RETURN`, `OPEN`, `START_PROGRESS`, `ON_HOLD`,
-`RESOLVE`, `CLOSE`, `RESTORE`, `LOGIN`, `EXPORT_REPORT`
+`RESOLVE`, `CLOSE`, `RESTORE`, `LOGIN`, `EXPORT_REPORT`, `BORROW_REQUEST_CREATED`,
+`BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`, `BORROW_REQUEST_CANCELLED`
 
 | เหตุการณ์ | Action ที่บันทึก | จุดที่เรียก |
 |-----------|------------------|-------------|
@@ -519,6 +542,7 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 | สร้าง/แก้ไข/Archive/Restore พนักงาน | `CREATE` / `UPDATE` / `DELETE` / `RESTORE` | `routes/employees.js` |
 | สร้าง/แก้ไข/ลบ master data (Category/Location/Department/Vendor) | `CREATE` / `UPDATE` / `DELETE` | `utils/masterDataRouter.js` (จุดเดียว ใช้ร่วมกันทั้ง 4 entity) |
 | มอบหมาย / แก้ไขรายละเอียด / รับคืนครุภัณฑ์ | `ASSIGN` / `UPDATE` / `RETURN` | `routes/assignments.js` |
+| สร้าง / อนุมัติ / ปฏิเสธ / ยกเลิกคำขอยืม | `BORROW_REQUEST_*` | `routes/borrowRequests.js` |
 | แจ้งปัญหาใหม่ / เริ่มดำเนินการ / พักงาน / แก้ไขสำเร็จ / ปิดงาน | `OPEN` / `START_PROGRESS` / `ON_HOLD` / `RESOLVE` / `CLOSE` | `routes/tickets.js` (action ตาม target status ของแต่ละ transition) |
 | สมัครสมาชิก / เข้าสู่ระบบ | `CREATE` (entityType `User`) / `LOGIN` | `routes/auth.js` |
 | ส่งออกรายงาน (CSV/Excel/PDF) | `EXPORT_REPORT` | `routes/reports.js` (ทุก endpoint ที่ `?format=` มา) |
@@ -541,7 +565,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.2`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.3`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -688,8 +712,8 @@ cd deploy
 - **ไม่มี endpoint ลบประวัติการมอบหมาย** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติต้องอยู่ครบเสมอ) ไม่ใช่ข้อจำกัดทางเทคนิค
 - **Master data ที่ถูกลบยังผูกกับ asset เก่าได้** — ตั้งใจให้ asset เก่าที่อ้างอิง category/location ที่ถูกลบไปแล้ว
   ยังแสดงชื่อได้ถูกต้อง แต่หมายความว่าการลบ master data ไม่ cascade ไปเช็ก asset ที่ใช้อยู่
-- **Automated tests ยังไม่ครอบคลุมทุก module เดิม** — มี unit/policy tests สำหรับ Employee และ Assignment
-  integration (validation, legacy compatibility, RBAC scope, fallback และ migration contract) แล้ว แต่ browser E2E
+- **Automated tests ยังไม่ครอบคลุมทุก module เดิม** — มี unit/policy tests สำหรับ Employee, Assignment และ Borrow Request
+  (validation, legacy compatibility, RBAC scope, audit policy และ migration contract) แล้ว แต่ browser E2E
   และโมดูลเดิมทั้งหมดยังไม่มี coverage อัตโนมัติเต็มระบบ
 - **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
@@ -750,7 +774,8 @@ cd deploy
 
 - [x] Employee Management Foundation — model/migration, REST API, RBAC, Audit Log และ responsive UI (`v1.1.0-alpha.1`)
 - [x] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม (`v1.1.0-alpha.2`)
-- [ ] Borrow Request / Return / Approval Workflow / Notifications / HR Integration บน Employee foundation
+- [x] Borrow Request Workflow — submit/approve/reject/cancel, auto Assignment, Dashboard, Report และ Audit (`v1.1.0-alpha.3`)
+- [ ] Return Workflow / Notifications / HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว

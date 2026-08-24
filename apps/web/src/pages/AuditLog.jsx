@@ -22,8 +22,10 @@ const ACTION_UI = {
   ASSIGN: ['violet', PackageCheck], RETURN: ['cyan', RotateCcw], OPEN: ['blue', Ticket],
   START_PROGRESS: ['amber', Wrench], ON_HOLD: ['amber', CirclePause], RESOLVE: ['green', CheckCircle2],
   CLOSE: ['slate', XCircle], LOGIN: ['cyan', LogIn], EXPORT_REPORT: ['violet', FileDown],
+  BORROW_REQUEST_CREATED: ['blue', FilePlus2], BORROW_REQUEST_APPROVED: ['green', CheckCircle2],
+  BORROW_REQUEST_REJECTED: ['red', XCircle], BORROW_REQUEST_CANCELLED: ['slate', CirclePause],
 }
-const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Employee: Users, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
+const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Employee: Users, BorrowRequest: FileClock, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
 
 function AuditSkeleton() {
   return <div className="audit-skeleton" aria-label="กำลังโหลด Audit Log" aria-busy="true">{[1, 2, 3, 4].map((item) => <div className="audit-shimmer" key={item} />)}</div>

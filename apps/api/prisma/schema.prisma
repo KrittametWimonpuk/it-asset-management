@@ -30,6 +30,7 @@ model User {
   // Milestone 7: ใบแจ้งซ่อม/ปัญหา — แยก 2 ความสัมพันธ์เพราะ Ticket ชี้มาที่ User สองทางเช่นกัน
   ticketsReported Ticket[] @relation("TicketReportedBy") // ตั๋วที่ตัวเองเป็นผู้แจ้ง
   ticketsAssigned Ticket[] @relation("TicketAssignedTo") // ตั๋วที่ตัวเองถูกมอบหมายให้ดูแล (เฉพาะ ADMIN/IT_STAFF)
+  approvedBorrowRequests BorrowRequest[] @relation("BorrowRequestApprovedBy")
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -137,6 +138,7 @@ model Employee {
   updatedAt    DateTime       @updatedAt
   deletedAt    DateTime?
   assignments  Assignment[]
+  borrowRequests BorrowRequest[]
 
   @@index([departmentId])
   @@index([status])
@@ -179,6 +181,7 @@ model Asset {
   owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   assignments Assignment[] // Milestone 5: ประวัติการมอบหมายทั้งหมด (ปัจจุบัน + อดีต) ของ asset นี้
   tickets     Ticket[] // Milestone 7: ใบแจ้งซ่อม/ปัญหาทั้งหมด (ปัจจุบัน + ประวัติ) ของ asset นี้
+  borrowRequests BorrowRequest[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
   deletedAt   DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
@@ -293,6 +296,50 @@ model Assignment {
   @@index([employeeId])
   @@index([assignedById])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// v1.1.0 Phase 3 — Borrow Request Workflow
+// คำขอยืมเป็นขั้นตอนก่อน Assignment; เมื่ออนุมัติ API จะสร้าง Assignment และปิดคำขอเป็น COMPLETED
+// ---------------------------------------------------------------------------
+enum BorrowRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+model BorrowRequest {
+  id            String              @id @default(uuid())
+  requestNumber String              @unique
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  assetId String
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  requestedAt       DateTime @default(now())
+  expectedReturnDate DateTime?
+  reason             String
+  status             BorrowRequestStatus @default(PENDING)
+
+  approvedByUserId String?
+  approvedByUser   User? @relation("BorrowRequestApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  rejectedReason   String?
+  remark           String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employeeId])
+  @@index([assetId])
+  @@index([approvedByUserId])
+  @@index([status, requestedAt])
+  @@index([deletedAt])
 }
 
 // ---------------------------------------------------------------------------

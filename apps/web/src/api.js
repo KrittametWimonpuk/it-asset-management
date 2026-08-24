@@ -127,6 +127,17 @@ export const api = {
     restore: (id) => request(`/employees/${id}/restore`, { method: 'POST' }),
   },
 
+  // v1.1.0 Phase 3: คำขอยืมก่อนสร้าง Assignment
+  borrowRequests: {
+    list: (params) => request(`/borrow-requests${toQueryString(params)}`),
+    get: (id) => request(`/borrow-requests/${id}`),
+    add: (body) => request('/borrow-requests', { method: 'POST', body: JSON.stringify(body) }),
+    approve: (id) => request(`/borrow-requests/${id}/approve`, { method: 'POST' }),
+    reject: (id, body) => request(`/borrow-requests/${id}/reject`, { method: 'POST', body: JSON.stringify(body) }),
+    cancel: (id) => request(`/borrow-requests/${id}/cancel`, { method: 'POST' }),
+    availableAssets: (params) => request(`/borrow-requests/options/assets${toQueryString(params)}`),
+  },
+
   // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
   dashboard: {
     get: () => request('/dashboard'),
@@ -155,6 +166,7 @@ export const api = {
     helpdesk: (params) => request(`/reports/helpdesk${toQueryString(params)}`),
     departments: (params) => request(`/reports/departments${toQueryString(params)}`),
     vendors: (params) => request(`/reports/vendors${toQueryString(params)}`),
+    borrowRequests: (params) => request(`/reports/borrow-requests${toQueryString(params)}`),
     download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
 

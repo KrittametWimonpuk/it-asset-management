@@ -183,6 +183,9 @@ async function buildOrgWideDashboard() {
     closedToday,
     recentTickets,
     recentAuditLogRows,
+    pendingBorrowRequests,
+    approvedBorrowRequestsToday,
+    rejectedBorrowRequestsToday,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -254,6 +257,9 @@ async function buildOrgWideDashboard() {
     // Milestone 9 — เหตุการณ์ audit log ล่าสุด (ยังไม่รู้ชื่อผู้ทำรายการตรงนี้ — attachPerformer join ทีหลัง
     // นอก Promise.all เพราะต้องรู้ก่อนว่ามี performedById อะไรบ้างในหน้านี้)
     prisma.auditLog.findMany({ orderBy: { performedAt: 'desc' }, take: RECENT_AUDIT_LOGS_LIMIT }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, status: 'PENDING' } }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, approvedAt: todayRange(now) } }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, status: 'REJECTED', updatedAt: todayRange(now) } }),
   ])
 
   const recentAuditLogs = await attachPerformer(recentAuditLogRows)
@@ -332,6 +338,11 @@ async function buildOrgWideDashboard() {
       resolvedToday,
       closedToday,
     },
+    borrowRequests: {
+      pending: pendingBorrowRequests,
+      approvedToday: approvedBorrowRequestsToday,
+      rejectedToday: rejectedBorrowRequestsToday,
+    },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
         label: categoryNameById[g.categoryId] || NOT_SET_LABEL,
@@ -374,6 +385,7 @@ async function buildEmployeeDashboard(user) {
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
   const userId = user.id
   const holderScope = assignmentHolderScopeForAccount(user)
+  const borrowRequestScope = { employee: { email: { equals: user.email, mode: 'insensitive' } } }
 
   const [
     currentEmployee,
@@ -384,6 +396,9 @@ async function buildEmployeeDashboard(user) {
     resolvedToday,
     closedToday,
     recentTickets,
+    pendingBorrowRequests,
+    approvedBorrowRequestsToday,
+    rejectedBorrowRequestsToday,
   ] = await Promise.all([
     prisma.employee.findFirst({
       where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
@@ -410,6 +425,9 @@ async function buildEmployeeDashboard(user) {
       take: RECENT_ACTIVITIES_LIMIT,
       select: RECENT_TICKET_SELECT,
     }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'PENDING' } }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, approvedAt: todayRange(now) } }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'REJECTED', updatedAt: todayRange(now) } }),
   ])
 
   // จำนวน asset ที่ถือครองอยู่มักมีไม่กี่ชิ้นต่อคน — คำนวณ warranty bucket ในหน่วยความจำได้โดยไม่กระทบ performance
@@ -461,6 +479,11 @@ async function buildEmployeeDashboard(user) {
       inProgress: ticketStatusCounts.IN_PROGRESS,
       resolvedToday,
       closedToday,
+    },
+    borrowRequests: {
+      pending: pendingBorrowRequests,
+      approvedToday: approvedBorrowRequestsToday,
+      rejectedToday: rejectedBorrowRequestsToday,
     },
     charts: {
       assetsByCategory: [],

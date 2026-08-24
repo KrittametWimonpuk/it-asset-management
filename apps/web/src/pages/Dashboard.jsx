@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   Clock3,
   FolderTree,
   Gauge,
@@ -70,6 +71,12 @@ const TICKET_SUMMARY_CARDS = [
   { key: 'inProgress', label: 'กำลังดำเนินการ', icon: Clock3, tone: 'amber' },
   { key: 'resolvedToday', label: 'แก้ไขวันนี้', icon: CheckCircle2, tone: 'green' },
   { key: 'closedToday', label: 'ปิดงานวันนี้', icon: TicketCheck, tone: 'violet' },
+]
+
+const BORROW_REQUEST_SUMMARY_CARDS = [
+  { key: 'pending', label: 'คำขอรออนุมัติ', icon: Clock3, tone: 'amber', detail: 'รายการที่ต้องดำเนินการ' },
+  { key: 'approvedToday', label: 'อนุมัติวันนี้', icon: CheckCircle2, tone: 'green', detail: 'สร้างการมอบหมายแล้ว' },
+  { key: 'rejectedToday', label: 'ปฏิเสธวันนี้', icon: XCircle, tone: 'red', detail: 'คำขอที่ไม่ผ่านอนุมัติ' },
 ]
 
 const ACTIVITY_TYPE_LABELS = {
@@ -282,6 +289,19 @@ export default function Dashboard({ role }) {
             })}
           </div>
         )}
+      </section>
+
+      <section id="dashboard-borrow-requests" className="dashboard-block">
+        <SectionHeading icon={ClipboardList} title="Borrow Request Summary" description="ภาพรวมขั้นตอนคำขอยืมครุภัณฑ์วันนี้" />
+        <div className="dashboard-kpi-grid">
+          {BORROW_REQUEST_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
       </section>
 
       <div className="dashboard-summary-grid">

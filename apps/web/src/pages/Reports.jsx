@@ -13,7 +13,7 @@ import {
   AlertCircle, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Boxes, Building2,
   ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, FileSpreadsheet,
   FileText, FilterX, Headphones, RefreshCw, Search, SearchX,
-  ShieldCheck, Sparkles, Store, TableProperties,
+  ShieldCheck, Sparkles, Store, TableProperties, FileClock,
 } from 'lucide-react'
 import { api } from '../api.js'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
@@ -32,6 +32,12 @@ const WARRANTY_BUCKET_OPTIONS = [
   { value: 'normal', label: 'ปกติ' },
 ]
 
+const BORROW_REQUEST_STATUS_OPTIONS = [
+  { value: 'PENDING', label: 'รออนุมัติ' }, { value: 'APPROVED', label: 'อนุมัติแล้ว' },
+  { value: 'REJECTED', label: 'ปฏิเสธ' }, { value: 'CANCELLED', label: 'ยกเลิก' },
+  { value: 'COMPLETED', label: 'ดำเนินการเสร็จสิ้น' },
+]
+
 const EXPORT_FORMATS = [
   { value: 'csv', label: 'CSV', icon: FileText },
   { value: 'xlsx', label: 'Excel', icon: FileSpreadsheet },
@@ -43,6 +49,7 @@ const REPORT_UI = {
   assignments: { icon: ClipboardList, tone: 'violet', short: 'การมอบหมาย' },
   warranty: { icon: ShieldCheck, tone: 'green', short: 'การรับประกัน' },
   helpdesk: { icon: Headphones, tone: 'amber', short: 'Helpdesk' },
+  borrowRequests: { icon: FileClock, tone: 'blue', short: 'คำขอยืม' },
   departments: { icon: Building2, tone: 'cyan', short: 'แผนก' },
   vendors: { icon: Store, tone: 'rose', short: 'ผู้ขาย' },
 }
@@ -59,9 +66,10 @@ const FILTER_PARAM_KEYS = {
   assignmentStatus: ['assignmentStatus'],
   ticketStatus: ['ticketStatus'],
   ticketCategory: ['ticketCategory'],
+  borrowRequestStatus: ['borrowRequestStatus'],
 }
 
-// นิยามรายงานทั้ง 6 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
+// นิยามรายงานทั้ง 7 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
 const REPORT_DEFS = [
   {
     key: 'assets',
@@ -162,6 +170,26 @@ const REPORT_DEFS = [
     ],
   },
   {
+    key: 'borrowRequests',
+    title: 'Borrow Request Report',
+    description: 'คำขอยืมครุภัณฑ์ พร้อมพนักงาน ขั้นตอนอนุมัติ และผลการดำเนินการ',
+    apiFn: api.reports.borrowRequests,
+    paginated: true,
+    filterFields: ['dateRange', 'borrowRequestStatus', 'search'],
+    sortColumns: [
+      { field: 'requestedAt', label: 'วันที่ขอ' }, { field: 'requestNumber', label: 'เลขที่คำขอ' }, { field: 'status', label: 'สถานะ' },
+    ],
+    columns: [
+      { key: 'requestNumber', label: 'เลขที่คำขอ' }, { key: 'employeeCode', label: 'รหัสพนักงาน' },
+      { key: 'employeeName', label: 'ชื่อพนักงาน' }, { key: 'department', label: 'แผนก' },
+      { key: 'position', label: 'ตำแหน่ง' }, { key: 'asset', label: 'ครุภัณฑ์' },
+      { key: 'requestedAt', label: 'วันที่ขอ' }, { key: 'expectedReturnDate', label: 'วันที่คาดว่าจะคืน' },
+      { key: 'status', label: 'สถานะ' }, { key: 'approvedBy', label: 'ผู้อนุมัติ' },
+      { key: 'approvedAt', label: 'วันที่อนุมัติ' }, { key: 'reason', label: 'เหตุผลที่ขอ' },
+      { key: 'rejectedReason', label: 'เหตุผลที่ปฏิเสธ' }, { key: 'remark', label: 'หมายเหตุ' },
+    ],
+  },
+  {
     key: 'departments',
     title: 'Department Summary',
     description: 'สรุปจำนวนครุภัณฑ์/การมอบหมาย/ใบแจ้งซ่อม แยกตามแผนก',
@@ -214,7 +242,7 @@ export default function Reports({ role }) {
     {!activeReport ? <>
       <header className="reports-hero">
         <div><span className="reports-eyebrow"><BarChart3 size={15} /> Analytics center</span><h1>ศูนย์รวมรายงาน</h1><p>สำรวจข้อมูลสำคัญขององค์กร ดูตัวอย่าง และส่งออกในรูปแบบที่พร้อมใช้งาน</p></div>
-        <div className="reports-hero-mark" aria-hidden="true"><BarChart3 size={34} /><span>6</span><small>Reports</small></div>
+        <div className="reports-hero-mark" aria-hidden="true"><BarChart3 size={34} /><span>{visibleReports.length}</span><small>Reports</small></div>
       </header>
       <div className="reports-intro"><div><Sparkles size={18} /><span><strong>เลือกรายงานที่ต้องการ</strong><small>ข้อมูลทั้งหมดอัปเดตจากระบบปัจจุบัน</small></span></div><span>{visibleReports.length} รายงานพร้อมใช้งาน</span></div>
       <div className="reports-catalog">
@@ -428,6 +456,16 @@ function ReportView({ report }) {
             <select id="report-ticket-category" value={filters.ticketCategory} onChange={(e) => updateFilter('ticketCategory', e.target.value)}>
               <option value="">ทั้งหมด</option>
               {TICKET_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {report.filterFields.includes('borrowRequestStatus') && (
+          <div className="filter-field">
+            <label htmlFor="report-borrow-status">สถานะคำขอยืม</label>
+            <select id="report-borrow-status" value={filters.borrowRequestStatus} onChange={(e) => updateFilter('borrowRequestStatus', e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              {BORROW_REQUEST_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         )}

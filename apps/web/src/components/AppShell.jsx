@@ -27,6 +27,7 @@ const CORE_NAVIGATION = [
   { key: 'dashboard', label: 'แดชบอร์ด', group: 'ภาพรวม', icon: 'dashboard' },
   { key: 'assets', label: 'ครุภัณฑ์', group: 'การจัดการ', icon: 'assets' },
   { key: 'assignments', label: 'การมอบหมาย', group: 'การจัดการ', icon: 'assignment' },
+  { key: 'borrowRequests', label: 'คำขอยืม', group: 'การจัดการ', icon: 'borrow' },
   { key: 'tickets', label: 'Helpdesk', group: 'การจัดการ', icon: 'ticket' },
   { key: 'reports', label: 'รายงาน', group: 'การจัดการ', icon: 'report' },
 ]
@@ -44,6 +45,7 @@ const PAGE_META = {
   dashboard: { title: 'แดชบอร์ด', eyebrow: 'ภาพรวมองค์กร' },
   assets: { title: 'ครุภัณฑ์', eyebrow: 'การจัดการสินทรัพย์' },
   assignments: { title: 'การมอบหมาย', eyebrow: 'การใช้งานครุภัณฑ์' },
+  borrowRequests: { title: 'คำขอยืม', eyebrow: 'ขั้นตอนการอนุมัติ' },
   tickets: { title: 'Helpdesk', eyebrow: 'งานบริการไอที' },
   reports: { title: 'รายงาน', eyebrow: 'ข้อมูลและการวิเคราะห์' },
   audit: { title: 'Audit Log', eyebrow: 'การกำกับดูแลระบบ' },
@@ -59,6 +61,7 @@ function Icon({ name }) {
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     assets: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 5V3h8v2M3 10h18M9 14h6" /></>,
     assignment: <><path d="M8 4h8M9 2h6v4H9z" /><rect x="5" y="4" width="14" height="18" rx="2" /><path d="m9 14 2 2 4-4" /></>,
+    borrow: <><path d="M8 4h8M9 2h6v4H9z" /><rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 12h6M9 16h4" /></>,
     ticket: <><path d="M4 7a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2v-3a2 2 0 0 0 0-4V7Z" /><path d="M12 8v8" /></>,
     report: <><path d="M5 20V10M12 20V4M19 20v-7" /><path d="M3 20h18" /></>,
     audit: <><path d="M12 3 20 6v6c0 5-3.2 8.1-8 10-4.8-1.9-8-5-8-10V6l8-3Z" /><path d="m9 12 2 2 4-4" /></>,

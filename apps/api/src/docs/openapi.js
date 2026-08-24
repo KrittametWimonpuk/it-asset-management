@@ -165,7 +165,7 @@ const employeeSchemas = {
   },
   Employee: {
     type: 'object',
-    description: 'ข้อมูลบุคลากร แยกจากบัญชี User และยังไม่ถูกใช้แทน User ใน Assignment',
+    description: 'ข้อมูลบุคลากรซึ่งเป็น business identity ของผู้ถือครอง แยกจากบัญชี User สำหรับ authentication/RBAC',
     properties: {
       id: { type: 'string', format: 'uuid' },
       employeeCode: { type: 'string', example: 'EMP-0001' },
@@ -517,6 +517,44 @@ const ticketSchemas = {
   },
 }
 
+const borrowRequestSchemas = {
+  BorrowRequestStatus: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'] },
+  BorrowRequest: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      requestNumber: { type: 'string', example: 'BR-000001' },
+      employeeId: { type: 'string', format: 'uuid' },
+      assetId: { type: 'string', format: 'uuid' },
+      requestedAt: { type: 'string', format: 'date-time' },
+      expectedReturnDate: { type: 'string', format: 'date-time', nullable: true },
+      reason: { type: 'string' },
+      status: { $ref: '#/components/schemas/BorrowRequestStatus' },
+      approvedByUserId: { type: 'string', format: 'uuid', nullable: true },
+      approvedAt: { type: 'string', format: 'date-time', nullable: true },
+      rejectedReason: { type: 'string', nullable: true },
+      remark: { type: 'string', nullable: true },
+      employee: { $ref: '#/components/schemas/Employee' },
+      asset: { type: 'object', properties: { id: { type: 'string', format: 'uuid' }, assetTag: { type: 'string' }, name: { type: 'string' }, status: { $ref: '#/components/schemas/AssetStatus' } } },
+      approvedByUser: { allOf: [{ $ref: '#/components/schemas/User' }], nullable: true },
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  BorrowRequestCreateRequest: {
+    type: 'object', required: ['assetId', 'reason'],
+    properties: {
+      assetId: { type: 'string', format: 'uuid' },
+      expectedReturnDate: { type: 'string', format: 'date', nullable: true },
+      reason: { type: 'string', minLength: 3 }, remark: { type: 'string', nullable: true },
+    },
+  },
+  BorrowRequestRejectRequest: {
+    type: 'object', required: ['rejectedReason'],
+    properties: { rejectedReason: { type: 'string', minLength: 3 }, remark: { type: 'string', nullable: true } },
+  },
+}
+
 // ---- Dashboard (Milestone 6/7) ----
 const chartItemSchema = {
   type: 'object',
@@ -600,6 +638,10 @@ const dashboardSchemas = {
           open: { type: 'integer' }, inProgress: { type: 'integer' },
           resolvedToday: { type: 'integer' }, closedToday: { type: 'integer' },
         },
+      },
+      borrowRequests: {
+        type: 'object',
+        properties: { pending: { type: 'integer' }, approvedToday: { type: 'integer' }, rejectedToday: { type: 'integer' } },
       },
       charts: {
         type: 'object',
@@ -689,6 +731,16 @@ const reportSchemas = {
       resolutionTimeHours: { type: 'number', example: 11.2 },
     },
   },
+  BorrowRequestReportRow: {
+    type: 'object',
+    properties: {
+      requestNumber: { type: 'string', example: 'BR-000001' }, employeeCode: { type: 'string' },
+      employeeName: { type: 'string' }, department: { type: 'string' }, position: { type: 'string' },
+      asset: { type: 'string' }, requestedAt: { type: 'string' }, expectedReturnDate: { type: 'string' },
+      status: { type: 'string' }, approvedBy: { type: 'string' }, approvedAt: { type: 'string' },
+      reason: { type: 'string' }, rejectedReason: { type: 'string' }, remark: { type: 'string' },
+    },
+  },
   DepartmentSummaryRow: {
     type: 'object',
     properties: {
@@ -716,11 +768,11 @@ const reportSchemas = {
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED'],
   },
   AuditEntityType: {
     type: 'string',
-    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
+    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
   },
   AuditLog: {
     type: 'object',
@@ -749,10 +801,10 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-alpha.2',
+    version: '1.1.0-alpha.3',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
-      'Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
+      'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
       'เอกสารชุดนี้สร้างจาก JSDoc annotation ที่อ่าน route/validation/response จริงจากซอร์สโค้ด ' +
       '(ดู `src/docs/paths/*.js`) — ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง\n\n' +
       '**สิทธิ์การใช้งาน (RBAC)** บังคับที่ backend เสมอในทุก endpoint ที่ต้องล็อกอิน ' +
@@ -770,6 +822,7 @@ const definition = {
     { name: 'Employees', description: 'ข้อมูลพนักงานและ business identity สำหรับผู้ถือครองครุภัณฑ์; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
+    { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ และการสร้าง Assignment อัตโนมัติ' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },
@@ -796,6 +849,7 @@ const definition = {
       ...assetSchemas,
       ...assignmentSchemas,
       ...ticketSchemas,
+      ...borrowRequestSchemas,
       ...dashboardSchemas,
       ...reportSchemas,
       ...auditSchemas,
@@ -830,6 +884,11 @@ const definition = {
         name: 'id', in: 'path', required: true,
         schema: { type: 'string', format: 'uuid' },
         description: 'Employee ID (UUID)',
+      },
+      BorrowRequestId: {
+        name: 'id', in: 'path', required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Borrow Request ID (UUID)',
       },
       PageParam: { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
       PageSizeParam: { name: 'pageSize', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },

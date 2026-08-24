@@ -17,6 +17,10 @@ export const ACTION_LABELS = {
   CLOSE: 'ปิดงาน',
   LOGIN: 'เข้าสู่ระบบ',
   EXPORT_REPORT: 'ส่งออกรายงาน',
+  BORROW_REQUEST_CREATED: 'สร้างคำขอยืม',
+  BORROW_REQUEST_APPROVED: 'อนุมัติคำขอยืม',
+  BORROW_REQUEST_REJECTED: 'ปฏิเสธคำขอยืม',
+  BORROW_REQUEST_CANCELLED: 'ยกเลิกคำขอยืม',
 }
 
 export const ENTITY_TYPE_LABELS = {
@@ -24,6 +28,7 @@ export const ENTITY_TYPE_LABELS = {
   Assignment: 'การมอบหมาย',
   Ticket: 'ใบแจ้งซ่อม',
   Employee: 'พนักงาน',
+  BorrowRequest: 'คำขอยืม',
   Category: 'หมวดหมู่',
   Department: 'แผนก',
   Location: 'สถานที่ตั้ง',
