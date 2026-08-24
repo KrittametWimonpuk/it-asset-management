@@ -1,239 +1,113 @@
-// ---------------------------------------------------------------------------
-// หน้า Audit Log — Milestone 9: ประวัติการกระทำสำคัญทางธุรกิจทั้งระบบ
-//
-// เฉพาะ ADMIN/IT_STAFF เข้าได้ (backend คืน 403 ให้ EMPLOYEE — ไม่ต้องเช็ก role ซ้ำที่นี่ เพราะ App.jsx
-// ซ่อนแท็บนี้ไปเลยสำหรับ EMPLOYEE อยู่แล้ว เหมือนแพทเทิร์นเดียวกับ MasterDataPage)
-// อ่านอย่างเดียว — ไม่มีปุ่มแก้ไข/ลบ เพราะ audit log เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable)
-// เรียงตามเวลาล่าสุดก่อนเสมอ (performedAt desc) — ไม่มี sort ให้เลือกเหมือนหน้าอื่น (ตาม spec)
-// ---------------------------------------------------------------------------
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ArrowDownToLine, Box, CheckCircle2, ChevronLeft, ChevronRight, CirclePause,
+  Clock3, FileClock, FileDown, FilePlus2, FileX2, FilterX, History,
+  LogIn, MapPin, PackageCheck, Pencil, RefreshCw, RotateCcw, Search, SearchX,
+  ShieldCheck, Store, Tag, Ticket, UserRound, Users, Wrench, XCircle,
+} from 'lucide-react'
 import { api } from '../api.js'
 import AuditLogDetail from '../components/AuditLogDetail.jsx'
 import { formatDateTime } from '../utils/format.js'
 import { ACTION_LABELS, ENTITY_TYPE_LABELS } from '../utils/auditLabels.js'
+import './AuditLog.css'
 
 const PAGE_SIZE = 20
-
 const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
 const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABELS).map(([value, label]) => ({ value, label }))
-
 const EMPTY_FILTERS = { action: '', entityType: '', performedBy: '', dateFrom: '', dateTo: '' }
+
+const ACTION_UI = {
+  CREATE: ['green', FilePlus2], UPDATE: ['blue', Pencil], DELETE: ['red', FileX2],
+  ASSIGN: ['violet', PackageCheck], RETURN: ['cyan', RotateCcw], OPEN: ['blue', Ticket],
+  START_PROGRESS: ['amber', Wrench], ON_HOLD: ['amber', CirclePause], RESOLVE: ['green', CheckCircle2],
+  CLOSE: ['slate', XCircle], LOGIN: ['cyan', LogIn], EXPORT_REPORT: ['violet', FileDown],
+}
+const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
+
+function AuditSkeleton() {
+  return <div className="audit-skeleton" aria-label="กำลังโหลด Audit Log" aria-busy="true">{[1, 2, 3, 4].map((item) => <div className="audit-shimmer" key={item} />)}</div>
+}
 
 export default function AuditLog() {
   const [logs, setLogs] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
   const [error, setError] = useState('')
-
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
-
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [userOptions, setUserOptions] = useState(null)
   const [detailLog, setDetailLog] = useState(null)
 
-  // รายชื่อผู้ใช้ไว้ใช้เป็นตัวกรอง "ผู้ทำรายการ" — โหลดครั้งเดียว
   useEffect(() => {
     let cancelled = false
-    api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' })
-      .then((res) => { if (!cancelled) setUserOptions(res.items) })
-      .catch(() => {}) // ตัวกรองโหลดไม่สำเร็จไม่ critical — ยังกรองด้วยตัวอื่นได้ตามปกติ
+    api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' }).then((result) => { if (!cancelled) setUserOptions(result.items) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
+  useEffect(() => { const timer = setTimeout(() => setSearch(searchInput.trim()), 400); return () => clearTimeout(timer) }, [searchInput])
 
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), 400)
-    return () => clearTimeout(timer)
-  }, [searchInput])
-
-  useEffect(() => { setPage(1) }, [search, filters])
-  useEffect(() => { load() }, [page, search, filters])
-
-  async function load() {
+  const load = useCallback(async () => {
     setRefreshing(true)
     try {
-      const res = await api.audit.list({ page, pageSize: PAGE_SIZE, search, ...filters })
-      setLogs(res.items)
-      setMeta(res)
-      setError('')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
+      const result = await api.audit.list({ page, pageSize: PAGE_SIZE, search, ...filters })
+      setLogs(result.items); setMeta(result); setError('')
+    } catch (err) { setError(err.message) } finally { setLoading(false); setRefreshing(false) }
+  }, [filters, page, search])
 
-  function updateFilter(key, value) {
-    setFilters((f) => ({ ...f, [key]: value }))
-  }
+  useEffect(() => { setPage(1) }, [search, filters])
+  useEffect(() => { load() }, [load])
 
-  function resetFilters() {
-    setSearchInput('')
-    setSearch('')
-    setFilters(EMPTY_FILTERS)
-  }
+  const actionSummary = useMemo(() => logs.reduce((result, log) => ({ ...result, [log.action]: (result[log.action] || 0) + 1 }), {}), [logs])
+  const activeCount = Object.values(filters).filter(Boolean).length + (search ? 1 : 0)
+  const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }))
+  const quickFilter = (value) => setFilters((current) => ({ ...current, action: current.action === value ? '' : value }))
+  const resetFilters = () => { setSearchInput(''); setSearch(''); setFilters({ ...EMPTY_FILTERS }) }
 
-  const hasSearch = search.length > 0
-  const hasActiveFilters = hasSearch || Object.values(filters).some(Boolean)
-  const isEmpty = !loading && logs.length === 0
+  return <section className="audit-page">
+    <header className="audit-hero">
+      <div><span className="audit-eyebrow"><ShieldCheck size={15} /> System integrity</span><h1>Audit Log</h1><p>ตรวจสอบทุกความเคลื่อนไหวสำคัญ พร้อมหลักฐานการเปลี่ยนแปลงที่ย้อนดูได้</p></div>
+      <div className="audit-hero-stat"><History size={25} /><span><strong>{meta.totalItems}</strong><small>เหตุการณ์ทั้งหมด</small></span></div>
+    </header>
 
-  return (
-    <div>
-      <div className="between">
-        <h2 className="section-title">Audit Log — ประวัติการทำรายการ</h2>
-      </div>
-
-      <div className="filter-bar mt">
-        <div className="filter-field">
-          <label htmlFor="audit-search">ค้นหา</label>
-          <input
-            id="audit-search"
-            type="text"
-            className="search-input"
-            placeholder="ค้นหาในคำอธิบาย, entity id..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="audit-filter-action">การกระทำ</label>
-          <select id="audit-filter-action" value={filters.action} onChange={(e) => updateFilter('action', e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            {ACTION_OPTIONS.map((a) => (
-              <option key={a.value} value={a.value}>{a.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="audit-filter-entity">ประเภท</label>
-          <select id="audit-filter-entity" value={filters.entityType} onChange={(e) => updateFilter('entityType', e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            {ENTITY_TYPE_OPTIONS.map((e) => (
-              <option key={e.value} value={e.value}>{e.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="audit-filter-user">ผู้ทำรายการ</label>
-          <select
-            id="audit-filter-user"
-            value={filters.performedBy}
-            onChange={(e) => updateFilter('performedBy', e.target.value)}
-            disabled={!userOptions}
-          >
-            <option value="">ทั้งหมด</option>
-            {userOptions?.map((u) => (
-              <option key={u.id} value={u.id}>{u.name || u.email}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="audit-filter-from">ตั้งแต่วันที่</label>
-          <input
-            id="audit-filter-from"
-            type="date"
-            value={filters.dateFrom}
-            onChange={(e) => updateFilter('dateFrom', e.target.value)}
-          />
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="audit-filter-to">ถึงวันที่</label>
-          <input
-            id="audit-filter-to"
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => updateFilter('dateTo', e.target.value)}
-          />
-        </div>
-
-        <div className="filter-actions">
-          <button type="button" className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
-        </div>
-      </div>
-
-      {!loading && <p className="muted mt">แสดง {logs.length} จาก {meta.totalItems} รายการ</p>}
-
-      {error && <p className="error mt">{error}</p>}
-
-      {loading ? (
-        <p className="muted mt">กำลังโหลด...</p>
-      ) : isEmpty ? (
-        hasActiveFilters ? (
-          <div className="empty-state mt">
-            <h3>ไม่พบผลลัพธ์</h3>
-            <p className="muted">ไม่พบ audit log ที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือรีเซ็ตตัวกรอง</p>
-            <button className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
-          </div>
-        ) : (
-          <div className="empty-state mt">
-            <h3>ยังไม่มี audit log</h3>
-            <p className="muted">ประวัติการทำรายการจะปรากฏที่นี่เมื่อมีการสร้าง/แก้ไข/ลบข้อมูลในระบบ</p>
-          </div>
-        )
-      ) : (
-        <>
-          <div className={`table-wrap mt${refreshing ? ' is-refreshing' : ''}`}>
-            <table>
-              <thead>
-                <tr>
-                  <th>เวลา</th>
-                  <th>ผู้ทำรายการ</th>
-                  <th>การกระทำ</th>
-                  <th>ประเภท</th>
-                  <th>รายละเอียด</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{formatDateTime(log.performedAt)}</td>
-                    <td>{log.performedBy ? (log.performedBy.name || log.performedBy.email) : 'ระบบ/ไม่ทราบ'}</td>
-                    <td><span className={`badge badge-audit-${log.action.toLowerCase().replace(/_/g, '-')}`}>{ACTION_LABELS[log.action] || log.action}</span></td>
-                    <td>{ENTITY_TYPE_LABELS[log.entityType] || log.entityType}</td>
-                    <td>{log.description || '-'}</td>
-                    <td><button className="link" onClick={() => setDetailLog(log)}>ดูรายละเอียด</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="row between mt">
-            <span className="muted">
-              หน้า {meta.page} จาก {meta.totalPages} • ทั้งหมด {meta.totalItems} รายการ
-              {refreshing && ' • กำลังโหลด...'}
-            </span>
-            <div className="row">
-              <button
-                className="secondary"
-                disabled={refreshing || meta.page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ก่อนหน้า
-              </button>
-              <button
-                className="secondary"
-                disabled={refreshing || meta.page >= meta.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                ถัดไป
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {detailLog && <AuditLogDetail log={detailLog} onClose={() => setDetailLog(null)} />}
+    <div className="audit-toolbar">
+      <label className="audit-search" htmlFor="audit-search"><Search size={18} /><input id="audit-search" type="search" placeholder="ค้นหาคำอธิบาย หรือรหัสรายการ..." value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />{refreshing && <RefreshCw className="audit-spin" size={16} />}</label>
+      <button className={filtersOpen ? 'is-active' : ''} type="button" onClick={() => setFiltersOpen((open) => !open)}><FilterX size={17} /> ตัวกรอง {activeCount > 0 && <b>{activeCount}</b>}</button>
     </div>
-  )
+
+    {filtersOpen && <div className="audit-filters">
+      <label>การกระทำ<select value={filters.action} onChange={(e) => setFilter('action', e.target.value)}><option value="">ทั้งหมด</option>{ACTION_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      <label>ประเภทข้อมูล<select value={filters.entityType} onChange={(e) => setFilter('entityType', e.target.value)}><option value="">ทั้งหมด</option>{ENTITY_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      <label>ผู้ทำรายการ<select value={filters.performedBy} onChange={(e) => setFilter('performedBy', e.target.value)} disabled={!userOptions}><option value="">ทั้งหมด</option>{userOptions?.map((item) => <option key={item.id} value={item.id}>{item.name || item.email}</option>)}</select></label>
+      <label>ตั้งแต่วันที่<input type="date" value={filters.dateFrom} onChange={(e) => setFilter('dateFrom', e.target.value)} /></label>
+      <label>ถึงวันที่<input type="date" value={filters.dateTo} onChange={(e) => setFilter('dateTo', e.target.value)} /></label>
+      <button className="audit-reset" type="button" onClick={resetFilters} disabled={!activeCount}><FilterX size={16} /> ล้างตัวกรอง</button>
+    </div>}
+
+    <nav className="audit-quick" aria-label="ตัวกรองการกระทำด่วน"><span>ดูด่วน</span>{[['LOGIN', LogIn], ['CREATE', FilePlus2], ['UPDATE', Pencil], ['DELETE', FileX2], ['EXPORT_REPORT', ArrowDownToLine]].map(([value, Icon]) => <button className={filters.action === value ? 'is-active' : ''} type="button" key={value} onClick={() => quickFilter(value)}><Icon size={14} />{ACTION_LABELS[value]}<b>{actionSummary[value] || 0}</b></button>)}</nav>
+    {error && <div className="audit-error" role="alert"><XCircle size={18} />{error}<button onClick={load}>ลองใหม่</button></div>}
+
+    {loading ? <AuditSkeleton /> : logs.length === 0 ? <div className="audit-empty"><span><SearchX size={28} /></span><h2>{activeCount ? 'ไม่พบเหตุการณ์ที่ค้นหา' : 'ยังไม่มี Audit Log'}</h2><p>{activeCount ? 'ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง' : 'ประวัติการทำรายการสำคัญจะปรากฏที่นี่'}</p>{activeCount > 0 && <button onClick={resetFilters}><FilterX size={16} /> ล้างตัวกรอง</button>}</div> :
+      <div className={`audit-panel${refreshing ? ' is-refreshing' : ''}`}>
+        <div className="audit-panel-head"><div><h2>ลำดับเหตุการณ์</h2><p>แสดง {logs.length} จาก {meta.totalItems} รายการ · เรียงล่าสุดก่อน</p></div><span><Clock3 size={15} /> Live history</span></div>
+        <ol className="audit-timeline">{logs.map((log) => {
+          const [tone, ActionIcon] = ACTION_UI[log.action] || ['slate', History]
+          const EntityIcon = ENTITY_ICONS[log.entityType] || FileClock
+          return <li key={log.id} className={`is-${tone}`}>
+            <div className="audit-time"><strong>{formatDateTime(log.performedAt)}</strong><small>{log.ipAddress || 'ไม่ระบุ IP'}</small></div>
+            <span className="audit-node"><ActionIcon size={17} /></span>
+            <article className="audit-event">
+              <div className="audit-event-head"><div><span className={`audit-action is-${tone}`}><ActionIcon size={13} />{ACTION_LABELS[log.action] || log.action}</span><span className="audit-entity"><EntityIcon size={13} />{ENTITY_TYPE_LABELS[log.entityType] || log.entityType}</span></div><button type="button" onClick={() => setDetailLog(log)}>ดูการเปลี่ยนแปลง</button></div>
+              <h3>{log.description || 'ไม่มีคำอธิบายเพิ่มเติม'}</h3>
+              <div className="audit-actor"><span><UserRound size={15} /></span><div><small>ดำเนินการโดย</small><strong>{log.performedBy ? (log.performedBy.name || log.performedBy.email) : 'ระบบ/ไม่ทราบ'}</strong></div>{log.entityId && <code>{log.entityId}</code>}</div>
+            </article>
+          </li>
+        })}</ol>
+        <div className="audit-pagination"><span>หน้า {meta.page} จาก {meta.totalPages} · ทั้งหมด {meta.totalItems} รายการ</span><div><button aria-label="หน้าก่อนหน้า" disabled={refreshing || meta.page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={17} /></button><b>{meta.page}</b><button aria-label="หน้าถัดไป" disabled={refreshing || meta.page >= meta.totalPages} onClick={() => setPage((value) => value + 1)}><ChevronRight size={17} /></button></div></div>
+      </div>}
+
+    {detailLog && <AuditLogDetail log={detailLog} onClose={() => setDetailLog(null)} />}
+  </section>
 }
