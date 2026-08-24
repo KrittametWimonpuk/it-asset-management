@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
+import DateInput from './DateInput.jsx'
 
 // ใช้ร่วมกับ Assignments.jsx (label สถานะในตาราง/ตัวกรอง) — ต้องตรงกับ enum AssignmentStatus ใน schema.prisma
 export const ASSIGNMENT_STATUS_OPTIONS = [
@@ -63,11 +64,10 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
 
         <form onSubmit={submit} noValidate>
           <label htmlFor="return-returnedAt">วันที่คืน</label>
-          <input
+          <DateInput
             id="return-returnedAt"
-            type="date"
             value={returnedAt}
-            onChange={(e) => setReturnedAt(e.target.value)}
+            onChange={setReturnedAt}
             className={fieldErrors.returnedAt ? 'invalid' : ''}
           />
           {fieldErrors.returnedAt && <p className="field-error">{fieldErrors.returnedAt}</p>}

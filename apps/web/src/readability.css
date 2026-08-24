@@ -1,0 +1,80 @@
+/* Readability layer — comfortable defaults for prolonged use and 40+ users. */
+:root {
+  --font-size-h1: 2.125rem;
+  --font-size-h2: 1.625rem;
+  --font-size-h3: 1.1875rem;
+  --font-size-body: 1.0625rem;
+  --font-size-caption: 0.8125rem;
+  --line-height-body: 1.65;
+  --line-height-caption: 1.55;
+}
+
+body { font-size: var(--font-size-body); line-height: var(--line-height-body); }
+
+/* Operational application: establish a readable floor without changing layout structure. */
+.app-shell :where(button, input, select, textarea) { font-size: 0.9375rem !important; }
+.app-shell :where(p, .muted, .error) { font-size: 0.9375rem !important; line-height: 1.65 !important; }
+.app-shell :where(small, time, code, .text-caption, .field-error) { font-size: 0.8125rem !important; line-height: 1.55 !important; }
+.app-shell :where(label, .filter-field label) { font-size: 0.875rem !important; line-height: 1.5 !important; }
+.app-shell :where(table th) { font-size: 0.8125rem !important; line-height: 1.45 !important; }
+.app-shell :where(table td) { font-size: 0.875rem !important; line-height: 1.55 !important; }
+.app-shell :where(.badge, [class*="-badge"], [class*="-chip"], [class*="-eyebrow"]) { font-size: 0.8125rem !important; line-height: 1.4 !important; }
+.app-shell .app-main h1 { font-size: clamp(2rem, 3vw, 2.375rem) !important; }
+.app-shell .app-main h2 { font-size: 1.375rem !important; }
+.app-shell .app-main h3 { font-size: 1.0625rem !important; line-height: 1.45 !important; }
+
+/* Navigation and global chrome must remain legible from a normal desk distance. */
+.app-shell :where(.sidebar-nav button, .sidebar-footer button) { font-size: 0.9375rem !important; }
+.app-shell :where(.sidebar-group-label, .topbar-context, .topbar-profile-role, .sidebar-version) { font-size: 0.8125rem !important; line-height: 1.45 !important; }
+.app-shell :where(.topbar-title, .topbar-profile-name) { font-size: 0.9375rem !important; }
+
+/* Dense data views: raise page-specific metadata that previously rendered at 8–12px. */
+.app-shell :where(
+  .assets-table-meta span, .assets-bulk-bar span, .assets-tag-cell small,
+  .assets-mono, .assets-pagination > span,
+  .assignment-status-card em, .holder-copy span, .current-holder-item time,
+  .assignment-timeline strong, .assignment-timeline time, .assignment-refreshing,
+  .assignment-asset-cell small, .assignment-holder-cell small, .assignment-pagination > span,
+  .hd-panel-head > span, .hd-details, .hd-assignee strong,
+  .hd-pagination > div span, .hd-timeline strong,
+  .reports-intro > span, .reports-card-footer, .reports-card-footer b,
+  .report-section-head > b, .report-bar span, .report-bar strong,
+  .report-pagination > span, .report-pagination b,
+  .audit-toolbar b, .audit-quick > span, .audit-quick button b,
+  .audit-panel-head > span, .audit-time strong, .audit-action, .audit-entity,
+  .audit-actor strong, .audit-pagination > span, .audit-pagination b,
+  .audit-diff-title span, .audit-diff-title b, .audit-diff-title code,
+  .audit-diff-row > strong, .audit-diff-footer > span,
+  .master-hero > div:first-child > span, .master-pagination > span, .master-pagination b
+) { font-size: 0.8125rem !important; line-height: 1.5 !important; }
+
+.app-shell :where(
+  .assets-tag-cell strong, .holder-copy strong, .assignment-asset-cell strong,
+  .assignment-holder-cell strong, .hd-ticket-meta > strong, .hd-assignee strong
+) { font-size: 0.875rem !important; line-height: 1.45 !important; }
+
+.app-shell :where(.holder-avatar, .holder-avatar span, .assignment-holder-cell > span) {
+  font-size: 0.8125rem !important;
+  line-height: 1 !important;
+}
+
+/* Auth screens use the same minimum reading sizes. */
+.login-page :where(p, label, input, button),
+.register-page :where(p, label, input, button) { font-size: 0.9375rem !important; line-height: 1.6 !important; }
+.login-page :where(small, .login-welcome, .login-eyebrow, .login-version, .login-mobile-version),
+.register-page :where(small, .register-heading > span) { font-size: 0.8125rem !important; line-height: 1.5 !important; }
+
+/* Portfolio copy is recruiter-facing content; decorative product miniatures stay compact. */
+.showcase-page :where(.showcase-nav a, .showcase-nav button, .showcase-hero-actions a, .showcase-hero-actions button) { font-size: 0.875rem !important; }
+.showcase-page :where(.showcase-section-heading p, .showcase-highlight-grid p, .showcase-cta p) { font-size: 0.9375rem !important; line-height: 1.7 !important; }
+.showcase-page :where(.showcase-stack-grid strong, .showcase-architecture-step strong) { font-size: 0.9375rem !important; }
+.showcase-page :where(.showcase-stack-grid small, .showcase-architecture-step p, .showcase-release-track strong, .showcase-release-track small, .showcase-stat span, .showcase-footer) { font-size: 0.8125rem !important; line-height: 1.5 !important; }
+
+@media (max-width: 600px) {
+  .app-shell .app-main h1 { font-size: 1.875rem !important; }
+  .app-shell .app-main h2 { font-size: 1.25rem !important; }
+  .app-shell :where(button, input, select, textarea) { font-size: 1rem !important; }
+  .login-page :where(input, button),
+  .register-page :where(input, button),
+  .showcase-page :where(a, button) { font-size: 1rem !important; }
+}

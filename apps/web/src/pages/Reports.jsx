@@ -21,6 +21,7 @@ import { STATUS_OPTIONS } from '../components/AssetForm.jsx'
 import { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 import { TICKET_STATUS_OPTIONS, TICKET_CATEGORY_OPTIONS } from '../components/TicketForm.jsx'
 import './Reports.css'
+import DateInput from '../components/DateInput.jsx'
 
 const PAGE_SIZE = 20
 
@@ -329,11 +330,11 @@ function ReportView({ report }) {
           <>
             <div className="filter-field">
               <label htmlFor="report-date-from">วันที่เริ่ม</label>
-              <input id="report-date-from" type="date" value={filters.dateFrom} onChange={(e) => updateFilter('dateFrom', e.target.value)} />
+              <DateInput id="report-date-from" value={filters.dateFrom} onChange={(value) => updateFilter('dateFrom', value)} />
             </div>
             <div className="filter-field">
               <label htmlFor="report-date-to">วันที่สิ้นสุด</label>
-              <input id="report-date-to" type="date" value={filters.dateTo} onChange={(e) => updateFilter('dateTo', e.target.value)} />
+              <DateInput id="report-date-to" value={filters.dateTo} onChange={(value) => updateFilter('dateTo', value)} />
             </div>
           </>
         )}

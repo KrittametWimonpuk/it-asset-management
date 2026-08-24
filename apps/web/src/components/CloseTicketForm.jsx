@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 import { useState } from 'react'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
+import DateInput from './DateInput.jsx'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -49,11 +50,10 @@ export default function CloseTicketForm({ ticket, onSubmit, onCancel }) {
 
         <form onSubmit={submit} noValidate>
           <label htmlFor="close-date">วันที่ปิดงาน</label>
-          <input
+          <DateInput
             id="close-date"
-            type="date"
             value={closedAt}
-            onChange={(e) => setClosedAt(e.target.value)}
+            onChange={setClosedAt}
             className={fieldErrors.closedAt ? 'invalid' : ''}
           />
           {fieldErrors.closedAt && <p className="field-error">{fieldErrors.closedAt}</p>}

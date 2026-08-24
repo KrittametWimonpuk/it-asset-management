@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from 'react'
 import { api } from '../api.js'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
+import DateInput from './DateInput.jsx'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -190,12 +191,11 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
           <div className="row">
             <div className="grow">
               <label htmlFor="assignment-assignedAt">วันที่มอบหมาย{!isEdit && ' *'}</label>
-              <input
+              <DateInput
                 id="assignment-assignedAt"
-                ref={isEdit ? firstInputRef : undefined}
-                type="date"
+                inputRef={isEdit ? firstInputRef : undefined}
                 value={form.assignedAt}
-                onChange={(e) => update('assignedAt', e.target.value)}
+                onChange={(value) => update('assignedAt', value)}
                 disabled={isEdit}
                 className={fieldErrors.assignedAt ? 'invalid' : ''}
               />
@@ -203,11 +203,10 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
             </div>
             <div className="grow">
               <label htmlFor="assignment-expectedReturnDate">วันที่คาดว่าจะคืน</label>
-              <input
+              <DateInput
                 id="assignment-expectedReturnDate"
-                type="date"
                 value={form.expectedReturnDate}
-                onChange={(e) => update('expectedReturnDate', e.target.value)}
+                onChange={(value) => update('expectedReturnDate', value)}
                 className={fieldErrors.expectedReturnDate ? 'invalid' : ''}
               />
               {fieldErrors.expectedReturnDate && <p className="field-error">{fieldErrors.expectedReturnDate}</p>}

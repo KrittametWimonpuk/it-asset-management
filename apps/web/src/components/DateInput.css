@@ -1,0 +1,7 @@
+.date-input-wrap { position: relative; width: 100%; }
+.date-input-wrap > input[type="text"] { width: 100%; padding-right: 46px; font-variant-numeric: tabular-nums; }
+.date-input-trigger { position: absolute; top: 50%; right: 5px; width: 34px; min-height: 34px; padding: 0; border: 0; border-radius: var(--radius-sm); color: var(--color-text-secondary); background: transparent; box-shadow: none; transform: translateY(-50%); }
+.date-input-trigger:hover:not(:disabled) { color: var(--color-primary); background: var(--color-primary-soft); box-shadow: none; }
+.date-input-trigger:active:not(:disabled) { transform: translateY(-50%); }
+.date-input-native { position: absolute; right: 8px; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.date-input-wrap.is-disabled { opacity: .72; }

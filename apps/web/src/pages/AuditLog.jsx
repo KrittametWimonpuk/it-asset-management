@@ -8,6 +8,7 @@ import {
 import { api } from '../api.js'
 import AuditLogDetail from '../components/AuditLogDetail.jsx'
 import { formatDateTime } from '../utils/format.js'
+import DateInput from '../components/DateInput.jsx'
 import { ACTION_LABELS, ENTITY_TYPE_LABELS } from '../utils/auditLabels.js'
 import './AuditLog.css'
 
@@ -81,8 +82,8 @@ export default function AuditLog() {
       <label>การกระทำ<select value={filters.action} onChange={(e) => setFilter('action', e.target.value)}><option value="">ทั้งหมด</option>{ACTION_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <label>ประเภทข้อมูล<select value={filters.entityType} onChange={(e) => setFilter('entityType', e.target.value)}><option value="">ทั้งหมด</option>{ENTITY_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <label>ผู้ทำรายการ<select value={filters.performedBy} onChange={(e) => setFilter('performedBy', e.target.value)} disabled={!userOptions}><option value="">ทั้งหมด</option>{userOptions?.map((item) => <option key={item.id} value={item.id}>{item.name || item.email}</option>)}</select></label>
-      <label>ตั้งแต่วันที่<input type="date" value={filters.dateFrom} onChange={(e) => setFilter('dateFrom', e.target.value)} /></label>
-      <label>ถึงวันที่<input type="date" value={filters.dateTo} onChange={(e) => setFilter('dateTo', e.target.value)} /></label>
+      <label>ตั้งแต่วันที่<DateInput value={filters.dateFrom} onChange={(value) => setFilter('dateFrom', value)} /></label>
+      <label>ถึงวันที่<DateInput value={filters.dateTo} onChange={(value) => setFilter('dateTo', value)} /></label>
       <button className="audit-reset" type="button" onClick={resetFilters} disabled={!activeCount}><FilterX size={16} /> ล้างตัวกรอง</button>
     </div>}
 

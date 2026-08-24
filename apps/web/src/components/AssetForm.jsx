@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
 import { Boxes, X } from 'lucide-react'
+import DateInput from './DateInput.jsx'
 
 export const STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'พร้อมใช้งาน' },
@@ -43,7 +44,7 @@ const TEXT_FIELDS = [
   'cpu', 'ram', 'storage', 'graphics', 'monitorSize', 'domainName', 'description',
 ]
 
-// ฟิลด์วันที่ของฟอร์ม (ใช้ <input type="date">) — แปลงจาก ISO string ที่ backend ส่งมาตอนแก้ไข
+// ฟิลด์วันที่ของฟอร์ม — เก็บค่า ISO สำหรับ API แต่ DateInput แสดงผลเป็น dd/mm/yyyy
 const DATE_FIELDS = ['purchaseDate', 'warrantyExpiry', 'lastSeenAt']
 
 const REQUIRED_MESSAGES = {
@@ -92,7 +93,7 @@ const emptyForm = {
   remark: '',
 }
 
-// ตัด ISO datetime ที่ backend ส่งมาให้เหลือแค่ yyyy-mm-dd เพื่อใส่ใน <input type="date">
+// ตัด ISO datetime ที่ backend ส่งมาให้เหลือ yyyy-mm-dd สำหรับ state และ API
 function toDateInputValue(value) {
   if (!value) return ''
   return String(value).slice(0, 10)
@@ -240,7 +241,13 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
     return (
       <div className="grow">
         <label htmlFor={fieldId}>{label}</label>
-        <input
+        {type === 'date' ? <DateInput
+          id={fieldId}
+          value={form[key] || ''}
+          min={min}
+          onChange={(value) => update(key, value)}
+          className={fieldErrors[key] ? 'invalid' : ''}
+        /> : <input
           id={fieldId}
           type={type}
           value={form[key] || ''}
@@ -249,7 +256,7 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
           min={min}
           onChange={(e) => update(key, e.target.value)}
           className={fieldErrors[key] ? 'invalid' : ''}
-        />
+        />}
         {fieldErrors[key] && <p className="field-error">{fieldErrors[key]}</p>}
       </div>
     )

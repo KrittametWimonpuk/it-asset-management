@@ -357,13 +357,14 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                   <th className="assets-select-cell">
                     <input ref={selectAllRef} type="checkbox" checked={allOnPageSelected} onChange={togglePageSelection} aria-label="เลือกครุภัณฑ์ทั้งหมดในหน้านี้" />
                   </th>
-                  {SORT_COLUMNS.map((column) => <SortHeader key={column.field} {...column} sortBy={sortBy} sortOrder={sortOrder} refreshing={refreshing} onSort={toggleSort} />)}
+                  {SORT_COLUMNS.slice(0, 2).map((column) => <SortHeader key={column.field} {...column} sortBy={sortBy} sortOrder={sortOrder} refreshing={refreshing} onSort={toggleSort} />)}
+                  <th className="assets-actions-heading">จัดการ</th>
+                  {SORT_COLUMNS.slice(2).map((column) => <SortHeader key={column.field} {...column} sortBy={sortBy} sortOrder={sortOrder} refreshing={refreshing} onSort={toggleSort} />)}
                   <th>หมวดหมู่</th>
                   {visibleColumns.brand && <th>ยี่ห้อ</th>}
                   {visibleColumns.model && <th>รุ่น</th>}
                   {visibleColumns.hostname && <th>Hostname</th>}
                   {visibleColumns.ipAddress && <th>IP Address</th>}
-                  <th className="assets-actions-heading">จัดการ</th>
                   {visibleColumns.warrantyExpiry && <th>วันหมดประกัน</th>}
                   {visibleColumns.currentHolder && <th>ผู้ถือครองปัจจุบัน</th>}
                   {visibleColumns.assignmentStatus && <th>สถานะการมอบหมาย</th>}
@@ -384,7 +385,17 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                     <tr key={asset.id} className={selected ? 'is-selected' : ''}>
                       <td className="assets-select-cell"><input type="checkbox" checked={selected} onChange={() => toggleAsset(asset.id)} aria-label={`เลือก ${asset.assetTag}`} /></td>
                       <td className="assets-tag-cell"><strong>{asset.assetTag}</strong><small>{asset.serialNumber || 'ไม่มี Serial Number'}</small></td>
-                      <td className="assets-name-cell"><span className="assets-device-icon"><Boxes size={17} /></span><strong>{asset.name}</strong></td>
+                      <td className="assets-name-cell">
+                        <div className="assets-name-cell-inner"><span className="assets-device-icon"><Boxes size={17} /></span><strong>{asset.name}</strong></div>
+                      </td>
+                      <td className="assets-row-actions">
+                        <div className="assets-row-actions-inner">
+                          <button type="button" onClick={() => onViewHistory?.(asset.id)} title="ดูประวัติ" aria-label={`ดูประวัติ ${asset.assetTag}`}><History size={16} /></button>
+                          <button type="button" onClick={() => onViewTickets?.(asset.id)} title="ดูใบแจ้งซ่อม" aria-label={`ดูใบแจ้งซ่อม ${asset.assetTag}`}><ClipboardList size={16} /></button>
+                          {canManage && <button type="button" onClick={() => openEdit(asset)} title="แก้ไข" aria-label={`แก้ไข ${asset.assetTag}`}><Edit3 size={16} /></button>}
+                          {canManage && <button type="button" className="is-danger" onClick={() => setDeleteTarget(asset)} title="ลบ" aria-label={`ลบ ${asset.assetTag}`}><Trash2 size={16} /></button>}
+                        </div>
+                      </td>
                       <td><span className={`assets-status-badge status-${asset.status.toLowerCase()}`}><i />{statusLabel(asset.status)}</span></td>
                       <td>{formatDate(asset.createdAt)}</td>
                       <td>{asset.category?.name || '-'}</td>
@@ -392,12 +403,6 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                       {visibleColumns.model && <td>{asset.model || '-'}</td>}
                       {visibleColumns.hostname && <td className="assets-mono">{asset.hostname || '-'}</td>}
                       {visibleColumns.ipAddress && <td className="assets-mono">{asset.ipAddress || '-'}</td>}
-                      <td className="assets-row-actions">
-                        <button type="button" onClick={() => onViewHistory?.(asset.id)} title="ดูประวัติ" aria-label={`ดูประวัติ ${asset.assetTag}`}><History size={16} /></button>
-                        <button type="button" onClick={() => onViewTickets?.(asset.id)} title="ดูใบแจ้งซ่อม" aria-label={`ดูใบแจ้งซ่อม ${asset.assetTag}`}><ClipboardList size={16} /></button>
-                        {canManage && <button type="button" onClick={() => openEdit(asset)} title="แก้ไข" aria-label={`แก้ไข ${asset.assetTag}`}><Edit3 size={16} /></button>}
-                        {canManage && <button type="button" className="is-danger" onClick={() => setDeleteTarget(asset)} title="ลบ" aria-label={`ลบ ${asset.assetTag}`}><Trash2 size={16} /></button>}
-                      </td>
                       {visibleColumns.warrantyExpiry && <td>{asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}{warranty && <span className={`assets-warranty-badge ${warranty.className}`}>{warranty.label}</span>}</td>}
                       {visibleColumns.currentHolder && <td>{holder ? (holder.user.name || holder.user.email) : <span className="assets-muted-value">ไม่มีผู้ถือครอง</span>}</td>}
                       {visibleColumns.assignmentStatus && <td>{holder ? assignmentStatusLabel(holder.status) : '-'}</td>}

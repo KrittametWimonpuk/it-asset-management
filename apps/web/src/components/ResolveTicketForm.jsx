@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
+import DateInput from './DateInput.jsx'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -59,11 +60,10 @@ export default function ResolveTicketForm({ ticket, onSubmit, onCancel }) {
 
         <form onSubmit={submit} noValidate>
           <label htmlFor="resolve-date">วันที่แก้ไขเสร็จ</label>
-          <input
+          <DateInput
             id="resolve-date"
-            type="date"
             value={resolvedAt}
-            onChange={(e) => setResolvedAt(e.target.value)}
+            onChange={setResolvedAt}
             className={fieldErrors.resolvedAt ? 'invalid' : ''}
           />
           {fieldErrors.resolvedAt && <p className="field-error">{fieldErrors.resolvedAt}</p>}
