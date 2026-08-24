@@ -8,12 +8,19 @@
 // Preview ใช้ column key ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร (shapeAssetRow ฯลฯ) เพื่อให้
 // สิ่งที่เห็นในตาราง preview ตรงกับสิ่งที่อยู่ในไฟล์ export เป๊ะ — ไม่มี business logic คำนวณซ้ำฝั่งนี้เลย
 // ---------------------------------------------------------------------------
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Boxes, Building2,
+  ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, FileSpreadsheet,
+  FileText, FilterX, Headphones, RefreshCw, Search, SearchX,
+  ShieldCheck, Sparkles, Store, TableProperties,
+} from 'lucide-react'
 import { api } from '../api.js'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
 import { STATUS_OPTIONS } from '../components/AssetForm.jsx'
 import { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 import { TICKET_STATUS_OPTIONS, TICKET_CATEGORY_OPTIONS } from '../components/TicketForm.jsx'
+import './Reports.css'
 
 const PAGE_SIZE = 20
 
@@ -25,10 +32,19 @@ const WARRANTY_BUCKET_OPTIONS = [
 ]
 
 const EXPORT_FORMATS = [
-  { value: 'csv', label: 'CSV' },
-  { value: 'xlsx', label: 'Excel' },
-  { value: 'pdf', label: 'PDF' },
+  { value: 'csv', label: 'CSV', icon: FileText },
+  { value: 'xlsx', label: 'Excel', icon: FileSpreadsheet },
+  { value: 'pdf', label: 'PDF', icon: FileDown },
 ]
+
+const REPORT_UI = {
+  assets: { icon: Boxes, tone: 'blue', short: 'ครุภัณฑ์' },
+  assignments: { icon: ClipboardList, tone: 'violet', short: 'การมอบหมาย' },
+  warranty: { icon: ShieldCheck, tone: 'green', short: 'การรับประกัน' },
+  helpdesk: { icon: Headphones, tone: 'amber', short: 'Helpdesk' },
+  departments: { icon: Building2, tone: 'cyan', short: 'แผนก' },
+  vendors: { icon: Store, tone: 'rose', short: 'ผู้ขาย' },
+}
 
 // ประเภทตัวกรอง -> ชื่อ query param จริงที่ backend อ่าน (ดู utils/reportHelpers.js: parseReportQuery)
 const FILTER_PARAM_KEYS = {
@@ -190,27 +206,29 @@ export default function Reports({ role }) {
   const visibleReports = REPORT_DEFS.filter((r) => !r.orgWideOnly || role !== 'EMPLOYEE')
   const activeReport = REPORT_DEFS.find((r) => r.key === activeKey)
 
-  return (
-    <div>
-      <div className="between">
-        <h2 className="section-title">{activeReport ? activeReport.title : 'รายงาน'}</h2>
-        {activeReport && <button className="secondary" onClick={() => setActiveKey(null)}>← กลับไปหน้ารายงาน</button>}
+  return <section className="reports-page">
+    {!activeReport ? <>
+      <header className="reports-hero">
+        <div><span className="reports-eyebrow"><BarChart3 size={15} /> Analytics center</span><h1>ศูนย์รวมรายงาน</h1><p>สำรวจข้อมูลสำคัญขององค์กร ดูตัวอย่าง และส่งออกในรูปแบบที่พร้อมใช้งาน</p></div>
+        <div className="reports-hero-mark" aria-hidden="true"><BarChart3 size={34} /><span>6</span><small>Reports</small></div>
+      </header>
+      <div className="reports-intro"><div><Sparkles size={18} /><span><strong>เลือกรายงานที่ต้องการ</strong><small>ข้อมูลทั้งหมดอัปเดตจากระบบปัจจุบัน</small></span></div><span>{visibleReports.length} รายงานพร้อมใช้งาน</span></div>
+      <div className="reports-catalog">
+        {visibleReports.map((report) => {
+          const ui = REPORT_UI[report.key]
+          const Icon = ui.icon
+          return <button key={report.key} className={`reports-card is-${ui.tone}`} onClick={() => setActiveKey(report.key)}>
+            <span className="reports-card-icon"><Icon size={23} /></span>
+            <span className="reports-card-copy"><small>{ui.short}</small><strong>{report.title}</strong><p>{report.description}</p></span>
+            <span className="reports-card-footer"><span><TableProperties size={14} /> {report.columns.length} คอลัมน์</span><b>ดูรายงาน <ChevronRight size={16} /></b></span>
+          </button>
+        })}
       </div>
-
-      {!activeReport ? (
-        <div className="stat-cards mt">
-          {visibleReports.map((r) => (
-            <button key={r.key} className="card report-card" onClick={() => setActiveKey(r.key)}>
-              <h3>{r.title}</h3>
-              <p className="muted">{r.description}</p>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <ReportView key={activeReport.key} report={activeReport} />
-      )}
-    </div>
-  )
+    </> : <>
+      <button className="reports-back" type="button" onClick={() => setActiveKey(null)}><ArrowLeft size={17} /> กลับไปหน้ารายงาน</button>
+      <ReportView key={activeReport.key} report={activeReport} />
+    </>}
+  </section>
 }
 
 function ReportView({ report }) {
@@ -234,10 +252,7 @@ function ReportView({ report }) {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  useEffect(() => { setPage(1) }, [search, sortBy, sortOrder, filters])
-  useEffect(() => { load() }, [page, sortBy, sortOrder, search, filters])
-
-  async function load() {
+  const load = useCallback(async () => {
     setRefreshing(true)
     try {
       const params = { ...filters, search, ...(report.paginated ? { page, pageSize: PAGE_SIZE, sortBy, sortOrder } : {}) }
@@ -250,7 +265,10 @@ function ReportView({ report }) {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [filters, page, report, search, sortBy, sortOrder])
+
+  useEffect(() => { setPage(1) }, [search, sortBy, sortOrder, filters])
+  useEffect(() => { load() }, [load])
 
   function updateFilter(key, value) {
     setFilters((f) => ({ ...f, [key]: value }))
@@ -280,15 +298,33 @@ function ReportView({ report }) {
     }
   }
 
-  const items = data?.items || []
+  const items = useMemo(() => data?.items || [], [data])
   const isEmpty = !loading && items.length === 0
   const hasActiveFilters = search.length > 0 || Object.values(filters).some(Boolean)
+  const chart = useMemo(() => {
+    if (!items.length) return []
+    const preferred = ['status', 'bucket', 'category', 'department', 'vendor', 'priority']
+    const key = preferred.find((candidate) => report.columns.some((column) => column.key === candidate)) || report.columns[0].key
+    const counts = items.reduce((result, item) => {
+      const label = item[key] === '' || item[key] == null ? 'ไม่ระบุ' : String(item[key])
+      result[label] = (result[label] || 0) + 1
+      return result
+    }, {})
+    const values = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    const max = Math.max(...values.map(([, value]) => value), 1)
+    return values.map(([label, value]) => ({ label, value, width: `${Math.max(8, (value / max) * 100)}%` }))
+  }, [items, report.columns])
 
   return (
-    <div>
-      <p className="muted mt">{report.description}</p>
+    <div className="report-view">
+      <header className={`report-view-hero is-${REPORT_UI[report.key].tone}`}>
+        <span><TableProperties size={15} /> Report preview</span>
+        <h1>{report.title}</h1>
+        <p>{report.description}</p>
+      </header>
 
-      <div className="filter-bar mt">
+      <div className="report-filters">
+        <div className="report-filters-title"><span><Search size={17} /></span><div><strong>ค้นหาและกรองข้อมูล</strong><small>ปรับเงื่อนไขเพื่อดูข้อมูลที่ต้องการ</small></div></div>
         {report.filterFields.includes('dateRange') && (
           <>
             <div className="filter-field">
@@ -399,59 +435,47 @@ function ReportView({ report }) {
           </div>
         )}
 
-        <div className="filter-actions">
-          <button type="button" className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
-        </div>
+        <button type="button" className="report-reset" onClick={resetFilters} disabled={!hasActiveFilters}><FilterX size={16} /> ล้างตัวกรอง</button>
       </div>
 
-      <div className="row between mt">
-        {!loading && (
-          <p className="muted">
-            {report.paginated ? `แสดง ${items.length} จาก ${data.totalItems} รายการ` : `ทั้งหมด ${items.length} รายการ`}
-          </p>
-        )}
-        <div className="row">
-          <span className="muted">ส่งออก:</span>
-          {EXPORT_FORMATS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              className="secondary"
-              disabled={Boolean(exportingFormat) || isEmpty}
-              onClick={() => handleExport(f.value)}
-            >
-              {exportingFormat === f.value ? 'กำลังส่งออก...' : f.label}
+      <div className="report-export-bar">
+        <div><span><Download size={18} /></span><div><strong>ส่งออกรายงาน</strong><small>{!loading && (report.paginated ? `${data.totalItems} รายการทั้งหมด` : `${items.length} รายการ`)}</small></div></div>
+        <div className="report-export-actions">
+          {EXPORT_FORMATS.map((format) => {
+            const Icon = format.icon
+            return <button key={format.value} type="button" disabled={Boolean(exportingFormat) || isEmpty} onClick={() => handleExport(format.value)}>
+              {exportingFormat === format.value ? <RefreshCw className="reports-spin" size={16} /> : <Icon size={16} />}{format.label}
             </button>
-          ))}
+          })}
         </div>
       </div>
 
-      {error && <p className="error mt">{error}</p>}
-      {exportError && <p className="error mt">{exportError}</p>}
+      {error && <div className="report-error"><AlertCircle size={17} />{error}</div>}
+      {exportError && <div className="report-error"><AlertCircle size={17} />{exportError}</div>}
 
       {loading ? (
-        <p className="muted mt">กำลังโหลด...</p>
+        <div className="report-loading" aria-busy="true"><div className="report-shimmer" /><div className="report-shimmer" /></div>
       ) : isEmpty ? (
-        <div className="empty-state mt">
-          <h3>ไม่พบข้อมูล</h3>
-          <p className="muted">
-            {hasActiveFilters ? 'ไม่พบข้อมูลที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือรีเซ็ตตัวกรอง' : 'ยังไม่มีข้อมูลสำหรับรายงานนี้'}
-          </p>
-          {hasActiveFilters && <button className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>}
+        <div className="report-empty"><span><SearchX size={28} /></span><h3>ไม่พบข้อมูล</h3><p>{hasActiveFilters ? 'ไม่พบข้อมูลที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง' : 'ยังไม่มีข้อมูลสำหรับรายงานนี้'}</p>
+          {hasActiveFilters && <button onClick={resetFilters}><FilterX size={16} /> ล้างตัวกรอง</button>}
         </div>
       ) : (
         <>
-          <div className={`table-wrap mt${refreshing ? ' is-refreshing' : ''}`}>
+          <section className="report-chart-panel">
+            <div className="report-section-head"><div><span><BarChart3 size={18} /></span><div><h2>ภาพรวมข้อมูล</h2><p>สัดส่วนจากข้อมูลในหน้าปัจจุบัน</p></div></div><b>{items.length} รายการ</b></div>
+            <div className="report-bars">{chart.map((item, index) => <div className="report-bar" key={item.label}><div><span>{item.label}</span><strong>{item.value}</strong></div><i><span style={{ width: item.width, '--bar-index': index }} /></i></div>)}</div>
+          </section>
+
+          <section className="report-preview-panel">
+            <div className="report-section-head"><div><span><TableProperties size={18} /></span><div><h2>ตัวอย่างรายงาน</h2><p>{report.paginated ? `แสดง ${items.length} จาก ${data.totalItems} รายการ` : `ทั้งหมด ${items.length} รายการ`}</p></div></div>{refreshing && <RefreshCw className="reports-spin" size={17} />}</div>
+          <div className={`report-table-wrap${refreshing ? ' is-refreshing' : ''}`}>
             <table>
               <thead>
                 <tr>
                   {report.columns.map((col) => {
                     const sortCol = report.sortColumns?.find((s) => s.label === col.label)
                     return sortCol ? (
-                      <th key={col.key} className="sortable" onClick={() => toggleSort(sortCol.field)}>
-                        {col.label}
-                        {sortBy === sortCol.field && <span className="sort-arrow">{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>}
-                      </th>
+                      <th key={col.key}><button className="report-sort" onClick={() => toggleSort(sortCol.field)}>{col.label}{sortBy === sortCol.field && (sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}</button></th>
                     ) : (
                       <th key={col.key}>{col.label}</th>
                     )
@@ -469,17 +493,16 @@ function ReportView({ report }) {
           </div>
 
           {report.paginated && (
-            <div className="row between mt">
-              <span className="muted">
-                หน้า {data.page} จาก {data.totalPages} • ทั้งหมด {data.totalItems} รายการ
-                {refreshing && ' • กำลังโหลด...'}
-              </span>
-              <div className="row">
-                <button className="secondary" disabled={refreshing || data.page <= 1} onClick={() => setPage((p) => p - 1)}>ก่อนหน้า</button>
-                <button className="secondary" disabled={refreshing || data.page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>ถัดไป</button>
+            <div className="report-pagination">
+              <span>หน้า {data.page} จาก {data.totalPages} · ทั้งหมด {data.totalItems} รายการ</span>
+              <div>
+                <button aria-label="หน้าก่อนหน้า" disabled={refreshing || data.page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={17} /></button>
+                <b>{data.page}</b>
+                <button aria-label="หน้าถัดไป" disabled={refreshing || data.page >= data.totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={17} /></button>
               </div>
             </div>
           )}
+          </section>
         </>
       )}
     </div>
