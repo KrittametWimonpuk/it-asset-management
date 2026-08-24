@@ -1,12 +1,6 @@
-// ---------------------------------------------------------------------------
-// AssetFilterBar — แถบค้นหา + กรอง + ตั้งค่าคอลัมน์ เหนือตารางครุภัณฑ์ (Milestone 4.1)
-//
-// เป็น presentational component ล้วน ๆ (รับ props เข้า, เรียก callback ออก) — state จริงอยู่ที่ Assets.jsx
-// ตัวกรอง category/location/department/vendor ใช้ตัวเลือกจาก useMasterDataOptions (โหลดครั้งเดียว ใช้ซ้ำกับ AssetForm ได้)
-// ---------------------------------------------------------------------------
+import { Columns3, Filter, Plus, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { STATUS_OPTIONS } from './AssetForm.jsx'
 
-// ต้องตรงกับ key ที่ useMasterDataOptions คืนมา (categoryId/locationId/departmentId/vendorId)
 const SELECT_FILTERS = [
   { key: 'categoryId', label: 'หมวดหมู่' },
   { key: 'status', label: 'สถานะ' },
@@ -16,80 +10,114 @@ const SELECT_FILTERS = [
 ]
 
 export default function AssetFilterBar({
-  searchInput,
-  onSearchChange,
-  filters,
-  onFilterChange,
-  onReset,
-  options,
-  optionsError,
-  canManage,
-  onAddAsset,
-  columns,
-  onToggleColumn,
-  columnsOpen,
-  onToggleColumnsPanel,
+  searchInput, onSearchChange, filters, onFilterChange, onReset, options, optionsError,
+  canManage, onAddAsset, columns, onToggleColumn, columnsOpen, onToggleColumnsPanel,
+  filtersOpen, onToggleFilters, activeFilterCount,
 }) {
-  // ตัวเลือกของแต่ละ select — status ใช้ค่าคงที่ ที่เหลือโหลดจาก master data API
   function optionsFor(key) {
     if (key === 'status') return STATUS_OPTIONS
     return (options?.[key] || []).map((item) => ({ value: item.id, label: item.name }))
   }
 
   return (
-    <div className="filter-bar mt">
-      <div className="filter-field">
-        <label htmlFor="asset-search">ค้นหา</label>
-        <input
-          id="asset-search"
-          type="text"
-          className="search-input"
-          placeholder="ค้นหา Asset Tag, ชื่อ, ยี่ห้อ, รุ่น, Serial Number, Hostname, IP, MAC, OS..."
-          value={searchInput}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
-
-      {SELECT_FILTERS.map((f) => (
-        <div className="filter-field" key={f.key}>
-          <label htmlFor={`filter-${f.key}`}>{f.label}</label>
-          <select
-            id={`filter-${f.key}`}
-            value={filters[f.key]}
-            onChange={(e) => onFilterChange(f.key, e.target.value)}
-            disabled={f.key !== 'status' && !options}
-          >
-            <option value="">ทั้งหมด</option>
-            {optionsFor(f.key).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-      ))}
-
-      <div className="filter-actions">
-        <button type="button" className="secondary" onClick={onReset}>รีเซ็ตตัวกรอง</button>
-
-        <div className="columns-picker">
-          <button type="button" className="secondary" onClick={onToggleColumnsPanel} aria-expanded={columnsOpen}>
-            คอลัมน์
-          </button>
-          {columnsOpen && (
-            <div className="columns-panel">
-              {columns.map((c) => (
-                <label key={c.key} className="columns-panel-item">
-                  <input type="checkbox" checked={c.visible} onChange={() => onToggleColumn(c.key)} />
-                  {c.label}
-                </label>
-              ))}
-            </div>
+    <div className="assets-controls-card">
+      <div className="assets-toolbar">
+        <div className="assets-search-wrap">
+          <Search size={18} aria-hidden="true" />
+          <input
+            id="asset-search"
+            type="search"
+            placeholder="ค้นหา Asset Tag, ชื่อ, Serial, Hostname หรือ IP..."
+            value={searchInput}
+            onChange={(event) => onSearchChange(event.target.value)}
+            aria-label="ค้นหาครุภัณฑ์"
+          />
+          {searchInput && (
+            <button className="assets-clear-search" type="button" onClick={() => onSearchChange('')} aria-label="ล้างคำค้นหา">
+              <X size={16} />
+            </button>
           )}
         </div>
 
-        {canManage && <button type="button" onClick={onAddAsset}>+ เพิ่มครุภัณฑ์ใหม่</button>}
+        <div className="assets-toolbar-actions">
+          <button
+            type="button"
+            className={`assets-control-button${filtersOpen ? ' is-active' : ''}`}
+            onClick={onToggleFilters}
+            aria-expanded={filtersOpen}
+            aria-controls="asset-advanced-filters"
+          >
+            <SlidersHorizontal size={17} /> ตัวกรอง
+            {activeFilterCount > 0 && <span className="assets-control-count">{activeFilterCount}</span>}
+          </button>
+
+          <div className="assets-columns-picker">
+            <button
+              type="button"
+              className={`assets-control-button${columnsOpen ? ' is-active' : ''}`}
+              onClick={onToggleColumnsPanel}
+              aria-expanded={columnsOpen}
+            >
+              <Columns3 size={17} /> คอลัมน์
+            </button>
+            {columnsOpen && (
+              <div className="assets-columns-panel" role="group" aria-label="เลือกคอลัมน์ที่แสดง">
+                <div className="assets-columns-heading">
+                  <span>แสดงคอลัมน์</span>
+                  <small>{columns.filter((column) => column.visible).length}/{columns.length}</small>
+                </div>
+                <div className="assets-columns-list">
+                  {columns.map((column) => (
+                    <label key={column.key} className="assets-column-option">
+                      <input type="checkbox" checked={column.visible} onChange={() => onToggleColumn(column.key)} />
+                      <span>{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {canManage && (
+            <button type="button" className="assets-add-button" onClick={onAddAsset}>
+              <Plus size={18} /> เพิ่มครุภัณฑ์
+            </button>
+          )}
+        </div>
       </div>
 
-      {optionsError && <p className="error">{optionsError}</p>}
+      {filtersOpen && (
+        <div className="assets-advanced-filters" id="asset-advanced-filters">
+          <div className="assets-filter-heading">
+            <span><Filter size={16} /> ตัวกรองขั้นสูง</span>
+            {activeFilterCount > 0 && (
+              <button type="button" className="assets-reset-button" onClick={onReset}>
+                <RotateCcw size={15} /> รีเซ็ตทั้งหมด
+              </button>
+            )}
+          </div>
+          <div className="assets-filter-grid">
+            {SELECT_FILTERS.map((filter) => (
+              <div className="assets-filter-field" key={filter.key}>
+                <label htmlFor={`filter-${filter.key}`}>{filter.label}</label>
+                <select
+                  id={`filter-${filter.key}`}
+                  value={filters[filter.key]}
+                  onChange={(event) => onFilterChange(filter.key, event.target.value)}
+                  disabled={filter.key !== 'status' && !options}
+                >
+                  <option value="">ทั้งหมด</option>
+                  {optionsFor(filter.key).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {optionsError && <p className="assets-inline-error">{optionsError}</p>}
     </div>
   )
 }

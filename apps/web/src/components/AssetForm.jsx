@@ -6,6 +6,7 @@
 // (หมวดหมู่บังคับเลือก ที่เหลือเลือกหรือไม่ก็ได้)
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
+import { Boxes, X } from 'lucide-react'
 
 export const STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'พร้อมใช้งาน' },
@@ -118,6 +119,14 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
   useEffect(() => {
     firstInputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === 'Escape' && !busy) onCancel()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [busy, onCancel])
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -266,8 +275,19 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{isEdit ? 'แก้ไขครุภัณฑ์' : 'เพิ่มครุภัณฑ์ใหม่'}</h2>
+      <div className="card modal asset-form-modal" role="dialog" aria-modal="true" aria-labelledby="asset-form-title" onClick={(e) => e.stopPropagation()}>
+        <header className="assets-modal-header">
+          <div className="assets-modal-title">
+            <span><Boxes size={20} /></span>
+            <div>
+              <h2 id="asset-form-title">{isEdit ? 'แก้ไขครุภัณฑ์' : 'เพิ่มครุภัณฑ์ใหม่'}</h2>
+              <p>{isEdit ? `อัปเดตข้อมูล ${asset.assetTag}` : 'บันทึกข้อมูลและรายละเอียดครุภัณฑ์เข้าสู่ระบบ'}</p>
+            </div>
+          </div>
+          <button type="button" className="assets-modal-close" onClick={onCancel} disabled={busy} aria-label="ปิดหน้าต่าง">
+            <X size={18} />
+          </button>
+        </header>
         <form onSubmit={submit} noValidate>
           <h3 className="form-section-title">ข้อมูลทั่วไป</h3>
           <label htmlFor="asset-assetTag">เลขทะเบียนครุภัณฑ์ (Asset Tag)</label>
@@ -401,7 +421,7 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
           {error && <p className="error">{error}</p>}
 
-          <div className="row mt end">
+          <div className="row mt end assets-modal-actions">
             <button type="button" className="secondary" onClick={onCancel} disabled={busy}>ยกเลิก</button>
             <button type="submit" disabled={busy}>
               {busy ? busyLabel : 'บันทึก'}
