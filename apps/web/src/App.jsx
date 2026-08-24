@@ -17,6 +17,7 @@ import Tickets from './pages/Tickets.jsx'
 import Reports from './pages/Reports.jsx'
 import AuditLog from './pages/AuditLog.jsx'
 import MasterDataPage from './pages/MasterDataPage.jsx'
+import AppShell from './components/AppShell.jsx'
 import { categoryConfig, locationConfig, departmentConfig, vendorConfig } from './pages/masterDataConfigs.jsx'
 
 // แท็บทั้งหมดหลังล็อกอิน — 'assets' เป็น tab พิเศษ (มี component ของตัวเอง)
@@ -85,6 +86,12 @@ export default function App() {
     setTab('tickets')
   }
 
+  function handleNavigate(nextTab) {
+    if (nextTab === 'assignments') return goToAssignments()
+    if (nextTab === 'tickets') return goToTickets()
+    setTab(nextTab)
+  }
+
   // Milestone 7: จาก Assets.jsx ปุ่ม "ดูใบแจ้งซ่อม" — พาไปแท็บ Helpdesk กรองเฉพาะ asset นั้น
   function handleViewTickets(assetId) {
     setTicketsAssetFilter(assetId)
@@ -107,45 +114,30 @@ export default function App() {
   const activeMaster = canManageMasterData ? MASTER_TABS[tab] : null
 
   return (
-    <div className="container wide">
-      <div className="card">
-        <div className="between">
-          <h1>ระบบจัดการครุภัณฑ์ IT</h1>
-          <button className="secondary" onClick={handleLogout}>ออกจากระบบ</button>
-        </div>
-        <p className="muted">สวัสดี {user.name || user.email} • {ROLE_LABELS[user.role] || user.role}</p>
-
-        <nav className="tabs mt">
-          <button className={`tab${tab === 'dashboard' ? ' active' : ''}`} onClick={() => setTab('dashboard')}>แดชบอร์ด</button>
-          <button className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => setTab('assets')}>ครุภัณฑ์</button>
-          <button className={`tab${tab === 'assignments' ? ' active' : ''}`} onClick={goToAssignments}>การมอบหมาย</button>
-          <button className={`tab${tab === 'tickets' ? ' active' : ''}`} onClick={goToTickets}>Helpdesk</button>
-          <button className={`tab${tab === 'reports' ? ' active' : ''}`} onClick={() => setTab('reports')}>รายงาน</button>
-          {canManageMasterData && (
-            <button className={`tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>Audit Log</button>
-          )}
-          {canManageMasterData && Object.entries(MASTER_TABS).map(([key, { label }]) => (
-            <button key={key} className={`tab${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}>{label}</button>
-          ))}
-        </nav>
-
-        <div className="mt">
-          {tab === 'dashboard' && <Dashboard role={user.role} />}
-          {tab === 'assets' && (
-            <Assets
-              role={user.role}
-              onNavigateToMaster={(target) => setTab(target)}
-              onViewHistory={handleViewHistory}
-              onViewTickets={handleViewTickets}
-            />
-          )}
-          {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
-          {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
-          {tab === 'reports' && <Reports role={user.role} />}
-          {tab === 'audit' && canManageMasterData && <AuditLog />}
-          {activeMaster && <MasterDataPage {...activeMaster.config} />}
-        </div>
+    <AppShell
+      activeTab={tab}
+      canManageMasterData={canManageMasterData}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      roleLabel={ROLE_LABELS[user.role] || user.role}
+      user={user}
+    >
+      <div>
+        {tab === 'dashboard' && <Dashboard role={user.role} />}
+        {tab === 'assets' && (
+          <Assets
+            role={user.role}
+            onNavigateToMaster={(target) => setTab(target)}
+            onViewHistory={handleViewHistory}
+            onViewTickets={handleViewTickets}
+          />
+        )}
+        {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
+        {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
+        {tab === 'reports' && <Reports role={user.role} />}
+        {tab === 'audit' && canManageMasterData && <AuditLog />}
+        {activeMaster && <MasterDataPage {...activeMaster.config} />}
       </div>
-    </div>
+    </AppShell>
   )
 }
