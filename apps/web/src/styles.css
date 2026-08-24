@@ -148,8 +148,8 @@ th.sortable:hover { color: var(--color-text); }
 .dashboard-section:first-child { margin-top: 0; }
 .dashboard-section h3 { font-size: 15px; margin: 0 0 12px; }
 
-.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-@media (max-width: 900px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
+.stat-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .stat-cards { grid-template-columns: 1fr; } }
 
 .stat-card {
@@ -186,7 +186,8 @@ th.sortable:hover { color: var(--color-text); }
    รีเซ็ต style ปุ่มเริ่มต้นให้หน้าตาเหมือน .card ปกติ ต่างแค่กดได้ + มี hover ----*/
 .report-card {
   text-align: left; cursor: pointer; font: inherit; color: inherit;
-  display: block; width: 100%; border: 1px solid transparent;
+  display: block; width: 100%; min-width: 0; border: 1px solid transparent;
+  white-space: normal; overflow-wrap: anywhere;
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 .report-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-md); }
