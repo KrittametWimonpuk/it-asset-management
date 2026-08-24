@@ -121,8 +121,11 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
 
     async function loadNotifications() {
       try {
-        const response = await api.tickets.list({ page: 1, pageSize: 6, sortBy: 'openedAt', sortOrder: 'desc' })
-        if (!cancelled) setNotifications(response.items)
+        const response = await api.tickets.list({ page: 1, pageSize: 12, sortBy: 'openedAt', sortOrder: 'desc' })
+        const notificationsForOthers = response.items
+          .filter((ticket) => !user.id || ticket.reportedBy?.id !== user.id)
+          .slice(0, 6)
+        if (!cancelled) setNotifications(notificationsForOthers)
       } catch {
         // การแจ้งเตือนเป็นข้อมูลเสริม — หากโหลดไม่ได้ เมนูหลักและหน้าปัจจุบันยังต้องใช้งานต่อได้
       } finally {
@@ -136,6 +139,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
 
     function addCreatedTicket(event) {
       if (!event.detail?.id) return
+      if (user.id && event.detail.reportedBy?.id === user.id) return
       setNotifications((current) => [event.detail, ...current.filter((ticket) => ticket.id !== event.detail.id)].slice(0, 6))
     }
 
@@ -151,7 +155,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
       window.removeEventListener('focus', loadNotifications)
       window.removeEventListener('helpdesk-ticket-created', addCreatedTicket)
     }
-  }, [])
+  }, [user.id])
 
   useEffect(() => {
     localStorage.setItem(`helpdesk-notifications-seen:${userNotificationKey}`, JSON.stringify(seenNotificationIds.slice(-100)))
