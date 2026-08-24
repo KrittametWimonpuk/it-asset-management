@@ -2,6 +2,60 @@
 
 /* Existing application layout and feature-specific patterns. */
 
+.skip-link {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-160%);
+  transition: transform var(--transition-fast) var(--ease-enterprise);
+}
+
+.skip-link:focus { transform: translateY(0); }
+
+.app-boot {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  background: radial-gradient(circle at 50% 35%, var(--color-primary-soft), transparent 34%), var(--color-background);
+}
+
+.app-boot-mark {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-2);
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, #3b82f6, var(--color-primary-hover));
+  box-shadow: 0 10px 24px rgb(37 99 235 / 24%);
+}
+
+.app-boot strong { font-size: 1rem; }
+.app-boot small { color: var(--color-text-secondary); }
+.app-boot-progress { width: 150px; height: 3px; overflow: hidden; margin-top: var(--space-3); border-radius: var(--radius-full); background: var(--color-border); }
+.app-boot-progress i { display: block; width: 45%; height: 100%; border-radius: inherit; background: var(--color-primary); animation: app-boot-progress 1.1s var(--ease-enterprise) infinite alternate; }
+
+.app-page-content { min-width: 0; animation: page-enter var(--transition-slow) var(--ease-enterprise); }
+.page-loading { display: grid; gap: var(--space-4); width: 100%; min-height: 320px; padding: var(--space-4) 0; }
+.page-loading-title { width: min(320px, 60%); height: 42px; border-radius: var(--radius-md); }
+.page-loading-card { width: 100%; height: 260px; border-radius: var(--radius-lg); }
+
+@keyframes app-boot-progress { to { transform: translateX(125%); } }
+@keyframes page-enter { from { opacity: 0; transform: translateY(5px); } }
+
+* { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: var(--radius-full); background: #cbd5e1; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: padding-box; }
+
 .container {
   max-width: 480px;
   margin: var(--space-12) auto;
@@ -110,9 +164,16 @@ th.sortable:hover { color: var(--color-text); }
 .overlay {
   position: fixed; inset: 0; background: var(--color-overlay);
   display: flex; align-items: center; justify-content: center;
-  padding: 16px; z-index: 50;
+  padding: 16px; z-index: 50; backdrop-filter: blur(3px);
+  animation: overlay-enter var(--transition-fast) var(--ease-enterprise);
 }
-.modal { max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal { max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; animation: modal-enter var(--transition-base) var(--ease-enterprise); }
+
+@keyframes overlay-enter { from { opacity: 0; } }
+@keyframes modal-enter { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+
+[data-theme="dark"] * { scrollbar-color: #475569 transparent; }
+[data-theme="dark"] *::-webkit-scrollbar-thumb { background: #475569; background-clip: padding-box; }
 
 /* ---- แท็บสลับหน้า (ครุภัณฑ์ / master data ต่าง ๆ) ---- */
 .tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }

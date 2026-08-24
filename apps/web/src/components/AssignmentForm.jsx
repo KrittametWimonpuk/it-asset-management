@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { api } from '../api.js'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -51,6 +52,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
+  useDialogDismiss(onCancel, busy)
 
   // ตัวเลือกครุภัณฑ์ที่ยังไม่มีผู้ถือครอง + รายชื่อพนักงาน — โหลดเฉพาะตอนมอบหมายใหม่ (แก้ไขเปลี่ยนไม่ได้)
   const [assetOptions, setAssetOptions] = useState(null)
@@ -130,7 +132,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label={isEdit ? 'แก้ไขรายการมอบหมาย' : 'มอบหมายครุภัณฑ์ใหม่'} onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'แก้ไขรายการมอบหมาย' : 'มอบหมายครุภัณฑ์ใหม่'}</h2>
         <form onSubmit={submit} noValidate>
           {isEdit ? (

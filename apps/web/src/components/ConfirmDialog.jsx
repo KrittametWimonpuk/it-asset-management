@@ -4,10 +4,14 @@
 //
 // message รับได้ทั้ง string ธรรมดา หรือ React node (เช่น JSX ที่โชว์รายละเอียดแบบมีสไตล์)
 // ---------------------------------------------------------------------------
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
+
 export default function ConfirmDialog({ title, message, note, confirmLabel = 'ยืนยัน', busy, onConfirm, onCancel }) {
+  useDialogDismiss(onCancel, busy)
+
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="alertdialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         <div className="mt">{message}</div>
         {note && <p className="muted mt">{note}</p>}

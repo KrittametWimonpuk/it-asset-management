@@ -5,6 +5,7 @@
 // field: { name, label, type?: 'text'|'email'|'checkbox'|'textarea', required?: boolean }
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 function emptyValue(type) {
   return type === 'checkbox' ? true : ''
@@ -22,6 +23,7 @@ export default function MasterDataForm({ title, fields, item, onSubmit, onCancel
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
+  useDialogDismiss(onCancel, busy)
 
   useEffect(() => { firstInputRef.current?.focus() }, [])
 
@@ -75,7 +77,7 @@ export default function MasterDataForm({ title, fields, item, onSubmit, onCancel
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         <form onSubmit={submit} noValidate>
           {fields.map((f, idx) => {

@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 import { useState } from 'react'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 // ใช้ร่วมกับ Assignments.jsx (label สถานะในตาราง/ตัวกรอง) — ต้องตรงกับ enum AssignmentStatus ใน schema.prisma
 export const ASSIGNMENT_STATUS_OPTIONS = [
@@ -29,6 +30,7 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  useDialogDismiss(onCancel, busy)
 
   async function submit(e) {
     e.preventDefault()
@@ -50,7 +52,7 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label="รับคืนครุภัณฑ์" onClick={(e) => e.stopPropagation()}>
         <h2>รับคืนครุภัณฑ์</h2>
         <div className="delete-summary">
           <div className="delete-summary-tag">{assignment.asset?.assetTag}</div>

@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
 import { api } from '../api.js'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 export const TICKET_STATUS_OPTIONS = [
   { value: 'OPEN', label: 'เปิดใหม่' },
@@ -78,6 +79,7 @@ export default function TicketForm({ ticket, onSubmit, onCancel }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
+  useDialogDismiss(onCancel, busy)
 
   // โหมดแจ้งใหม่: ตัวเลือกครุภัณฑ์ (backend กรองตาม role ให้อัตโนมัติอยู่แล้ว — EMPLOYEE เห็นเฉพาะของตัวเอง)
   // โหมดแก้ไข: รายชื่อ ADMIN/IT_STAFF ที่มอบหมายให้ดูแลได้ (มอบหมายให้ EMPLOYEE ไม่ได้)
@@ -165,7 +167,7 @@ export default function TicketForm({ ticket, onSubmit, onCancel }) {
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label={isEdit ? `แก้ไขใบแจ้งซ่อม ${ticket.ticketNumber}` : 'แจ้งปัญหาใหม่'} onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? `แก้ไขใบแจ้งซ่อม ${ticket.ticketNumber}` : 'แจ้งปัญหาใหม่'}</h2>
         <form onSubmit={submit} noValidate>
           {isEdit ? (

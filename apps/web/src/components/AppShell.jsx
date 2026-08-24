@@ -215,7 +215,8 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   }, [])
 
   return (
-    <div className={`app-shell${collapsed ? ' is-collapsed' : ''}${theme === 'dark' ? ' is-dark' : ''}`}>
+    <div data-theme={theme} className={`app-shell${collapsed ? ' is-collapsed' : ''}${theme === 'dark' ? ' is-dark' : ''}`}>
+      <a className="skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
       <aside id="app-sidebar" className={`app-sidebar${mobileOpen ? ' is-mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <span className="sidebar-brand-mark">
@@ -436,7 +437,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
         </div>
       </header>
 
-      <main className="app-main">
+      <main id="main-content" className="app-main" tabIndex="-1">
         <div className="card app-page-card">{children}</div>
       </main>
     </div>

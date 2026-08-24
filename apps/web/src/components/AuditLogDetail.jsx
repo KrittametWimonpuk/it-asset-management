@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarClock, FileClock, Globe2, UserRound, X } from 'lucide-react'
 import { formatDateTime } from '../utils/format.js'
 import { ACTION_LABELS, ENTITY_TYPE_LABELS } from '../utils/auditLabels.js'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 function displayValue(value) {
   if (value === undefined || value === null || value === '') return '—'
@@ -10,6 +11,7 @@ function displayValue(value) {
 }
 
 export default function AuditLogDetail({ log, onClose }) {
+  useDialogDismiss(onClose)
   const oldValues = log.oldValues || {}
   const newValues = log.newValues || {}
   const fields = [...new Set([...Object.keys(oldValues), ...Object.keys(newValues)])]

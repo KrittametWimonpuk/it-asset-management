@@ -4,6 +4,7 @@
 // ไม่มีฟิลด์บังคับเพิ่ม (สรุปวิธีแก้ไขบันทึกไว้แล้วตอนแก้ไขสำเร็จ) — แสดงย้อนดูให้มั่นใจก่อนปิดงานจริง
 // ---------------------------------------------------------------------------
 import { useState } from 'react'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -14,6 +15,7 @@ export default function CloseTicketForm({ ticket, onSubmit, onCancel }) {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  useDialogDismiss(onCancel, busy)
 
   async function submit(e) {
     e.preventDefault()
@@ -35,7 +37,7 @@ export default function CloseTicketForm({ ticket, onSubmit, onCancel }) {
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label="ปิดงานใบแจ้งซ่อม" onClick={(e) => e.stopPropagation()}>
         <h2>ปิดงานใบแจ้งซ่อม</h2>
         <div className="delete-summary">
           <div className="delete-summary-tag">{ticket.ticketNumber}</div>

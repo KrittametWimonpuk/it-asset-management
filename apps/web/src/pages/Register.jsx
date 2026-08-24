@@ -1,6 +1,8 @@
 // หน้าสมัครสมาชิก
 import { useState } from 'react'
+import { ArrowLeft, ArrowRight, LockKeyhole, Mail, ShieldCheck, UserRound, UserRoundPlus } from 'lucide-react'
 import { api } from '../api.js'
+import './Register.css'
 
 export default function Register({ onAuthed, goLogin }) {
   const [name, setName] = useState('')
@@ -24,29 +26,23 @@ export default function Register({ onAuthed, goLogin }) {
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>สมัครสมาชิก</h1>
+    <main className="register-page">
+      <section className="register-panel">
+        <div className="register-brand"><span><ShieldCheck size={23} /></span><div><strong>IT Asset Management</strong><small>Enterprise Platform · v1.0.0</small></div></div>
+        <div className="register-heading"><span><UserRoundPlus size={16} /> Create account</span><h1>สมัครสมาชิก</h1><p>สร้างบัญชีเพื่อเริ่มใช้งานระบบจัดการครุภัณฑ์</p></div>
         <form onSubmit={submit}>
-          <label htmlFor="register-name">ชื่อ</label>
-          <input id="register-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+          <label htmlFor="register-name">ชื่อ</label><div className="register-input"><UserRound size={17} /><input id="register-name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
 
-          <label htmlFor="register-email">อีเมล</label>
-          <input id="register-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="register-email">อีเมล</label><div className="register-input"><Mail size={17} /><input id="register-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
 
-          <label htmlFor="register-password">รหัสผ่าน (อย่างน้อย 8 ตัว)</label>
-          <input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label htmlFor="register-password">รหัสผ่าน <small>อย่างน้อย 8 ตัว</small></label><div className="register-input"><LockKeyhole size={17} /><input id="register-password" type="password" autoComplete="new-password" minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className="register-error" role="alert">{error}</p>}
 
-          <button className="mt" type="submit" disabled={busy}>
-            {busy ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}
-          </button>
+          <button className="register-submit" type="submit" disabled={busy} aria-busy={busy}>{busy ? 'กำลังสมัคร...' : <><span>สมัครสมาชิก</span><ArrowRight size={17} /></>}</button>
         </form>
-        <p className="muted mt">
-          มีบัญชีอยู่แล้ว? <button className="link" onClick={goLogin}>เข้าสู่ระบบ</button>
-        </p>
-      </div>
-    </div>
+        <button className="register-back" type="button" onClick={goLogin}><ArrowLeft size={15} /> มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</button>
+      </section>
+    </main>
   )
 }

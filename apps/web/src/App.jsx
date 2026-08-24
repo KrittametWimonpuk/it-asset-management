@@ -6,19 +6,28 @@
 // หมายเหตุ: ตัวอย่างนี้ตั้งใจไม่ใช้ router library เพื่อให้มือใหม่อ่านง่าย
 // ถ้าแอปโตขึ้น แนะนำเปลี่ยนไปใช้ react-router-dom
 // ---------------------------------------------------------------------------
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { auth, api } from './api.js'
 import Login from './pages/Login.jsx'
-import Register from './pages/Register.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Assets from './pages/Assets.jsx'
-import Assignments from './pages/Assignments.jsx'
-import Tickets from './pages/Tickets.jsx'
-import Reports from './pages/Reports.jsx'
-import AuditLog from './pages/AuditLog.jsx'
-import MasterDataPage from './pages/MasterDataPage.jsx'
 import AppShell from './components/AppShell.jsx'
 import { categoryConfig, locationConfig, departmentConfig, vendorConfig } from './pages/masterDataConfigs.jsx'
+
+const Register = lazy(() => import('./pages/Register.jsx'))
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
+const Assets = lazy(() => import('./pages/Assets.jsx'))
+const Assignments = lazy(() => import('./pages/Assignments.jsx'))
+const Tickets = lazy(() => import('./pages/Tickets.jsx'))
+const Reports = lazy(() => import('./pages/Reports.jsx'))
+const AuditLog = lazy(() => import('./pages/AuditLog.jsx'))
+const MasterDataPage = lazy(() => import('./pages/MasterDataPage.jsx'))
+
+function PageLoading() {
+  return <div className="page-loading" role="status" aria-live="polite">
+    <span className="skeleton page-loading-title" />
+    <span className="skeleton page-loading-card" />
+    <span className="sr-only">กำลังโหลดหน้า...</span>
+  </div>
+}
 
 // แท็บทั้งหมดหลังล็อกอิน — 'assets' เป็น tab พิเศษ (มี component ของตัวเอง)
 // ที่เหลือใช้ MasterDataPage ตัวเดียวกันแค่เปลี่ยน config
@@ -99,14 +108,19 @@ export default function App() {
   }
 
   if (loading) {
-    return <div className="container"><p className="muted">กำลังโหลด...</p></div>
+    return <div className="app-boot" role="status" aria-live="polite">
+      <span className="app-boot-mark" aria-hidden="true" />
+      <strong>IT Asset Management</strong>
+      <small>กำลังเตรียมระบบ...</small>
+      <span className="app-boot-progress" aria-hidden="true"><i /></span>
+    </div>
   }
 
   // ยังไม่ล็อกอิน -> สลับระหว่างหน้า Login / Register
   if (!user) {
     return view === 'login'
       ? <Login onAuthed={handleAuthed} goRegister={() => setView('register')} />
-      : <Register onAuthed={handleAuthed} goLogin={() => setView('login')} />
+      : <Suspense fallback={<PageLoading />}><Register onAuthed={handleAuthed} goLogin={() => setView('login')} /></Suspense>
   }
 
   // EMPLOYEE จัดการ master data ไม่ได้ (Milestone 4) — ซ่อนแท็บทั้งหมดไปเลย ไม่ใช่แค่ปุ่มข้างใน
@@ -122,21 +136,23 @@ export default function App() {
       roleLabel={ROLE_LABELS[user.role] || user.role}
       user={user}
     >
-      <div>
-        {tab === 'dashboard' && <Dashboard role={user.role} />}
-        {tab === 'assets' && (
-          <Assets
-            role={user.role}
-            onNavigateToMaster={(target) => setTab(target)}
-            onViewHistory={handleViewHistory}
-            onViewTickets={handleViewTickets}
-          />
-        )}
-        {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
-        {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
-        {tab === 'reports' && <Reports role={user.role} />}
-        {tab === 'audit' && canManageMasterData && <AuditLog />}
-        {activeMaster && <MasterDataPage {...activeMaster.config} />}
+      <div className="app-page-content">
+        <Suspense fallback={<PageLoading />}>
+          {tab === 'dashboard' && <Dashboard role={user.role} />}
+          {tab === 'assets' && (
+            <Assets
+              role={user.role}
+              onNavigateToMaster={(target) => setTab(target)}
+              onViewHistory={handleViewHistory}
+              onViewTickets={handleViewTickets}
+            />
+          )}
+          {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
+          {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
+          {tab === 'reports' && <Reports role={user.role} />}
+          {tab === 'audit' && canManageMasterData && <AuditLog />}
+          {activeMaster && <MasterDataPage {...activeMaster.config} />}
+        </Suspense>
       </div>
     </AppShell>
   )

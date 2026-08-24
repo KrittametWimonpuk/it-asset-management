@@ -4,6 +4,7 @@
 // บังคับสรุปวิธีแก้ไข (resolution) เสมอ ตั้ง resolvedAt เมื่อบันทึกสำเร็จ สถานะเปลี่ยนเป็น RESOLVED
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect } from 'react'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -16,6 +17,7 @@ export default function ResolveTicketForm({ ticket, onSubmit, onCancel }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
+  useDialogDismiss(onCancel, busy)
 
   useEffect(() => { firstInputRef.current?.focus() }, [])
 
@@ -46,7 +48,7 @@ export default function ResolveTicketForm({ ticket, onSubmit, onCancel }) {
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal" onClick={(e) => e.stopPropagation()}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label="บันทึกแก้ไขปัญหาสำเร็จ" onClick={(e) => e.stopPropagation()}>
         <h2>บันทึกแก้ไขปัญหาสำเร็จ</h2>
         <div className="delete-summary">
           <div className="delete-summary-tag">{ticket.ticketNumber}</div>

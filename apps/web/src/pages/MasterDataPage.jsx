@@ -2,9 +2,11 @@
 // MasterDataPage — หน้าจัดการ master data แบบเดียว ใช้ซ้ำได้กับ Category/Location/Department/Vendor
 // ขับเคลื่อนด้วย props (entityApi, fields, columns) แทนการเขียนหน้าแยกทีละประเภท
 // ---------------------------------------------------------------------------
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Database, Edit3, Plus, RefreshCw, Search, SearchX, Trash2 } from 'lucide-react'
 import MasterDataForm from '../components/MasterDataForm.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import './MasterData.css'
 
 const PAGE_SIZE = 20
 
@@ -42,9 +44,7 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
 
   useEffect(() => { setPage(1) }, [search])
 
-  useEffect(() => { load() }, [entityApi, page, search])
-
-  async function load() {
+  const load = useCallback(async () => {
     setRefreshing(true)
     try {
       const res = await entityApi.list({ page, pageSize: PAGE_SIZE, search })
@@ -57,7 +57,9 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [entityApi, page, search])
+
+  useEffect(() => { load() }, [load])
 
   function openCreate() {
     setEditingItem(null)
@@ -102,44 +104,36 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
   const isEmpty = !loading && items.length === 0
 
   return (
-    <div>
-      <div className="between">
-        <h2 className="section-title">{title}</h2>
-      </div>
-      <p className="muted">ทั้งหมด {meta.totalItems} รายการ</p>
+    <section className="master-page">
+      <header className="master-hero"><div><span><Database size={15} /> Master data</span><h1>{title}</h1><p>จัดการข้อมูลอ้างอิงที่ใช้ร่วมกันภายในระบบ</p></div><div><strong>{meta.totalItems}</strong><small>รายการทั้งหมด</small></div></header>
 
-      <div className="toolbar mt">
-        <input
+      <div className="master-toolbar">
+        <label className="master-search"><Search size={18} /><input
           type="text"
-          className="search-input"
           placeholder={searchPlaceholder || `ค้นหา${entityLabel}...`}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <button onClick={openCreate}>+ เพิ่ม{entityLabel}</button>
+        />{refreshing && <RefreshCw className="master-spin" size={16} />}</label>
+        <button type="button" onClick={openCreate}><Plus size={17} /> เพิ่ม{entityLabel}</button>
       </div>
 
-      {error && <p className="error mt">{error}</p>}
+      {error && <div className="master-error" role="alert">{error}<button type="button" onClick={load}>ลองใหม่</button></div>}
 
       {loading ? (
-        <p className="muted mt">กำลังโหลด...</p>
+        <div className="master-skeleton" aria-busy="true">{[1, 2, 3, 4].map((item) => <span key={item} />)}</div>
       ) : isEmpty ? (
         hasSearch ? (
-          <div className="empty-state mt">
-            <h3>ไม่พบผลลัพธ์</h3>
-            <p className="muted">ไม่พบ{entityLabel}ที่ตรงกับคำค้นหา "{search}"</p>
+          <div className="master-empty"><SearchX size={30} /><h3>ไม่พบผลลัพธ์</h3><p>ไม่พบ{entityLabel}ที่ตรงกับคำค้นหา “{search}”</p>
             <button className="secondary" onClick={() => setSearchInput('')}>ล้างการค้นหา</button>
           </div>
         ) : (
-          <div className="empty-state mt">
-            <h3>ยังไม่มี{entityLabel}</h3>
-            <p className="muted">เริ่มต้นด้วยการเพิ่ม{entityLabel}แรก</p>
-            <button onClick={openCreate}>+ เพิ่ม{entityLabel}</button>
+          <div className="master-empty"><Database size={30} /><h3>ยังไม่มี{entityLabel}</h3><p>เริ่มต้นด้วยการเพิ่ม{entityLabel}แรก</p>
+            <button onClick={openCreate}><Plus size={16} /> เพิ่ม{entityLabel}</button>
           </div>
         )
       ) : (
         <>
-          <div className={`table-wrap mt${refreshing ? ' is-refreshing' : ''}`}>
+          <div className={`master-table-wrap${refreshing ? ' is-refreshing' : ''}`}>
             <table>
               <thead>
                 <tr>
@@ -155,8 +149,8 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
                     ))}
                     <td>
                       <div className="row">
-                        <button className="link" onClick={() => openEdit(item)}>แก้ไข</button>
-                        <button className="danger" onClick={() => setDeleteTarget(item)}>ลบ</button>
+                        <button type="button" className="master-edit" onClick={() => openEdit(item)}><Edit3 size={14} /> แก้ไข</button>
+                        <button type="button" className="master-delete" onClick={() => setDeleteTarget(item)}><Trash2 size={14} /> ลบ</button>
                       </div>
                     </td>
                   </tr>
@@ -165,14 +159,9 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
             </table>
           </div>
 
-          <div className="row between mt">
-            <span className="muted">
-              หน้า {meta.page} จาก {meta.totalPages} • ทั้งหมด {meta.totalItems} รายการ
-              {refreshing && ' • กำลังโหลด...'}
-            </span>
-            <div className="row">
-              <button className="secondary" disabled={refreshing || meta.page <= 1} onClick={() => setPage((p) => p - 1)}>ก่อนหน้า</button>
-              <button className="secondary" disabled={refreshing || meta.page >= meta.totalPages} onClick={() => setPage((p) => p + 1)}>ถัดไป</button>
+          <div className="master-pagination"><span>หน้า {meta.page} จาก {meta.totalPages} · ทั้งหมด {meta.totalItems} รายการ</span><div>
+              <button aria-label="หน้าก่อนหน้า" disabled={refreshing || meta.page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={17} /></button><b>{meta.page}</b>
+              <button aria-label="หน้าถัดไป" disabled={refreshing || meta.page >= meta.totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={17} /></button>
             </div>
           </div>
         </>
@@ -199,6 +188,6 @@ export default function MasterDataPage({ title, entityLabel, entityApi, fields, 
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </section>
   )
 }
