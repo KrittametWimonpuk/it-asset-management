@@ -363,6 +363,7 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                   {visibleColumns.model && <th>รุ่น</th>}
                   {visibleColumns.hostname && <th>Hostname</th>}
                   {visibleColumns.ipAddress && <th>IP Address</th>}
+                  <th className="assets-actions-heading">จัดการ</th>
                   {visibleColumns.warrantyExpiry && <th>วันหมดประกัน</th>}
                   {visibleColumns.currentHolder && <th>ผู้ถือครองปัจจุบัน</th>}
                   {visibleColumns.assignmentStatus && <th>สถานะการมอบหมาย</th>}
@@ -372,7 +373,6 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                   {visibleColumns.openTickets && <th>ใบแจ้งซ่อมที่เปิดอยู่</th>}
                   {visibleColumns.ticketHistory && <th>ใบแจ้งซ่อมทั้งหมด</th>}
                   <th>สภาพ</th>
-                  <th className="assets-actions-heading">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -392,6 +392,12 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                       {visibleColumns.model && <td>{asset.model || '-'}</td>}
                       {visibleColumns.hostname && <td className="assets-mono">{asset.hostname || '-'}</td>}
                       {visibleColumns.ipAddress && <td className="assets-mono">{asset.ipAddress || '-'}</td>}
+                      <td className="assets-row-actions">
+                        <button type="button" onClick={() => onViewHistory?.(asset.id)} title="ดูประวัติ" aria-label={`ดูประวัติ ${asset.assetTag}`}><History size={16} /></button>
+                        <button type="button" onClick={() => onViewTickets?.(asset.id)} title="ดูใบแจ้งซ่อม" aria-label={`ดูใบแจ้งซ่อม ${asset.assetTag}`}><ClipboardList size={16} /></button>
+                        {canManage && <button type="button" onClick={() => openEdit(asset)} title="แก้ไข" aria-label={`แก้ไข ${asset.assetTag}`}><Edit3 size={16} /></button>}
+                        {canManage && <button type="button" className="is-danger" onClick={() => setDeleteTarget(asset)} title="ลบ" aria-label={`ลบ ${asset.assetTag}`}><Trash2 size={16} /></button>}
+                      </td>
                       {visibleColumns.warrantyExpiry && <td>{asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}{warranty && <span className={`assets-warranty-badge ${warranty.className}`}>{warranty.label}</span>}</td>}
                       {visibleColumns.currentHolder && <td>{holder ? (holder.user.name || holder.user.email) : <span className="assets-muted-value">ไม่มีผู้ถือครอง</span>}</td>}
                       {visibleColumns.assignmentStatus && <td>{holder ? assignmentStatusLabel(holder.status) : '-'}</td>}
@@ -401,12 +407,6 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                       {visibleColumns.openTickets && <td>{asset.openTicketsCount > 0 ? <span className="assets-ticket-count"><Wrench size={13} />{asset.openTicketsCount}</span> : '-'}</td>}
                       {visibleColumns.ticketHistory && <td>{asset.ticketHistoryCount}</td>}
                       <td>{conditionLabel(asset.assetCondition)}</td>
-                      <td className="assets-row-actions">
-                        <button type="button" onClick={() => onViewHistory?.(asset.id)} title="ดูประวัติ" aria-label={`ดูประวัติ ${asset.assetTag}`}><History size={16} /></button>
-                        <button type="button" onClick={() => onViewTickets?.(asset.id)} title="ดูใบแจ้งซ่อม" aria-label={`ดูใบแจ้งซ่อม ${asset.assetTag}`}><ClipboardList size={16} /></button>
-                        {canManage && <button type="button" onClick={() => openEdit(asset)} title="แก้ไข" aria-label={`แก้ไข ${asset.assetTag}`}><Edit3 size={16} /></button>}
-                        {canManage && <button type="button" className="is-danger" onClick={() => setDeleteTarget(asset)} title="ลบ" aria-label={`ลบ ${asset.assetTag}`}><Trash2 size={16} /></button>}
-                      </td>
                     </tr>
                   )
                 })}
