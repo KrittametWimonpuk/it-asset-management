@@ -1,5 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '../api.js'
 import './AppShell.css'
+
+const NOTIFICATION_POLL_MS = 30000
+
+function loadSeenNotificationIds(userKey) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`helpdesk-notifications-seen:${userKey}`) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function formatNotificationTime(value) {
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return 'เมื่อสักครู่'
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000))
+  if (minutes < 1) return 'เมื่อสักครู่'
+  if (minutes < 60) return `${minutes} นาทีที่แล้ว`
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} ชั่วโมงที่แล้ว`
+  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(timestamp)
+}
 
 const CORE_NAVIGATION = [
   { key: 'dashboard', label: 'แดชบอร์ด', group: 'ภาพรวม', icon: 'dashboard' },
@@ -65,6 +87,10 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const [query, setQuery] = useState('')
   const [theme, setTheme] = useState(() => localStorage.getItem('ui-theme') || 'light')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const userNotificationKey = user.id || user.email
+  const [seenNotificationIds, setSeenNotificationIds] = useState(() => loadSeenNotificationIds(userNotificationKey))
   const [profileOpen, setProfileOpen] = useState(false)
   const notificationRef = useRef(null)
   const profileRef = useRef(null)
@@ -84,10 +110,52 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const pageMeta = PAGE_META[activeTab] || PAGE_META.dashboard
   const displayName = user.name || user.email
   const initials = displayName.split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+  const unreadNotifications = notifications.filter((ticket) => !seenNotificationIds.includes(ticket.id))
 
   useEffect(() => {
     localStorage.setItem('ui-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadNotifications() {
+      try {
+        const response = await api.tickets.list({ page: 1, pageSize: 6, sortBy: 'openedAt', sortOrder: 'desc' })
+        if (!cancelled) setNotifications(response.items)
+      } catch {
+        // การแจ้งเตือนเป็นข้อมูลเสริม — หากโหลดไม่ได้ เมนูหลักและหน้าปัจจุบันยังต้องใช้งานต่อได้
+      } finally {
+        if (!cancelled) setNotificationsLoading(false)
+      }
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') loadNotifications()
+    }
+
+    function addCreatedTicket(event) {
+      if (!event.detail?.id) return
+      setNotifications((current) => [event.detail, ...current.filter((ticket) => ticket.id !== event.detail.id)].slice(0, 6))
+    }
+
+    loadNotifications()
+    const poller = window.setInterval(loadNotifications, NOTIFICATION_POLL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', loadNotifications)
+    window.addEventListener('helpdesk-ticket-created', addCreatedTicket)
+    return () => {
+      cancelled = true
+      window.clearInterval(poller)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', loadNotifications)
+      window.removeEventListener('helpdesk-ticket-created', addCreatedTicket)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(`helpdesk-notifications-seen:${userNotificationKey}`, JSON.stringify(seenNotificationIds.slice(-100)))
+  }, [seenNotificationIds, userNotificationKey])
 
   useEffect(() => {
     function closeMenus(event) {
@@ -123,6 +191,16 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
     onNavigate(tabKey)
     setMobileOpen(false)
     setQuery('')
+  }
+
+  function markNotificationsRead(ids) {
+    setSeenNotificationIds((current) => [...new Set([...current, ...ids])].slice(-100))
+  }
+
+  function openNotification(ticket) {
+    markNotificationsRead([ticket.id])
+    setNotificationsOpen(false)
+    navigate('tickets')
   }
 
   const groupedNavigation = navigation.reduce((groups, item) => {
@@ -233,7 +311,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
 
           <div className="topbar-popover-wrap" ref={notificationRef}>
             <button
-              className="topbar-icon-button"
+              className={`topbar-icon-button notification-trigger${unreadNotifications.length ? ' has-unread' : ''}`}
               type="button"
               onClick={() => {
                 setNotificationsOpen((value) => !value)
@@ -243,18 +321,66 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
               aria-expanded={notificationsOpen}
             >
               <Icon name="bell" />
+              {unreadNotifications.length > 0 && (
+                <span className="notification-count" aria-label={`มีการแจ้งเตือนใหม่ ${unreadNotifications.length} รายการ`}>
+                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                </span>
+              )}
             </button>
             {notificationsOpen && (
-              <div className="topbar-popover notification-popover">
+              <div className="topbar-popover notification-popover" role="dialog" aria-label="รายการแจ้งเตือน">
                 <div className="popover-heading">
-                  <strong>การแจ้งเตือน</strong>
-                  <span>ล่าสุด</span>
+                  <div>
+                    <strong>การแจ้งเตือน</strong>
+                    <span>{unreadNotifications.length > 0 ? `ใหม่ ${unreadNotifications.length} รายการ` : 'ล่าสุด'}</span>
+                  </div>
+                  {unreadNotifications.length > 0 && (
+                    <button type="button" onClick={() => markNotificationsRead(notifications.map((ticket) => ticket.id))}>
+                      อ่านทั้งหมด
+                    </button>
+                  )}
                 </div>
-                <div className="notification-empty">
-                  <span><Icon name="bell" /></span>
-                  <strong>ไม่มีการแจ้งเตือนใหม่</strong>
-                  <p>รายการแจ้งเตือนของคุณจะแสดงที่นี่</p>
-                </div>
+                {notificationsLoading ? (
+                  <div className="notification-loading" aria-label="กำลังโหลดการแจ้งเตือน">
+                    {Array.from({ length: 3 }, (_, index) => <span key={index} />)}
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="notification-empty">
+                    <span><Icon name="bell" /></span>
+                    <strong>ไม่มีการแจ้งเตือนใหม่</strong>
+                    <p>เมื่อมีการแจ้งปัญหา รายการจะแสดงที่นี่</p>
+                  </div>
+                ) : (
+                  <div className="notification-list">
+                    {notifications.map((ticket) => {
+                      const unread = !seenNotificationIds.includes(ticket.id)
+                      return (
+                        <button
+                          type="button"
+                          className={`notification-item${unread ? ' is-unread' : ''}`}
+                          key={ticket.id}
+                          onClick={() => openNotification(ticket)}
+                        >
+                          <span className="notification-item-icon"><Icon name="ticket" /></span>
+                          <span className="notification-item-copy">
+                            <span className="notification-item-meta">
+                              <strong>{ticket.ticketNumber}</strong>
+                              <time dateTime={ticket.openedAt || ticket.createdAt}>{formatNotificationTime(ticket.openedAt || ticket.createdAt)}</time>
+                            </span>
+                            <b>{ticket.title}</b>
+                            <small>{ticket.reportedBy?.name || ticket.reportedBy?.email || 'ผู้ใช้งาน'} · {ticket.asset?.assetTag || 'ไม่ระบุครุภัณฑ์'}</small>
+                          </span>
+                          {unread && <i className="notification-unread-dot" aria-hidden="true" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {notifications.length > 0 && (
+                  <button type="button" className="notification-view-all" onClick={() => { setNotificationsOpen(false); navigate('tickets') }}>
+                    ดู Helpdesk ทั้งหมด <span aria-hidden="true">→</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -134,7 +134,8 @@ export default function Tickets({ role, initialAssetId }) {
     if (editingTicket) {
       await api.tickets.update(editingTicket.id, payload)
     } else {
-      await api.tickets.add(payload)
+      const createdTicket = await api.tickets.add(payload)
+      window.dispatchEvent(new CustomEvent('helpdesk-ticket-created', { detail: createdTicket }))
     }
     setFormOpen(false)
     setEditingTicket(null)
