@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 import DateInput from './DateInput.jsx'
+import { assignmentHolderName } from '../utils/assignmentHolder.js'
 
 // ใช้ร่วมกับ Assignments.jsx (label สถานะในตาราง/ตัวกรอง) — ต้องตรงกับ enum AssignmentStatus ใน schema.prisma
 export const ASSIGNMENT_STATUS_OPTIONS = [
@@ -58,7 +59,7 @@ export default function ReturnAssignmentForm({ assignment, onSubmit, onCancel })
         <div className="delete-summary">
           <div className="delete-summary-tag">{assignment.asset?.assetTag}</div>
           <div className="delete-summary-name">
-            {assignment.asset?.name} — ถือครองโดย {assignment.user?.name || assignment.user?.email}
+            {assignment.asset?.name} — ถือครองโดย {assignmentHolderName(assignment)}
           </div>
         </div>
 

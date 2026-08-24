@@ -103,7 +103,10 @@ const REPORT_DEFS = [
     ],
     columns: [
       { key: 'asset', label: 'ครุภัณฑ์' },
-      { key: 'employee', label: 'พนักงาน' },
+      { key: 'employeeCode', label: 'รหัสพนักงาน' },
+      { key: 'employeeName', label: 'ชื่อพนักงาน' },
+      { key: 'department', label: 'แผนก' },
+      { key: 'position', label: 'ตำแหน่ง' },
       { key: 'assignedDate', label: 'วันที่มอบหมาย' },
       { key: 'returnedDate', label: 'วันที่คืน' },
       { key: 'status', label: 'สถานะการมอบหมาย' },

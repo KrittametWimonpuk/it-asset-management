@@ -222,6 +222,32 @@ async function main() {
     include: { assets: true },
   })
 
+  // ---- v1.1.0 Phase 2: Employee business identities for assignment holders ----
+  // Email intentionally matches the login account only as an incremental compatibility bridge.
+  const employeeSeeds = [
+    {
+      employeeCode: 'EMP-ADMIN-001', firstName: 'Admin', lastName: 'User', fullName: 'Admin User',
+      email: admin.email, departmentId: departments['IT'].id, position: 'IT Administrator',
+    },
+    {
+      employeeCode: 'EMP-IT-001', firstName: 'IT', lastName: 'Staff', fullName: 'IT Staff',
+      email: itStaff.email, departmentId: departments['IT'].id, position: 'IT Support',
+    },
+    {
+      employeeCode: 'EMP-USER-001', firstName: 'Employee', lastName: 'User', fullName: 'Employee User',
+      email: employee.email, departmentId: departments['Sales'].id, position: 'Sales Officer',
+    },
+  ]
+  const employeesByEmail = {}
+  for (const data of employeeSeeds) {
+    const row = await prisma.employee.upsert({
+      where: { employeeCode: data.employeeCode },
+      update: { ...data, status: 'ACTIVE', isActive: true, deletedAt: null },
+      create: data,
+    })
+    employeesByEmail[data.email] = row
+  }
+
   // ---- Milestone 7: ครุภัณฑ์เพิ่มเติมสำหรับตัวอย่างใบแจ้งซ่อม (เครื่องพิมพ์/เครือข่าย ไม่มีผู้ถือครองรายบุคคล) ----
   // แยก upsert ต่างหากจาก assets ที่ผูกกับ admin ตอนสร้างผู้ใช้ด้านบน เพราะ upsert ของ admin ใช้
   // update: {} เมื่อมีอยู่แล้ว (รันซ้ำจะไม่สร้าง asset ใหม่ในนั้นอีก) — ฟังก์ชันนี้เช็คซ้ำเองจาก assetTag แทน
@@ -273,7 +299,15 @@ async function main() {
   // idempotent: ถ้า asset นี้มีประวัติ assignment อยู่แล้ว (รันซ้ำ) ให้ข้าม ไม่สร้างซ้ำ
   async function ensureAssignment(assetId, data) {
     const existing = await prisma.assignment.findFirst({ where: { assetId } })
-    if (existing) return existing
+    if (existing) {
+      if (!existing.employeeId && data.employeeId) {
+        return prisma.assignment.update({
+          where: { id: existing.id },
+          data: { employeeId: data.employeeId, userId: existing.userId || data.userId },
+        })
+      }
+      return existing
+    }
     return prisma.assignment.create({ data: { assetId, ...data } })
   }
 
@@ -282,6 +316,7 @@ async function main() {
   // Dell Latitude -> Admin ถือครองอยู่ (active) — มอบโดย IT Staff
   await ensureAssignment(assetByTag['IT-0001'].id, {
     userId: admin.id,
+    employeeId: employeesByEmail[admin.email].id,
     assignedById: itStaff.id,
     assignedAt: addDays(-490),
     status: 'ASSIGNED',
@@ -292,6 +327,7 @@ async function main() {
   // HP ProDesk -> เคยมอบให้ IT Staff แล้วคืนแล้ว (ประวัติ) — ตอนนี้ไม่มีผู้ถือครอง กลับเข้าคลัง
   await ensureAssignment(assetByTag['IT-0002'].id, {
     userId: itStaff.id,
+    employeeId: employeesByEmail[itStaff.email].id,
     assignedById: admin.id,
     assignedAt: addDays(-1195),
     expectedReturnDate: addDays(-900),
@@ -305,6 +341,7 @@ async function main() {
   // Lenovo ThinkPad -> IT Staff ถือครองอยู่ (active) — มอบโดย Admin
   await ensureAssignment(assetByTag['IT-0003'].id, {
     userId: itStaff.id,
+    employeeId: employeesByEmail[itStaff.email].id,
     assignedById: admin.id,
     assignedAt: addDays(-55),
     status: 'ASSIGNED',
@@ -315,6 +352,7 @@ async function main() {
   // iPhone -> Employee ถือครองอยู่ (active) — มอบโดย Admin
   await ensureAssignment(assetByTag['IT-0004'].id, {
     userId: employee.id,
+    employeeId: employeesByEmail[employee.email].id,
     assignedById: admin.id,
     assignedAt: addDays(-198),
     status: 'ASSIGNED',

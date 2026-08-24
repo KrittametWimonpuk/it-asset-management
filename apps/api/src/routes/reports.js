@@ -24,7 +24,13 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 import { ok } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
-import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  CURRENT_ASSIGNMENT_INCLUDE,
+  EMPLOYEE_SUMMARY_SELECT,
+  LEGACY_HOLDER_SELECT,
+  assignmentHolderName,
+} from '../utils/assignmentHelpers.js'
 import { parseReportQuery, dateRangeWhere, warrantyBucketWhere, warrantyInfo, sendExport } from '../utils/reportHelpers.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
 import {
@@ -99,7 +105,7 @@ function shapeAssetRow(asset) {
     department: asset.department?.name || '-',
     vendor: asset.vendor?.name || '-',
     status: ASSET_STATUS_LABELS[asset.status] || asset.status,
-    currentHolder: holder ? (holder.user.name || holder.user.email) : 'ไม่มีผู้ถือครอง',
+    currentHolder: holder ? assignmentHolderName(holder) : 'ไม่มีผู้ถือครอง',
     warrantyExpiry: fmtDate(asset.warrantyExpiry),
     purchaseDate: fmtDate(asset.purchaseDate),
     purchasePrice: asset.purchasePrice ?? '',
@@ -150,7 +156,10 @@ router.get('/assets', asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 const ASSIGNMENT_REPORT_COLUMNS = [
   { key: 'asset', label: 'ครุภัณฑ์' },
-  { key: 'employee', label: 'พนักงาน' },
+  { key: 'employeeCode', label: 'รหัสพนักงาน' },
+  { key: 'employeeName', label: 'ชื่อพนักงาน' },
+  { key: 'department', label: 'แผนก' },
+  { key: 'position', label: 'ตำแหน่ง' },
   { key: 'assignedDate', label: 'วันที่มอบหมาย' },
   { key: 'returnedDate', label: 'วันที่คืน' },
   { key: 'status', label: 'สถานะการมอบหมาย' },
@@ -163,7 +172,10 @@ const ASSIGNMENT_REPORT_SORTABLE = ['assignedAt', 'returnedAt', 'status']
 function shapeAssignmentRow(a) {
   return {
     asset: `${a.asset?.assetTag ?? ''} — ${a.asset?.name ?? ''}`,
-    employee: a.user?.name || a.user?.email || '-',
+    employeeCode: a.employee?.employeeCode || '-',
+    employeeName: assignmentHolderName(a),
+    department: a.employee?.department?.name || '-',
+    position: a.employee?.position || '-',
     assignedDate: fmtDate(a.assignedAt),
     returnedDate: fmtDate(a.returnedAt),
     status: ASSIGNMENT_STATUS_LABELS[a.status] || a.status,
@@ -174,7 +186,10 @@ function shapeAssignmentRow(a) {
 }
 
 function buildAssignmentReportWhere(req, f) {
-  const where = { deletedAt: null, ...assignmentScopeForRead(req.user), ...dateRangeWhere('assignedAt', f.dateFrom, f.dateTo) }
+  const where = { deletedAt: null, ...dateRangeWhere('assignedAt', f.dateFrom, f.dateTo) }
+  const constraints = []
+  const readScope = assignmentScopeForRead(req.user)
+  if (Object.keys(readScope).length) constraints.push(readScope)
   const assetFilter = {}
   if (f.categoryId) assetFilter.categoryId = f.categoryId
   if (f.locationId) assetFilter.locationId = f.locationId
@@ -183,18 +198,23 @@ function buildAssignmentReportWhere(req, f) {
   if (Object.keys(assetFilter).length) where.asset = assetFilter
   if (ASSIGNMENT_STATUSES.includes(f.assignmentStatus)) where.status = f.assignmentStatus
   if (f.search) {
-    where.OR = [
+    constraints.push({ OR: [
       ...ASSIGNMENT_ASSET_SEARCH_FIELDS.map((field) => ({ asset: { [field]: { contains: f.search, mode: 'insensitive' } } })),
+      { employee: { employeeCode: { contains: f.search, mode: 'insensitive' } } },
+      { employee: { fullName: { contains: f.search, mode: 'insensitive' } } },
+      { employee: { department: { name: { contains: f.search, mode: 'insensitive' } } } },
       { user: { name: { contains: f.search, mode: 'insensitive' } } },
-    ]
+    ] })
   }
+  if (constraints.length) where.AND = constraints
   return where
 }
 
 const ASSIGNMENT_REPORT_INCLUDE = {
   include: {
     asset: { select: { assetTag: true, name: true } },
-    user: { select: { name: true, email: true } },
+    employee: { select: EMPLOYEE_SUMMARY_SELECT },
+    user: { select: LEGACY_HOLDER_SELECT },
   },
 }
 

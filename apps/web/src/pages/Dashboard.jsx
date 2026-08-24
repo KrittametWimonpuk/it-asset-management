@@ -219,7 +219,9 @@ export default function Dashboard({ role }) {
         <div className="dashboard-hero-copy">
           <span className="dashboard-hero-eyebrow"><Zap size={15} aria-hidden="true" /> Enterprise Overview</span>
           <h1>ยินดีต้อนรับสู่แดชบอร์ด</h1>
-          <p>{role === 'EMPLOYEE' ? 'ติดตามครุภัณฑ์และงานบริการไอทีของคุณได้จากที่นี่' : 'ติดตามสถานะครุภัณฑ์ การใช้งาน และงานบริการไอทีขององค์กรแบบครบวงจร'}</p>
+          <p>{role === 'EMPLOYEE'
+            ? `Current Employee: ${data.currentEmployee ? `${data.currentEmployee.employeeCode} · ${data.currentEmployee.fullName}` : 'Unknown Employee'}`
+            : 'ติดตามสถานะครุภัณฑ์ การใช้งาน และงานบริการไอทีขององค์กรแบบครบวงจร'}</p>
         </div>
         <div className="dashboard-today">
           <span><CalendarDays size={21} aria-hidden="true" /></span>

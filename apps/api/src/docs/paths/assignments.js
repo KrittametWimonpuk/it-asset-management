@@ -28,9 +28,14 @@
  *         name: assetId
  *         schema: { type: string, format: uuid }
  *       - in: query
- *         name: userId
+ *         name: employeeId
  *         schema: { type: string, format: uuid }
  *         description: กรองตามผู้ถือครอง — ใช้ได้เฉพาะ ADMIN/IT_STAFF (EMPLOYEE ถูกจำกัดที่ตัวเองอยู่แล้ว)
+ *       - in: query
+ *         name: userId
+ *         deprecated: true
+ *         schema: { type: string, format: uuid }
+ *         description: ตัวกรองบัญชีผู้ถือครองเดิมสำหรับ backward compatibility
  *     responses:
  *       200:
  *         description: รายการมอบหมาย
@@ -70,7 +75,7 @@
  *               type: object
  *               properties: { success: { type: boolean, example: true }, data: { $ref: '#/components/schemas/Assignment' } }
  *       400:
- *         description: ข้อมูลไม่ผ่าน validation, ครุภัณฑ์ไม่ถูกต้อง/ถูกลบไปแล้ว, หรือไม่พบผู้ใช้ที่เลือก
+ *         description: ข้อมูลไม่ผ่าน validation, ครุภัณฑ์ไม่ถูกต้อง/ถูกลบไปแล้ว, หรือ Employee ไม่ active/ถูก archive
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
  *       401:
  *         $ref: '#/components/responses/Unauthorized'

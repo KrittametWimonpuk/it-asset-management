@@ -8,12 +8,44 @@
 // ใช้ทั้งหาผู้ถือครองปัจจุบัน และเช็กก่อนมอบหมายใหม่ว่ามี assignment ค้างอยู่ไหม
 export const ACTIVE_ASSIGNMENT_WHERE = { returnedAt: null, deletedAt: null }
 
+export const EMPLOYEE_SUMMARY_SELECT = {
+  id: true,
+  employeeCode: true,
+  fullName: true,
+  position: true,
+  status: true,
+  department: { select: { id: true, name: true } },
+}
+
+export const LEGACY_HOLDER_SELECT = { id: true, name: true, email: true }
+
+// EMPLOYEE login accounts are linked incrementally by email. Keep the legacy userId branch so
+// old assignments continue to respect the exact same RBAC scope during the transition.
+export function assignmentHolderScopeForAccount(user) {
+  return {
+    OR: [
+      { userId: user.id },
+      { employee: { email: { equals: user.email, mode: 'insensitive' } } },
+    ],
+  }
+}
+
+export function assignmentHolderName(assignment, fallback = 'Unknown Employee') {
+  return assignment?.employee?.fullName
+    || assignment?.user?.name
+    || assignment?.user?.email
+    || fallback
+}
+
 // แนบไปกับ prisma include ของ Asset เพื่อดึง assignment ที่ active (ถ้ามี — มีได้สูงสุด 1 แถวเสมอ)
 // พร้อมข้อมูลผู้ถือครองมาด้วย ใช้แสดง "ผู้ถือครองปัจจุบัน" โดยไม่ต้องยิง query แยก
 export const CURRENT_ASSIGNMENT_INCLUDE = {
   where: ACTIVE_ASSIGNMENT_WHERE,
   take: 1,
-  include: { user: { select: { id: true, name: true, email: true } } },
+  include: {
+    employee: { select: EMPLOYEE_SUMMARY_SELECT },
+    user: { select: LEGACY_HOLDER_SELECT },
+  },
 }
 
 // แปลง asset ที่ query มาพร้อม assignments (จาก CURRENT_ASSIGNMENT_INCLUDE) + _count ให้เป็นรูปแบบใช้ง่ายฝั่ง frontend

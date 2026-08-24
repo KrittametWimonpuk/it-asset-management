@@ -106,7 +106,7 @@ export const api = {
   departments: createEntityApi('/departments'),
   vendors: createEntityApi('/vendors'),
 
-  // Milestone 5: มอบหมาย/รับคืนครุภัณฑ์ — params รองรับ: page, pageSize, sortBy, sortOrder, search, status, assetId, userId
+  // v1.1 Phase 2: params รองรับ employeeId; userId เดิมยังรับได้เพื่อ backward compatibility
   // (เขียนเองแทน createEntityApi เพราะ backend ไม่มี DELETE /assignments/:id — ประวัติการมอบหมายห้ามลบ)
   assignments: {
     list: (params) => request(`/assignments${toQueryString(params)}`),
@@ -121,7 +121,7 @@ export const api = {
     list: (params) => request(`/users${toQueryString(params)}`),
   },
 
-  // v1.1.0 Phase 1: ข้อมูลพนักงานแยกจากบัญชี User — Assignment ยังอ้าง User เหมือนเดิม
+  // v1.1.0: ข้อมูลพนักงานและ business identity ของผู้ถือครองครุภัณฑ์
   employees: {
     ...createEntityApi('/employees'),
     restore: (id) => request(`/employees/${id}/restore`, { method: 'POST' }),

@@ -6,7 +6,7 @@
 // asset หนึ่งชิ้นมีแถว active แบบนี้ได้สูงสุด 1 แถว บังคับจริงด้วย partial unique index ใน migration.sql
 //
 // สิทธิ์:
-//   - GET (list/one): ทุก role เข้าได้ แต่ EMPLOYEE เห็นเฉพาะรายการที่ตัวเองเป็นผู้ถือครอง (userId ตรงกับตัวเอง)
+//   - GET (list/one): ทุก role เข้าได้ แต่ EMPLOYEE เห็นเฉพาะรายการที่ Employee email หรือ legacy userId ตรงกับบัญชี
 //   - POST / (มอบหมาย), PUT /:id (แก้รายละเอียด), POST /:id/return (รับคืน): เฉพาะ ADMIN, IT_STAFF
 //   - PUT แก้ได้เฉพาะ expectedReturnDate/conditionBefore/remark — ไม่แก้ asset/ผู้ถือครอง/วันที่มอบหมาย
 //     (ข้อมูลหลักของประวัติต้องคงที่) และแก้ได้เฉพาะตอนยัง active เท่านั้น (คืนแล้ว = ปิดประวัติ)
@@ -20,7 +20,13 @@ import { ok, fail, fromZodError } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { parsePagination, parseSort, buildPageMeta } from '../utils/queryParams.js'
 import { optionalText, optionalDate, optionalEnum } from '../utils/zodHelpers.js'
-import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  EMPLOYEE_SUMMARY_SELECT,
+  LEGACY_HOLDER_SELECT,
+  assignmentHolderName,
+  assignmentHolderScopeForAccount,
+} from '../utils/assignmentHelpers.js'
 import { ASSET_CONDITIONS } from './assets.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
 
@@ -47,7 +53,8 @@ export const SEARCHABLE_ASSET_FIELDS = ['assetTag', 'name', 'hostname', 'serialN
 const WITH_RELATIONS = {
   include: {
     asset: { select: { id: true, assetTag: true, name: true, hostname: true, serialNumber: true } },
-    user: { select: { id: true, name: true, email: true } },
+    employee: { select: EMPLOYEE_SUMMARY_SELECT },
+    user: { select: LEGACY_HOLDER_SELECT },
     assignedBy: { select: { id: true, name: true, email: true } },
   },
 }
@@ -55,7 +62,7 @@ const WITH_RELATIONS = {
 // EMPLOYEE เห็นเฉพาะรายการที่ตัวเองเป็นผู้ถือครอง (ทั้งอดีต+ปัจจุบัน) — ADMIN/IT_STAFF เห็นทุกรายการ
 // export ไว้ให้ routes/reports.js ใช้ร่วมกัน (Milestone 8) — ดูเหตุผลเดียวกับที่ assets.js: scopeForRead ทำไว้
 export function scopeForRead(user) {
-  if (user.role === 'EMPLOYEE') return { userId: user.id }
+  if (user.role === 'EMPLOYEE') return assignmentHolderScopeForAccount(user)
   return {}
 }
 
@@ -71,13 +78,17 @@ function requiredDateOptional(message) {
 }
 
 // ---- CREATE: มอบหมายครุภัณฑ์ ----
-const createSchema = z.object({
+export const createSchema = z.object({
   assetId: z.string().trim().min(1, 'กรุณาเลือกครุภัณฑ์'),
-  userId: z.string().trim().min(1, 'กรุณาเลือกพนักงาน'),
+  employeeId: z.string().trim().min(1, 'กรุณาเลือกพนักงาน').optional(),
+  // รองรับ client เดิมระหว่างช่วงเปลี่ยนผ่าน โดย API จะ resolve User -> Employee ทางอีเมล
+  userId: z.string().trim().min(1, 'กรุณาเลือกพนักงาน').optional(),
   assignedAt: requiredDateOptional('วันที่มอบหมายไม่ถูกต้อง'),
   expectedReturnDate: optionalDate('วันที่คาดว่าจะคืนไม่ถูกต้อง'),
   conditionBefore: optionalEnum(ASSET_CONDITIONS, 'สภาพก่อนมอบหมายไม่ถูกต้อง'),
   remark: optionalText(),
+}).refine((data) => data.employeeId || data.userId, {
+  message: 'กรุณาเลือกพนักงาน', path: ['employeeId'],
 }).refine((data) => {
   if (!data.assignedAt || !data.expectedReturnDate) return true
   return data.expectedReturnDate >= data.assignedAt
@@ -103,21 +114,31 @@ router.get('/', asyncHandler(async (req, res) => {
   const pagination = parsePagination(req.query)
   const orderBy = parseSort(req.query, SORTABLE_FIELDS, 'assignedAt')
 
-  const where = { deletedAt: null, ...scopeForRead(req.user) }
+  const where = { deletedAt: null }
+  const constraints = []
+  const readScope = scopeForRead(req.user)
+  if (Object.keys(readScope).length) constraints.push(readScope)
 
   const search = (req.query.search || '').trim()
   if (search) {
-    where.OR = [
+    constraints.push({ OR: [
       ...SEARCHABLE_ASSET_FIELDS.map((field) => ({
         asset: { [field]: { contains: search, mode: 'insensitive' } },
       })),
+      { employee: { employeeCode: { contains: search, mode: 'insensitive' } } },
+      { employee: { fullName: { contains: search, mode: 'insensitive' } } },
+      { employee: { department: { name: { contains: search, mode: 'insensitive' } } } },
+      // legacy holder search keeps old assignments discoverable
       { user: { name: { contains: search, mode: 'insensitive' } } },
-    ]
+    ] })
   }
+
+  if (constraints.length) where.AND = constraints
 
   if (ASSIGNMENT_STATUSES.includes(req.query.status)) where.status = req.query.status
   if (req.query.assetId) where.assetId = req.query.assetId
-  // filter ตาม "ผู้ถือครอง" — เฉพาะ ADMIN/IT_STAFF (EMPLOYEE ถูกจำกัด userId ของตัวเองอยู่แล้วจาก scopeForRead)
+  if (req.query.employeeId && req.user.role !== 'EMPLOYEE') where.employeeId = req.query.employeeId
+  // legacy filter ตามบัญชีผู้ถือครอง — เก็บไว้เพื่อ backward compatibility
   if (req.query.userId && req.user.role !== 'EMPLOYEE') where.userId = req.query.userId
 
   const [items, totalItems] = await Promise.all([
@@ -143,17 +164,40 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
   if (!parsed.success) {
     return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
   }
-  const { assetId, userId, ...rest } = parsed.data
+  const { assetId, employeeId: requestedEmployeeId, userId: requestedUserId, ...rest } = parsed.data
 
   const asset = await prisma.asset.findFirst({ where: { id: assetId, deletedAt: null } })
   if (!asset) {
     return fail(res, 400, 'ครุภัณฑ์นี้ไม่ถูกต้อง หรือถูกลบไปแล้ว', [{ field: 'assetId', message: 'ครุภัณฑ์นี้ไม่ถูกต้อง หรือถูกลบไปแล้ว' }])
   }
 
-  // User model ยังไม่มี soft-delete/isActive flag ในตอนนี้ — เช็กแค่ว่ามีอยู่จริงไปก่อน
-  const targetUser = await prisma.user.findUnique({ where: { id: userId } })
-  if (!targetUser) {
-    return fail(res, 400, 'ไม่พบผู้ใช้นี้ในระบบ', [{ field: 'userId', message: 'ไม่พบผู้ใช้นี้ในระบบ' }])
+  let legacyUser = null
+  if (requestedUserId) {
+    legacyUser = await prisma.user.findUnique({ where: { id: requestedUserId } })
+    if (!legacyUser) {
+      return fail(res, 400, 'ไม่พบผู้ใช้นี้ในระบบ', [{ field: 'userId', message: 'ไม่พบผู้ใช้นี้ในระบบ' }])
+    }
+  }
+
+  const employeeWhere = requestedEmployeeId
+    ? { id: requestedEmployeeId }
+    : { email: { equals: legacyUser.email, mode: 'insensitive' } }
+  const targetEmployee = await prisma.employee.findFirst({
+    where: { ...employeeWhere, deletedAt: null, isActive: true, status: 'ACTIVE' },
+    select: { ...EMPLOYEE_SUMMARY_SELECT, email: true },
+  })
+  if (!targetEmployee) {
+    const message = requestedEmployeeId
+      ? 'ไม่พบพนักงานที่พร้อมรับมอบหมาย'
+      : 'บัญชีผู้ใช้เดิมนี้ยังไม่ได้เชื่อมกับพนักงานที่พร้อมรับมอบหมาย'
+    return fail(res, 400, message, [{ field: 'employeeId', message }])
+  }
+
+  // Preserve userId where a matching account exists, but do not require Employee to have a login.
+  if (!legacyUser && targetEmployee.email) {
+    legacyUser = await prisma.user.findFirst({
+      where: { email: { equals: targetEmployee.email, mode: 'insensitive' } },
+    })
   }
 
   const activeAssignment = await prisma.assignment.findFirst({ where: { assetId, ...ACTIVE_ASSIGNMENT_WHERE } })
@@ -162,14 +206,20 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
   }
 
   const assignment = await prisma.assignment.create({
-    data: { assetId, userId, assignedById: req.user.id, ...rest },
+    data: {
+      assetId,
+      employeeId: targetEmployee.id,
+      userId: legacyUser?.id,
+      assignedById: req.user.id,
+      ...rest,
+    },
     ...WITH_RELATIONS,
   })
 
   logAudit({
     ...auditContext(req), action: 'ASSIGN', entityType: 'Assignment', entityId: assignment.id,
-    description: `มอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name} ให้ ${assignment.user.name || assignment.user.email}`,
-    newValues: { assetId, userId, ...rest },
+    description: `มอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name} ให้ ${assignmentHolderName(assignment)} (${assignment.employee.employeeCode})`,
+    newValues: { assetId, employeeId: targetEmployee.id, userId: legacyUser?.id || null, ...rest },
   })
 
   ok(res, assignment, 201)
@@ -238,9 +288,9 @@ router.post('/:id/return', manageAssignments, asyncHandler(async (req, res) => {
 
   logAudit({
     ...auditContext(req), action: 'RETURN', entityType: 'Assignment', entityId: assignment.id,
-    description: `รับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignment.user.name || assignment.user.email}`,
+    description: `รับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignmentHolderName(assignment)}`,
     oldValues: { returnedAt: existing.returnedAt, status: existing.status, conditionAfter: existing.conditionAfter, remark: existing.remark },
-    newValues: returnData,
+    newValues: { ...returnData, employeeId: assignment.employeeId, employeeCode: assignment.employee?.employeeCode || null },
   })
 
   ok(res, assignment)

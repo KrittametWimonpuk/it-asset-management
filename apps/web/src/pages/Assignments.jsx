@@ -26,10 +26,11 @@ import { api } from '../api.js'
 import AssignmentForm from '../components/AssignmentForm.jsx'
 import ReturnAssignmentForm, { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 import { formatDate } from '../utils/format.js'
+import { assignmentHolderCode, assignmentHolderDepartment, assignmentHolderName, assignmentHolderPosition } from '../utils/assignmentHolder.js'
 import './Assignments.css'
 
 const PAGE_SIZE = 20
-const EMPTY_FILTERS = { status: '', assetId: '', userId: '' }
+const EMPTY_FILTERS = { status: '', assetId: '', employeeId: '' }
 
 const SORT_COLUMNS = [
   { field: 'assignedAt', label: 'วันที่มอบหมาย' },
@@ -99,17 +100,17 @@ export default function Assignments({ role, initialAssetId }) {
   const [editingAssignment, setEditingAssignment] = useState(null)
   const [returnTarget, setReturnTarget] = useState(null)
   const [assetOptions, setAssetOptions] = useState(null)
-  const [userOptions, setUserOptions] = useState(null)
+  const [employeeOptions, setEmployeeOptions] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     const requests = [api.listAssets({ pageSize: 100, sortBy: 'assetTag', sortOrder: 'asc' })]
-    if (canManage) requests.push(api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' }))
+    if (canManage) requests.push(api.employees.list({ pageSize: 100, sortBy: 'employeeCode', sortOrder: 'asc', status: 'ACTIVE', isActive: true }))
     Promise.all(requests)
-      .then(([assetsResponse, usersResponse]) => {
+      .then(([assetsResponse, employeesResponse]) => {
         if (cancelled) return
         setAssetOptions(assetsResponse.items)
-        if (usersResponse) setUserOptions(usersResponse.items)
+        if (employeesResponse) setEmployeeOptions(employeesResponse.items)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -241,9 +242,9 @@ export default function Assignments({ role, initialAssetId }) {
         {canManage && (
           <div className="assignment-filter-field">
             <label htmlFor="assignment-filter-holder">ผู้ถือครอง</label>
-            <select id="assignment-filter-holder" value={filters.userId} onChange={(event) => updateFilter('userId', event.target.value)} disabled={!userOptions}>
+            <select id="assignment-filter-holder" value={filters.employeeId} onChange={(event) => updateFilter('employeeId', event.target.value)} disabled={!employeeOptions}>
               <option value="">ทุกคน</option>
-              {userOptions?.map((user) => <option key={user.id} value={user.id}>{user.name || user.email}</option>)}
+              {employeeOptions?.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeCode} — {employee.fullName}</option>)}
             </select>
           </div>
         )}
@@ -289,8 +290,8 @@ export default function Assignments({ role, initialAssetId }) {
                 <div className="current-holder-list">
                   {currentHolders.map((assignment) => (
                     <article className="current-holder-item" key={assignment.id}>
-                      <span className="holder-avatar">{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span>
-                      <div className="holder-copy"><strong>{assignment.user?.name || assignment.user?.email}</strong><span>{assignment.asset?.assetTag} · {assignment.asset?.name}</span></div>
+                      <span className="holder-avatar">{assignmentHolderName(assignment).charAt(0).toUpperCase()}</span>
+                      <div className="holder-copy"><strong>{assignmentHolderName(assignment)}</strong><span>{assignmentHolderCode(assignment)} · {assignmentHolderDepartment(assignment)} · {assignmentHolderPosition(assignment)}</span></div>
                       <time><Clock3 size={13} /> {formatDate(assignment.assignedAt)}</time>
                     </article>
                   ))}
@@ -309,7 +310,7 @@ export default function Assignments({ role, initialAssetId }) {
                   return (
                     <li className={`tone-${config.tone}`} key={assignment.id}>
                       <span className="timeline-marker"><TimelineIcon size={14} /></span>
-                      <div><strong>{assignment.asset?.assetTag} · {statusLabel(assignment.status)}</strong><p>{assignment.user?.name || assignment.user?.email} · {assignment.asset?.name}</p></div>
+                      <div><strong>{assignment.asset?.assetTag} · {statusLabel(assignment.status)}</strong><p>{assignmentHolderName(assignment)} · {assignmentHolderCode(assignment)} · {assignment.asset?.name}</p></div>
                       <time>{formatDate(assignment.returnedAt || assignment.assignedAt)}</time>
                     </li>
                   )
@@ -340,7 +341,7 @@ export default function Assignments({ role, initialAssetId }) {
                     return (
                       <tr key={assignment.id}>
                         <td><div className="assignment-asset-cell"><span><Boxes size={17} /></span><div><strong>{assignment.asset?.assetTag}</strong><small>{assignment.asset?.name}</small></div></div></td>
-                        <td><div className="assignment-holder-cell"><span>{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span><div><strong>{assignment.user?.name || assignment.user?.email}</strong><small>{assignment.status === 'ASSIGNED' ? 'ผู้ถือครองปัจจุบัน' : 'ผู้ถือครองในอดีต'}</small></div></div></td>
+                        <td><div className="assignment-holder-cell"><span>{assignmentHolderName(assignment).charAt(0).toUpperCase()}</span><div><strong>{assignmentHolderName(assignment)}</strong><small>{assignmentHolderCode(assignment)} · {assignmentHolderDepartment(assignment)} · {assignmentHolderPosition(assignment)} · {assignment.status === 'ASSIGNED' ? 'ผู้ถือครองปัจจุบัน' : 'ผู้ถือครองในอดีต'}</small></div></div></td>
                         <td>{assignment.assignedBy?.name || assignment.assignedBy?.email}</td>
                         <td>{formatDate(assignment.assignedAt)}</td>
                         <td>{assignment.returnedAt ? formatDate(assignment.returnedAt) : <span className="assignment-muted">—</span>}</td>

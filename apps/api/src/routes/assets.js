@@ -33,7 +33,12 @@ import {
   optionalText, optionalDate, optionalIPv4, optionalMac,
   optionalCurrency, optionalNonNegativeNumber, optionalEnum,
 } from '../utils/zodHelpers.js'
-import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE, shapeAssetWithAssignment } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  CURRENT_ASSIGNMENT_INCLUDE,
+  assignmentHolderScopeForAccount,
+  shapeAssetWithAssignment,
+} from '../utils/assignmentHelpers.js'
 import { ASSET_TICKETS_INCLUDE, summarizeAssetTickets } from '../utils/ticketHelpers.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
 
@@ -133,7 +138,7 @@ function shapeAsset(asset) {
 export function scopeForRead(user) {
   const where = { deletedAt: null }
   if (user.role === 'EMPLOYEE') {
-    where.assignments = { some: { userId: user.id, ...ACTIVE_ASSIGNMENT_WHERE } }
+    where.assignments = { some: { ...ACTIVE_ASSIGNMENT_WHERE, ...assignmentHolderScopeForAccount(user) } }
   }
   return where
 }

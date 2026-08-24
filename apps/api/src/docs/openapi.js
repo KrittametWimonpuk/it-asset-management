@@ -333,7 +333,8 @@ const assignmentSchemas = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       assetId: { type: 'string', format: 'uuid' },
-      userId: { type: 'string', format: 'uuid' },
+      employeeId: { type: 'string', format: 'uuid', nullable: true, description: 'ผู้ถือครองทางธุรกิจ; null ได้เฉพาะข้อมูลเก่าที่ backfill ไม่ได้' },
+      userId: { type: 'string', format: 'uuid', nullable: true, deprecated: true, description: 'บัญชีผู้ถือครองเดิม เก็บไว้เพื่อ backward compatibility' },
       assignedById: { type: 'string', format: 'uuid' },
       assignedAt: { type: 'string', format: 'date-time' },
       expectedReturnDate: { type: 'string', format: 'date-time', nullable: true },
@@ -356,11 +357,26 @@ const assignmentSchemas = {
       },
       user: {
         type: 'object',
-        description: 'ผู้ถือครอง (พนักงานที่ได้รับมอบหมาย)',
+        nullable: true,
+        deprecated: true,
+        description: 'ข้อมูลบัญชีผู้ถือครองเดิม — ใช้ fallback สำหรับ assignment เก่าเท่านั้น',
         properties: {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string', nullable: true, example: 'Admin User' },
           email: { type: 'string', example: 'admin@example.com' },
+        },
+      },
+      employee: {
+        type: 'object',
+        nullable: true,
+        description: 'Employee business identity ของผู้ถือครอง; null ได้สำหรับข้อมูลเก่าที่ยัง map ไม่ได้',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          employeeCode: { type: 'string', example: 'EMP-IT-001' },
+          fullName: { type: 'string', example: 'IT Staff' },
+          department: { type: 'object', nullable: true, properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string', example: 'IT' } } },
+          position: { type: 'string', nullable: true, example: 'IT Support' },
+          status: { $ref: '#/components/schemas/EmployeeStatus' },
         },
       },
       assignedBy: {
@@ -376,10 +392,11 @@ const assignmentSchemas = {
   },
   AssignmentCreateRequest: {
     type: 'object',
-    required: ['assetId', 'userId'],
+    required: ['assetId', 'employeeId'],
     properties: {
       assetId: { type: 'string', format: 'uuid', description: 'ต้องเป็นครุภัณฑ์ที่ยังไม่มีผู้ถือครองอยู่' },
-      userId: { type: 'string', format: 'uuid', description: 'พนักงานที่จะรับมอบหมาย' },
+      employeeId: { type: 'string', format: 'uuid', description: 'Employee ที่ active และไม่ถูก archive เท่านั้น' },
+      userId: { type: 'string', format: 'uuid', deprecated: true, description: 'รองรับ client เดิม; API จะ resolve Employee ทางอีเมลและยังบังคับว่าต้องพบ Employee ที่ active' },
       assignedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = ใช้วันที่ปัจจุบัน' },
       expectedReturnDate: { type: 'string', format: 'date', nullable: true },
       conditionBefore: { $ref: '#/components/schemas/AssetCondition' },
@@ -531,6 +548,10 @@ const dashboardSchemas = {
     type: 'object',
     description: 'ผลลัพธ์ต่างกันตาม role — ADMIN/IT_STAFF เห็นภาพรวมองค์กร, EMPLOYEE เห็นเฉพาะของตัวเอง (ฟิลด์ org-wide เป็น null/array ว่าง)',
     properties: {
+      currentEmployee: {
+        allOf: [{ $ref: '#/components/schemas/Employee' }], nullable: true,
+        description: 'Employee ที่เชื่อมกับบัญชีปัจจุบันทางอีเมล; ส่งใน dashboard ของ EMPLOYEE และอาจเป็น null',
+      },
       summary: {
         type: 'object',
         properties: {
@@ -629,7 +650,10 @@ const reportSchemas = {
     type: 'object',
     properties: {
       asset: { type: 'string', example: 'IT-0001 — โน้ตบุ๊ค Dell Latitude 5440' },
-      employee: { type: 'string', example: 'Admin User' },
+      employeeCode: { type: 'string', example: 'EMP-ADMIN-001' },
+      employeeName: { type: 'string', example: 'Admin User' },
+      department: { type: 'string', example: 'IT' },
+      position: { type: 'string', example: 'IT Administrator' },
       assignedDate: { type: 'string', example: '2025-04-03' },
       returnedDate: { type: 'string', example: '' },
       status: { type: 'string', example: 'กำลังถือครอง' },
@@ -725,7 +749,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-alpha.1',
+    version: '1.1.0-alpha.2',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
@@ -742,8 +766,8 @@ const definition = {
   ],
   tags: [
     { name: 'Authentication', description: 'สมัครสมาชิก / เข้าสู่ระบบ / ข้อมูลตัวเอง' },
-    { name: 'Users', description: 'รายชื่อผู้ใช้ (ดูอย่างเดียว) — ใช้เลือกพนักงานตอนมอบหมาย/มอบหมายตั๋ว' },
-    { name: 'Employees', description: 'ข้อมูลพนักงาน — foundation แยกจาก User; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
+    { name: 'Users', description: 'บัญชีผู้ใช้สำหรับ authentication/RBAC และผู้รับผิดชอบตั๋ว Helpdesk' },
+    { name: 'Employees', description: 'ข้อมูลพนักงานและ business identity สำหรับผู้ถือครองครุภัณฑ์; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },

@@ -108,8 +108,8 @@ model Department {
 // ---------------------------------------------------------------------------
 // v1.1.0 Phase 1 — Employee Management Foundation
 //
-// Employee แยกจาก User โดยเจตนาในระยะแรก: User ยังเป็นบัญชีสำหรับ authentication/RBAC และ
-// Assignment ยังคงอ้างอิง User เหมือนเดิม เพื่อไม่ให้ feature ใหม่กระทบ workflow ที่ใช้งานอยู่
+// Employee แยกจาก User โดยเจตนา: User เป็นบัญชีสำหรับ authentication/RBAC ส่วน Employee
+// เป็น business identity ของผู้ถือครองครุภัณฑ์ โดย Assignment.user ยังเก็บไว้รองรับข้อมูลเดิม
 // ---------------------------------------------------------------------------
 enum EmployeeStatus {
   ACTIVE
@@ -136,6 +136,7 @@ model Employee {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   deletedAt    DateTime?
+  assignments  Assignment[]
 
   @@index([departmentId])
   @@index([status])
@@ -259,8 +260,14 @@ model Assignment {
   assetId String
   asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
-  userId String // ผู้ถือครอง (พนักงานที่ได้รับมอบหมาย)
-  user   User   @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+  // legacy holder relation — nullable ตั้งแต่ v1.1.0 Phase 2 และยังคงไว้เพื่ออ่านข้อมูลเก่า
+  userId String?
+  user   User?  @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+
+  // business holder relation — รายการใหม่ทุกแถวต้องมีค่า (บังคับใน API ระหว่างช่วงเปลี่ยนผ่าน)
+  // nullable ในฐานข้อมูลเพื่อรักษา assignment เก่าที่ไม่สามารถ backfill ได้อย่างแน่นอน
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   assignedById String // ผู้ทำรายการมอบหมาย (ADMIN/IT_STAFF) — ตั้งจาก req.user.id เสมอ ไม่รับจาก client
   assignedBy   User   @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
@@ -283,6 +290,7 @@ model Assignment {
   // query หลักของ list/get กรองด้วย assetId/userId/deletedAt เสมอ — index ช่วยให้ query เร็วขึ้น
   @@index([assetId, deletedAt])
   @@index([userId])
+  @@index([employeeId])
   @@index([assignedById])
   @@index([status])
 }

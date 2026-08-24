@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Route: /api/employees — v1.1.0 Phase 1: Employee Management Foundation
 //
-// Employee เป็นข้อมูลบุคลากร ไม่ใช่บัญชี User: Assignment ยังคงอ้าง User ตามเดิมใน Phase นี้
+// Employee เป็นข้อมูลบุคลากร ไม่ใช่บัญชี User และเป็น business identity ของผู้ถือครองตั้งแต่ Phase 2
 // สิทธิ์: ADMIN = CRUD + archive/restore, IT_STAFF = read/create/update, EMPLOYEE = ไม่มีสิทธิ์
 // ---------------------------------------------------------------------------
 import { Router } from 'express'

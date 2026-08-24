@@ -18,7 +18,13 @@ import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ok } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  EMPLOYEE_SUMMARY_SELECT,
+  LEGACY_HOLDER_SELECT,
+  assignmentHolderName,
+  assignmentHolderScopeForAccount,
+} from '../utils/assignmentHelpers.js'
 import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
@@ -126,12 +132,12 @@ function mergeRecentActivities(assignments, returns, newAssets, limit) {
   const items = [
     ...assignments.map((a) => ({
       type: 'ASSIGNMENT',
-      message: `มอบหมาย ${a.asset.assetTag} — ${a.asset.name} ให้ ${a.user.name || a.user.email}`,
+      message: `มอบหมาย ${a.asset.assetTag} — ${a.asset.name} ให้ ${assignmentHolderName(a)}`,
       at: a.assignedAt,
     })),
     ...returns.map((a) => ({
       type: 'RETURN',
-      message: `รับคืน ${a.asset.assetTag} — ${a.asset.name} จาก ${a.user.name || a.user.email}`,
+      message: `รับคืน ${a.asset.assetTag} — ${a.asset.name} จาก ${assignmentHolderName(a)}`,
       at: a.returnedAt,
     })),
     ...newAssets.map((a) => ({
@@ -211,13 +217,21 @@ async function buildOrgWideDashboard() {
       where: notDeleted,
       orderBy: { assignedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
-      include: { asset: { select: { assetTag: true, name: true } }, user: { select: { name: true, email: true } } },
+      include: {
+        asset: { select: { assetTag: true, name: true } },
+        employee: { select: EMPLOYEE_SUMMARY_SELECT },
+        user: { select: LEGACY_HOLDER_SELECT },
+      },
     }),
     prisma.assignment.findMany({
       where: { ...notDeleted, returnedAt: { not: null } },
       orderBy: { returnedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
-      include: { asset: { select: { assetTag: true, name: true } }, user: { select: { name: true, email: true } } },
+      include: {
+        asset: { select: { assetTag: true, name: true } },
+        employee: { select: EMPLOYEE_SUMMARY_SELECT },
+        user: { select: LEGACY_HOLDER_SELECT },
+      },
     }),
     prisma.asset.findMany({
       where: notDeleted,
@@ -355,11 +369,14 @@ async function buildOrgWideDashboard() {
 }
 
 // ---- เฉพาะของตัวเอง (EMPLOYEE) — ไม่มีสถิติภาพรวมองค์กรเลย ----
-async function buildEmployeeDashboard(userId) {
+async function buildEmployeeDashboard(user) {
   const now = new Date()
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
+  const userId = user.id
+  const holderScope = assignmentHolderScopeForAccount(user)
 
   const [
+    currentEmployee,
     activeAssignments,
     assignmentStatusGroups,
     recentOwn,
@@ -368,13 +385,17 @@ async function buildEmployeeDashboard(userId) {
     closedToday,
     recentTickets,
   ] = await Promise.all([
+    prisma.employee.findFirst({
+      where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
+      select: EMPLOYEE_SUMMARY_SELECT,
+    }),
     prisma.assignment.findMany({
-      where: { userId, ...ACTIVE_ASSIGNMENT_WHERE },
+      where: { ...holderScope, ...ACTIVE_ASSIGNMENT_WHERE },
       include: { asset: { select: { warrantyExpiry: true } } },
     }),
-    prisma.assignment.groupBy({ by: ['status'], where: { userId, deletedAt: null }, _count: true }),
+    prisma.assignment.groupBy({ by: ['status'], where: { ...holderScope, deletedAt: null }, _count: true }),
     prisma.assignment.findMany({
-      where: { userId, deletedAt: null },
+      where: { ...holderScope, deletedAt: null },
       orderBy: { assignedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
       include: { asset: { select: { assetTag: true, name: true } } },
@@ -409,6 +430,7 @@ async function buildEmployeeDashboard(userId) {
   const ticketStatusCounts = countByGroupField(ticketStatusGroups, TICKET_STATUSES, 'status')
 
   return {
+    currentEmployee,
     summary: {
       totalAssets: totalAssignedAssets,
       assignedAssets: totalAssignedAssets,
@@ -470,7 +492,7 @@ async function buildEmployeeDashboard(userId) {
 
 router.get('/', asyncHandler(async (req, res) => {
   const data = req.user.role === 'EMPLOYEE'
-    ? await buildEmployeeDashboard(req.user.id)
+    ? await buildEmployeeDashboard(req.user)
     : await buildOrgWideDashboard()
   ok(res, data)
 }))

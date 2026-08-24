@@ -5,6 +5,40 @@
 
 ---
 
+## [v1.1.0-alpha.2] — Assignment Employee Integration
+
+เฟส 2 เปลี่ยน business identity ของผู้ถือครองครุภัณฑ์จากบัญชี `User` เป็น `Employee` แบบ incremental
+โดยยังคง User authentication/RBAC, `assignedById` และข้อมูล assignment เดิมไว้ครบถ้วน
+
+### Added
+- Migration `0010_assignment_employee_integration`: เพิ่ม `Assignment.employeeId` และ Foreign Key ไปยัง
+  Employee พร้อม index; backfill เฉพาะคู่ User/Employee ที่มีอีเมลตรงกันแบบไม่กำกวม
+- Assignment API ส่ง nested Employee (รหัส/ชื่อ/แผนก/ตำแหน่ง/สถานะ), ค้นหารหัสพนักงาน ชื่อ และแผนก
+  พร้อมตัวกรอง `employeeId`
+- Employee selector ในฟอร์มมอบหมาย รองรับค้นหารหัส ชื่อ และแผนก แสดงสถานะ และเลือกเฉพาะพนักงาน
+  Active ที่ไม่ถูก archive
+- Current Holder, Assignment History, Employee dashboard และ Assignment Report แสดงข้อมูล Employee
+- Audit ASSIGN/RETURN ระบุ Employee identity และเก็บ `employeeId`/`employeeCode` ใน audit values
+
+### Changed
+- Assignment ใหม่บังคับ `employeeId`; `User` ยังคงระบุ operator ผ่าน `assignedById` และ `userId` เดิม
+  ยังรับได้แบบ deprecated เพื่อ backward compatibility
+- EMPLOYEE data scope ตรวจทั้ง relation Employee ที่ match อีเมลบัญชี และ legacy `userId` เดิม
+- Assignment Report เพิ่ม Employee Code, Employee Name, Department และ Position
+- Swagger/OpenAPI และ package version อัปเดตเป็น `v1.1.0-alpha.2`
+
+### Backward Compatibility
+- `employeeId` เป็น nullable ที่ฐานข้อมูลเพื่อให้ migration ไม่ทำข้อมูลเก่าหาย; assignment เก่าที่ยัง map ไม่ได้
+  แสดง User เดิม หรือ `Unknown Employee` แทนโดยไม่ crash
+- ไม่ลบ User authentication, RBAC, `Assignment.userId` หรือ endpoint/filter เดิม
+
+### Known Limitations
+- การเชื่อม User ↔ Employee ยังใช้ case-insensitive email matching ระหว่างช่วงเปลี่ยนผ่าน ยังไม่มี account link table
+- ข้อมูลเก่าที่ไม่มี Employee อีเมลตรงกันจะไม่ถูกเดาและคง `employeeId = null`
+- Borrow Request, Approval Workflow, Notifications และ HR Integration ยังไม่รวมใน alpha นี้
+
+---
+
 ## [v1.1.0-alpha.1] — Employee Management Foundation
 
 เฟสแรกของ v1.1.0 เพิ่มทะเบียนพนักงานแบบ incremental โดยแยก `Employee` ออกจากบัญชี `User` อย่างชัดเจน

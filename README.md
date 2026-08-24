@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.1`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.2`
 
 ---
 
@@ -29,8 +29,8 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
-| **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน โดย Assignment เดิมยังอ้าง User เหมือนเดิม |
-| **Asset Assignment & Lifecycle** | มอบหมาย/รับคืนครุภัณฑ์ พร้อมประวัติเต็มรูปแบบ (ห้ามแก้/ลบประวัติเก่า), "ผู้ถือครองปัจจุบัน" คำนวณจากประวัติเสมอ ไม่ใช่ field ที่แก้ตรง ๆ ได้ |
+| **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
+| **Asset Assignment & Lifecycle** | Employee เป็น business identity ของผู้ถือครอง, User เป็นผู้ทำรายการและบัญชี RBAC; รองรับค้นหา/เลือก Employee, มอบหมาย/รับคืน และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
@@ -58,7 +58,7 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0009_employee_management`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0010_assignment_employee_integration`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -66,9 +66,10 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
 - **RBAC ที่ backend เสมอ**: ทุก query ที่ scope ตาม role (เช่น EMPLOYEE เห็นเฉพาะของตัวเอง) กรองใน
   Prisma `where` โดยตรง ไม่ใช่กรองที่ frontend แล้วซ่อน UI — frontend ซ่อนปุ่ม/แท็บเป็นแค่ UX เสริม
   ไม่ใช่ชั้นความปลอดภัยจริง
-- **Employee ≠ User (v1.1 Phase 1)**: `Employee` เป็นข้อมูลบุคลากรสำหรับ workflow รุ่นถัดไป ส่วน `User`
-  ยังคงเป็นบัญชีสำหรับ Authentication/RBAC ทั้งสองโมเดลยังไม่เชื่อมกัน และ `Assignment.userId` ยังอ้าง
-  `User` ตามเดิมทุกประการ เพื่อให้การเพิ่ม foundation ครั้งนี้ backward-compatible
+- **Employee ≠ User (v1.1 Phase 2)**: `Employee` เป็น business identity ของผู้ถือครอง ส่วน `User` ยังคงเป็น
+  บัญชี Authentication/RBAC และ operator (`assignedById`) โดย `Assignment.employeeId` ใช้กับรายการใหม่
+  ขณะที่ `userId` ยังเก็บแบบ nullable เพื่ออ่านข้อมูลเก่า การ scope บัญชี EMPLOYEE ตรวจทั้งสอง relation และ
+  fallback เป็น User เดิมหรือ `Unknown Employee` หากแถวเก่ายัง map ไม่ได้
 - **Ticket lifecycle (Milestone 7)**: วงจรสถานะบังคับจริงที่ backend ([ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
   `TICKET_TRANSITIONS`) ไม่ใช่แค่ UI ซ่อนตัวเลือก — transition ที่ไม่อยู่ในตารางนี้ถูกปฏิเสธด้วย `400` เสมอ:
 
@@ -434,9 +435,9 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
-## 👥 Employee Management (v1.1.0-alpha.1)
+## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.2)
 
-Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` สำหรับเตรียม Borrow/Return/Approval/HR workflow ในรุ่นถัดไป
+Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` และเป็น business identity ของผู้ถือครองครุภัณฑ์
 หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
 กรองสถานะ/แผนก, แบ่งหน้า และ Archive/Restore แบบ soft delete
 
@@ -450,7 +451,9 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 | POST | `/api/employees/:id/restore` | Restore | 403 | 403 |
 
 `employeeCode` ไม่ซ้ำทั้งรายการปัจจุบันและ Archive, `fullName` คำนวณจากชื่อ/นามสกุลที่ backend และการลบ
-ไม่เคยลบแถวจริง ข้อสำคัญคือ Phase 1 **ยังไม่เชื่อม Employee กับ User** และ **ไม่เปลี่ยน Assignment** เดิม
+ไม่เคยลบแถวจริง ใน Phase 2 Assignment ใหม่เลือกเฉพาะ Employee ที่ Active และไม่ถูก archive; User ยังคง
+ใช้ login/RBAC และระบุผู้ทำรายการ มาตรฐาน migration จะ backfill ด้วยอีเมลเฉพาะกรณี match ได้เพียงรายการเดียว
+จึงไม่เดาหรือเขียนทับข้อมูลเก่าที่กำกวม
 
 ---
 
@@ -538,7 +541,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.1`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.2`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -685,8 +688,9 @@ cd deploy
 - **ไม่มี endpoint ลบประวัติการมอบหมาย** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติต้องอยู่ครบเสมอ) ไม่ใช่ข้อจำกัดทางเทคนิค
 - **Master data ที่ถูกลบยังผูกกับ asset เก่าได้** — ตั้งใจให้ asset เก่าที่อ้างอิง category/location ที่ถูกลบไปแล้ว
   ยังแสดงชื่อได้ถูกต้อง แต่หมายความว่าการลบ master data ไม่ cascade ไปเช็ก asset ที่ใช้อยู่
-- **Automated tests ยังครอบคลุมเฉพาะ Employee foundation** — มี unit/policy tests สำหรับ validation,
-  search/filter, RBAC และ audit dictionary แล้ว แต่ module เดิมและ browser E2E ยังไม่มี coverage อัตโนมัติเต็มระบบ
+- **Automated tests ยังไม่ครอบคลุมทุก module เดิม** — มี unit/policy tests สำหรับ Employee และ Assignment
+  integration (validation, legacy compatibility, RBAC scope, fallback และ migration contract) แล้ว แต่ browser E2E
+  และโมดูลเดิมทั้งหมดยังไม่มี coverage อัตโนมัติเต็มระบบ
 - **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
@@ -745,7 +749,7 @@ cd deploy
 ## 🗺️ Roadmap
 
 - [x] Employee Management Foundation — model/migration, REST API, RBAC, Audit Log และ responsive UI (`v1.1.0-alpha.1`)
-- [ ] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม
+- [x] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม (`v1.1.0-alpha.2`)
 - [ ] Borrow Request / Return / Approval Workflow / Notifications / HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8

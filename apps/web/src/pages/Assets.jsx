@@ -27,6 +27,7 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
 import { formatDate } from '../utils/format.js'
 import { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
+import { assignmentHolderCode, assignmentHolderDepartment, assignmentHolderName, assignmentHolderPosition } from '../utils/assignmentHolder.js'
 import './Assets.css'
 
 const PAGE_SIZE = 20
@@ -404,7 +405,7 @@ export default function Assets({ role, onNavigateToMaster, onViewHistory, onView
                       {visibleColumns.hostname && <td className="assets-mono">{asset.hostname || '-'}</td>}
                       {visibleColumns.ipAddress && <td className="assets-mono">{asset.ipAddress || '-'}</td>}
                       {visibleColumns.warrantyExpiry && <td>{asset.warrantyExpiry ? formatDate(asset.warrantyExpiry) : '-'}{warranty && <span className={`assets-warranty-badge ${warranty.className}`}>{warranty.label}</span>}</td>}
-                      {visibleColumns.currentHolder && <td>{holder ? (holder.user.name || holder.user.email) : <span className="assets-muted-value">ไม่มีผู้ถือครอง</span>}</td>}
+                      {visibleColumns.currentHolder && <td>{holder ? <div className="assets-holder-summary"><strong>{assignmentHolderName(holder)}</strong><small>{assignmentHolderCode(holder)} · {assignmentHolderDepartment(holder)} · {assignmentHolderPosition(holder)}</small></div> : <span className="assets-muted-value">ไม่มีผู้ถือครอง</span>}</td>}
                       {visibleColumns.assignmentStatus && <td>{holder ? assignmentStatusLabel(holder.status) : '-'}</td>}
                       {visibleColumns.assignedDate && <td>{holder ? formatDate(holder.assignedAt) : '-'}</td>}
                       {visibleColumns.expectedReturn && <td>{holder?.expectedReturnDate ? formatDate(holder.expectedReturnDate) : '-'}</td>}

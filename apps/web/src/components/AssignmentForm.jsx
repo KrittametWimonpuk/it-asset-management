@@ -5,11 +5,12 @@
 // (ครุภัณฑ์กับพนักงานเปลี่ยนไม่ได้ เพราะเป็นข้อมูลหลักของประวัติที่ห้ามเขียนทับ)
 // ถ้าไม่มี = โหมดมอบหมายใหม่ — เลือกได้เฉพาะครุภัณฑ์ที่ยังไม่มีผู้ถือครอง (?unassigned=true)
 // ---------------------------------------------------------------------------
-import { useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { api } from '../api.js'
 import { CONDITION_OPTIONS } from './AssetForm.jsx'
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 import DateInput from './DateInput.jsx'
+import { assignmentHolderName } from '../utils/assignmentHolder.js'
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -22,7 +23,7 @@ function toDateInputValue(value) {
 
 const emptyForm = {
   assetId: '',
-  userId: '',
+  employeeId: '',
   assignedAt: '',
   expectedReturnDate: '',
   conditionBefore: '',
@@ -31,7 +32,7 @@ const emptyForm = {
 
 const REQUIRED_MESSAGES = {
   assetId: 'กรุณาเลือกครุภัณฑ์',
-  userId: 'กรุณาเลือกพนักงาน',
+  employeeId: 'กรุณาเลือกพนักงาน',
   assignedAt: 'กรุณาระบุวันที่มอบหมาย',
 }
 
@@ -42,7 +43,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
     return {
       ...emptyForm,
       assetId: assignment.assetId,
-      userId: assignment.userId,
+      employeeId: assignment.employeeId || '',
       assignedAt: toDateInputValue(assignment.assignedAt),
       expectedReturnDate: toDateInputValue(assignment.expectedReturnDate),
       conditionBefore: assignment.conditionBefore || '',
@@ -57,7 +58,8 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
 
   // ตัวเลือกครุภัณฑ์ที่ยังไม่มีผู้ถือครอง + รายชื่อพนักงาน — โหลดเฉพาะตอนมอบหมายใหม่ (แก้ไขเปลี่ยนไม่ได้)
   const [assetOptions, setAssetOptions] = useState(null)
-  const [userOptions, setUserOptions] = useState(null)
+  const [employeeOptions, setEmployeeOptions] = useState(null)
+  const [employeeSearch, setEmployeeSearch] = useState('')
   const [optionsError, setOptionsError] = useState('')
 
   useEffect(() => {
@@ -65,18 +67,43 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
     let cancelled = false
     Promise.all([
       api.listAssets({ unassigned: true, pageSize: 100, sortBy: 'assetTag', sortOrder: 'asc' }),
-      api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' }),
+      api.employees.list({ pageSize: 100, sortBy: 'employeeCode', sortOrder: 'asc', status: 'ACTIVE', isActive: true }),
     ])
-      .then(([assetsRes, usersRes]) => {
+      .then(([assetsRes, employeesRes]) => {
         if (cancelled) return
         setAssetOptions(assetsRes.items)
-        setUserOptions(usersRes.items)
+        setEmployeeOptions(employeesRes.items)
       })
       .catch((err) => { if (!cancelled) setOptionsError(err.message) })
     return () => { cancelled = true }
   }, [isEdit])
 
   useEffect(() => { firstInputRef.current?.focus() }, [])
+
+  useEffect(() => {
+    if (isEdit) return
+    const timer = setTimeout(() => {
+      api.employees.list({
+        pageSize: 100,
+        sortBy: 'employeeCode',
+        sortOrder: 'asc',
+        status: 'ACTIVE',
+        isActive: true,
+        search: employeeSearch.trim() || undefined,
+      }).then((response) => setEmployeeOptions(response.items)).catch((err) => setOptionsError(err.message))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [employeeSearch, isEdit])
+
+  const visibleEmployees = useMemo(() => {
+    const term = employeeSearch.trim().toLocaleLowerCase('th-TH')
+    if (!term) return employeeOptions || []
+    return (employeeOptions || []).filter((employee) => [
+      employee.employeeCode,
+      employee.fullName,
+      employee.department?.name,
+    ].some((value) => value?.toLocaleLowerCase('th-TH').includes(term)))
+  }, [employeeOptions, employeeSearch])
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -91,7 +118,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
     setFieldErrors({})
 
     if (!isEdit) {
-      const missing = ['assetId', 'userId', 'assignedAt'].filter((f) => !form[f])
+      const missing = ['assetId', 'employeeId', 'assignedAt'].filter((f) => !form[f])
       if (missing.length > 0) {
         const errs = {}
         missing.forEach((f) => { errs[f] = REQUIRED_MESSAGES[f] })
@@ -110,7 +137,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
           }
         : {
             assetId: form.assetId,
-            userId: form.userId,
+            employeeId: form.employeeId,
             assignedAt: form.assignedAt,
             expectedReturnDate: form.expectedReturnDate,
             conditionBefore: form.conditionBefore,
@@ -141,7 +168,7 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
               <label htmlFor="assignment-asset">ครุภัณฑ์</label>
               <p className="muted" id="assignment-asset">{assignment.asset?.assetTag} — {assignment.asset?.name}</p>
               <label htmlFor="assignment-employee">พนักงาน</label>
-              <p className="muted" id="assignment-employee">{assignment.user?.name || assignment.user?.email}</p>
+              <p className="muted" id="assignment-employee">{assignmentHolderName(assignment)}{assignment.employee?.employeeCode ? ` (${assignment.employee.employeeCode})` : ''}</p>
             </>
           ) : (
             <>
@@ -166,23 +193,38 @@ export default function AssignmentForm({ assignment, onSubmit, onCancel }) {
               )}
               {fieldErrors.assetId && <p className="field-error">{fieldErrors.assetId}</p>}
 
-              <label htmlFor="assignment-user-select">พนักงาน *</label>
-              {!userOptions ? (
-                <p className="muted" id="assignment-user-select">กำลังโหลดตัวเลือก...</p>
+              <label htmlFor="assignment-employee-search">พนักงาน *</label>
+              {!employeeOptions ? (
+                <p className="muted" id="assignment-employee-search">กำลังโหลดตัวเลือก...</p>
               ) : (
-                <select
-                  id="assignment-user-select"
-                  value={form.userId}
-                  onChange={(e) => update('userId', e.target.value)}
-                  className={fieldErrors.userId ? 'invalid' : ''}
-                >
-                  <option value="">-- เลือกพนักงาน --</option>
-                  {userOptions.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                  ))}
-                </select>
+                <div className={`assignment-employee-picker${fieldErrors.employeeId ? ' invalid' : ''}`}>
+                  <input
+                    id="assignment-employee-search"
+                    type="search"
+                    value={employeeSearch}
+                    onChange={(event) => setEmployeeSearch(event.target.value)}
+                    placeholder="ค้นหารหัส ชื่อ หรือแผนก..."
+                    autoComplete="off"
+                    aria-invalid={Boolean(fieldErrors.employeeId)}
+                    aria-describedby={fieldErrors.employeeId ? 'assignment-employee-error' : undefined}
+                  />
+                  <div className="assignment-employee-options" role="group" aria-label="รายชื่อพนักงานที่พร้อมรับมอบหมาย" aria-live="polite">
+                    {visibleEmployees.length === 0 ? <p className="muted">ไม่พบพนักงานที่พร้อมรับมอบหมาย</p> : visibleEmployees.map((employee) => (
+                      <button
+                        type="button"
+                        aria-pressed={form.employeeId === employee.id}
+                        className={form.employeeId === employee.id ? 'is-selected' : ''}
+                        key={employee.id}
+                        onClick={() => update('employeeId', employee.id)}
+                      >
+                        <span><strong>{employee.employeeCode}</strong><small>{employee.fullName}</small></span>
+                        <span><small>{employee.department?.name || 'ไม่ระบุแผนก'}</small><em>Active</em></span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-              {fieldErrors.userId && <p className="field-error">{fieldErrors.userId}</p>}
+              {fieldErrors.employeeId && <p className="field-error" id="assignment-employee-error">{fieldErrors.employeeId}</p>}
             </>
           )}
 
