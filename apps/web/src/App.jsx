@@ -8,10 +8,11 @@
 // ---------------------------------------------------------------------------
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { auth, api } from './api.js'
-import Login from './pages/Login.jsx'
+import PortfolioShowcase from './pages/PortfolioShowcase.jsx'
 import AppShell from './components/AppShell.jsx'
 import { categoryConfig, locationConfig, departmentConfig, vendorConfig } from './pages/masterDataConfigs.jsx'
 
+const Login = lazy(() => import('./pages/Login.jsx'))
 const Register = lazy(() => import('./pages/Register.jsx'))
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
 const Assets = lazy(() => import('./pages/Assets.jsx'))
@@ -47,7 +48,7 @@ const ROLE_LABELS = {
 
 export default function App() {
   const [user, setUser] = useState(null)      // ข้อมูลผู้ใช้ที่ล็อกอินอยู่
-  const [view, setView] = useState('login')   // 'login' | 'register'
+  const [view, setView] = useState('showcase') // 'showcase' | 'login' | 'register'
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('dashboard') // 'dashboard' | 'assets' | 'assignments' | 'tickets' | 'categories' | 'locations' | 'departments' | 'vendors'
 
@@ -73,7 +74,7 @@ export default function App() {
   function handleLogout() {
     auth.clear()
     setUser(null)
-    setView('login')
+    setView('showcase')
     setTab('dashboard')
   }
 
@@ -118,9 +119,12 @@ export default function App() {
 
   // ยังไม่ล็อกอิน -> สลับระหว่างหน้า Login / Register
   if (!user) {
-    return view === 'login'
-      ? <Login onAuthed={handleAuthed} goRegister={() => setView('register')} />
-      : <Suspense fallback={<PageLoading />}><Register onAuthed={handleAuthed} goLogin={() => setView('login')} /></Suspense>
+    if (view === 'showcase') return <PortfolioShowcase onViewDemo={() => setView('login')} />
+    return <Suspense fallback={<PageLoading />}>
+      {view === 'login'
+        ? <Login onAuthed={handleAuthed} goRegister={() => setView('register')} />
+        : <Register onAuthed={handleAuthed} goLogin={() => setView('login')} />}
+    </Suspense>
   }
 
   // EMPLOYEE จัดการ master data ไม่ได้ (Milestone 4) — ซ่อนแท็บทั้งหมดไปเลย ไม่ใช่แค่ปุ่มข้างใน
