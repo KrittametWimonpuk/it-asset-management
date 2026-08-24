@@ -32,6 +32,7 @@ const CORE_NAVIGATION = [
 ]
 
 const ADMIN_NAVIGATION = [
+  { key: 'employees', label: 'พนักงาน', group: 'ผู้ดูแลระบบ', icon: 'employee' },
   { key: 'audit', label: 'Audit Log', group: 'ผู้ดูแลระบบ', icon: 'audit' },
   { key: 'categories', label: 'หมวดหมู่', group: 'ผู้ดูแลระบบ', icon: 'category' },
   { key: 'locations', label: 'สถานที่ตั้ง', group: 'ผู้ดูแลระบบ', icon: 'location' },
@@ -46,6 +47,7 @@ const PAGE_META = {
   tickets: { title: 'Helpdesk', eyebrow: 'งานบริการไอที' },
   reports: { title: 'รายงาน', eyebrow: 'ข้อมูลและการวิเคราะห์' },
   audit: { title: 'Audit Log', eyebrow: 'การกำกับดูแลระบบ' },
+  employees: { title: 'พนักงาน', eyebrow: 'การจัดการบุคลากร' },
   categories: { title: 'หมวดหมู่', eyebrow: 'ข้อมูลหลัก' },
   locations: { title: 'สถานที่ตั้ง', eyebrow: 'ข้อมูลหลัก' },
   departments: { title: 'แผนก', eyebrow: 'ข้อมูลหลัก' },
@@ -60,6 +62,7 @@ function Icon({ name }) {
     ticket: <><path d="M4 7a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2v-3a2 2 0 0 0 0-4V7Z" /><path d="M12 8v8" /></>,
     report: <><path d="M5 20V10M12 20V4M19 20v-7" /><path d="M3 20h18" /></>,
     audit: <><path d="M12 3 20 6v6c0 5-3.2 8.1-8 10-4.8-1.9-8-5-8-10V6l8-3Z" /><path d="m9 12 2 2 4-4" /></>,
+    employee: <><circle cx="9" cy="8" r="4" /><path d="M2.5 21a6.5 6.5 0 0 1 13 0M17 11a4 4 0 0 0 0-7M17 15a6 6 0 0 1 5 6" /></>,
     category: <><path d="m4 4 6 1 9 9-5 5-9-9-1-6Z" /><circle cx="7.5" cy="7.5" r="1" /></>,
     location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     department: <><path d="M3 21h18M5 21V8l7-4 7 4v13M9 12h2M13 12h2M9 16h2M13 16h2" /></>,
@@ -255,7 +258,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
         <div className="sidebar-footer">
           <div className="sidebar-version">
             <span className="sidebar-status-dot" />
-            <span>v1.0.0 Stable</span>
+            <span>v1.0.1 Stable</span>
           </div>
           <button
             className="sidebar-collapse"

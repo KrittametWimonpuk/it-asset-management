@@ -23,7 +23,7 @@ function formatTyping(value) {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
 }
 
-export default function DateInput({ id, value, onChange, className = '', disabled, required, min, ariaDescribedBy, inputRef }) {
+export default function DateInput({ id, value, onChange, className = '', disabled, required, min, ariaDescribedBy, ariaInvalid, inputRef }) {
   const [display, setDisplay] = useState(() => toDisplay(value))
   const focused = useRef(false)
   const pickerRef = useRef(null)
@@ -73,6 +73,7 @@ export default function DateInput({ id, value, onChange, className = '', disable
       disabled={disabled}
       required={required}
       aria-describedby={ariaDescribedBy}
+      aria-invalid={ariaInvalid}
     />
     <button type="button" className="date-input-trigger" onClick={openPicker} disabled={disabled} aria-label="เปิดปฏิทิน">
       <CalendarDays size={17} />

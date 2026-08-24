@@ -100,7 +100,46 @@ model Department {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   assets      Asset[]
+  employees   Employee[]
 
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// v1.1.0 Phase 1 — Employee Management Foundation
+//
+// Employee แยกจาก User โดยเจตนาในระยะแรก: User ยังเป็นบัญชีสำหรับ authentication/RBAC และ
+// Assignment ยังคงอ้างอิง User เหมือนเดิม เพื่อไม่ให้ feature ใหม่กระทบ workflow ที่ใช้งานอยู่
+// ---------------------------------------------------------------------------
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  RESIGNED
+}
+
+model Employee {
+  id           String         @id @default(uuid())
+  employeeCode String         @unique
+  firstName    String
+  lastName     String
+  fullName     String
+  email        String?
+  phone        String?
+  departmentId String?
+  department   Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position     String?
+  status       EmployeeStatus @default(ACTIVE)
+  hireDate     DateTime?
+  remark       String?
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([fullName])
   @@index([deletedAt])
 }
 

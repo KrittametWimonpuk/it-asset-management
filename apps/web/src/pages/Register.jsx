@@ -28,7 +28,7 @@ export default function Register({ onAuthed, goLogin }) {
   return (
     <main className="register-page">
       <section className="register-panel">
-        <div className="register-brand"><span><ShieldCheck size={23} /></span><div><strong>IT Asset Management</strong><small>Enterprise Platform · v1.0.0</small></div></div>
+        <div className="register-brand"><span><ShieldCheck size={23} /></span><div><strong>IT Asset Management</strong><small>Enterprise Platform · v1.0.1</small></div></div>
         <div className="register-heading"><span><UserRoundPlus size={16} /> Create account</span><h1>สมัครสมาชิก</h1><p>สร้างบัญชีเพื่อเริ่มใช้งานระบบจัดการครุภัณฑ์</p></div>
         <form onSubmit={submit}>
           <label htmlFor="register-name">ชื่อ</label><div className="register-input"><UserRound size={17} /><input id="register-name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>

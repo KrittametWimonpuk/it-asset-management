@@ -158,6 +158,70 @@ const masterDataSchemas = {
   },
 }
 
+const employeeSchemas = {
+  EmployeeStatus: {
+    type: 'string',
+    enum: ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'RESIGNED'],
+  },
+  Employee: {
+    type: 'object',
+    description: 'ข้อมูลบุคลากร แยกจากบัญชี User และยังไม่ถูกใช้แทน User ใน Assignment',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      employeeCode: { type: 'string', example: 'EMP-0001' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      fullName: { type: 'string', example: 'สมชาย ใจดี', readOnly: true },
+      email: { type: 'string', format: 'email', nullable: true, example: 'somchai@example.com' },
+      phone: { type: 'string', nullable: true, example: '0812345678' },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      department: { allOf: [{ $ref: '#/components/schemas/MasterDataItem' }], nullable: true },
+      position: { type: 'string', nullable: true, example: 'IT Support' },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date-time', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean', example: true },
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
+      deletedAt: { type: 'string', format: 'date-time', nullable: true },
+    },
+  },
+  EmployeeCreateRequest: {
+    type: 'object',
+    required: ['employeeCode', 'firstName', 'lastName'],
+    properties: {
+      employeeCode: { type: 'string', example: 'EMP-0001', description: 'ห้ามซ้ำ ระบบแปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      email: { type: 'string', format: 'email', nullable: true },
+      phone: { type: 'string', nullable: true },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      position: { type: 'string', nullable: true },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean', default: true },
+    },
+  },
+  EmployeeUpdateRequest: {
+    type: 'object',
+    description: 'ทุกฟิลด์ optional; fullName คำนวณจาก firstName + lastName ที่ backend',
+    properties: {
+      employeeCode: { type: 'string', example: 'EMP-0001', description: 'ห้ามซ้ำ ระบบแปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      email: { type: 'string', format: 'email', nullable: true },
+      phone: { type: 'string', nullable: true },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      position: { type: 'string', nullable: true },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean' },
+    },
+  },
+}
+
 const assetSchemas = {
   AssetStatus: { type: 'string', enum: ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED'] },
   AssetCondition: { type: 'string', enum: ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'] },
@@ -628,11 +692,11 @@ const reportSchemas = {
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT'],
   },
   AuditEntityType: {
     type: 'string',
-    enum: ['Asset', 'Assignment', 'Ticket', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
+    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
   },
   AuditLog: {
     type: 'object',
@@ -661,7 +725,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '0.9.0',
+    version: '1.1.0-alpha.1',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
@@ -679,6 +743,7 @@ const definition = {
   tags: [
     { name: 'Authentication', description: 'สมัครสมาชิก / เข้าสู่ระบบ / ข้อมูลตัวเอง' },
     { name: 'Users', description: 'รายชื่อผู้ใช้ (ดูอย่างเดียว) — ใช้เลือกพนักงานตอนมอบหมาย/มอบหมายตั๋ว' },
+    { name: 'Employees', description: 'ข้อมูลพนักงาน — foundation แยกจาก User; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
@@ -703,6 +768,7 @@ const definition = {
       ...errorResponse,
       ...userSchemas,
       ...masterDataSchemas,
+      ...employeeSchemas,
       ...assetSchemas,
       ...assignmentSchemas,
       ...ticketSchemas,
@@ -735,6 +801,11 @@ const definition = {
         name: 'id', in: 'path', required: true,
         schema: { type: 'string', format: 'uuid' },
         description: 'ID ของรายการ master data (UUID)',
+      },
+      EmployeeId: {
+        name: 'id', in: 'path', required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Employee ID (UUID)',
       },
       PageParam: { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
       PageSizeParam: { name: 'pageSize', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },

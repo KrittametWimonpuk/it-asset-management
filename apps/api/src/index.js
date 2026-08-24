@@ -22,6 +22,7 @@ import dashboardRoutes from './routes/dashboard.js'
 import ticketRoutes from './routes/tickets.js'
 import reportRoutes from './routes/reports.js'
 import auditRoutes from './routes/audit.js'
+import employeeRoutes from './routes/employees.js'
 import { fail } from './utils/response.js'
 
 const app = express()
@@ -73,6 +74,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/tickets', ticketRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/employees', employeeRoutes)
 
 // ---- ดักกรณีเรียก path ที่ไม่มี ----
 app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))

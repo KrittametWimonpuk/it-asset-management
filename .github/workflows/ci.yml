@@ -2,8 +2,8 @@
 # Continuous Integration — Milestone 10: CI/CD & Release Engineering
 #
 # ตรวจสอบคุณภาพโค้ดอัตโนมัติทุกครั้งที่ push หรือเปิด/อัปเดต pull request เข้า master หรือ feature/*
-# ไม่มีขั้นตอนไหน migrate/เชื่อมต่อฐานข้อมูลจริง — "Prisma validation" ตรวจแค่ syntax ของ schema.prisma
-# เท่านั้น (ไม่ใช่ "Test" — โปรเจกต์นี้ยังไม่มี automated test suite ดู README: Known Limitations)
+# ไม่มีขั้นตอนไหน migrate/เชื่อมต่อฐานข้อมูลจริง — automated tests ใช้ Node test runner ทดสอบ
+# validation, search/filter builder, RBAC policy และ audit dictionary โดยไม่พึ่งฐานข้อมูลภายนอก
 #
 # ทุก step รันตามลำดับในจ็อบเดียว ล้มเหลว step ไหนหยุดทันที (ไม่มี continue-on-error ที่ไหนเลย)
 # ---------------------------------------------------------------------------
@@ -21,7 +21,7 @@ on:
 
 jobs:
   ci:
-    name: Build, Lint & Validate
+    name: Test, Build, Lint & Validate
     runs-on: ubuntu-latest
 
     # DATABASE_URL ใส่ค่าหลอกไว้เท่านั้น — Prisma อ่านค่านี้ตอน parse schema (env("DATABASE_URL"))
@@ -62,6 +62,10 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
+      - name: Test backend
+        working-directory: apps/api
+        run: npm test
+
       - name: Build backend (generate Prisma Client)
         working-directory: apps/api
         run: npm run build
@@ -79,5 +83,6 @@ jobs:
           echo "- Prisma schema validated" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backend lint passed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend lint passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend tests passed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backend build succeeded (Prisma Client generated)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend build succeeded (Vite production bundle)" >> "$GITHUB_STEP_SUMMARY"

@@ -18,12 +18,12 @@ const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABELS).map(([value, labe
 const EMPTY_FILTERS = { action: '', entityType: '', performedBy: '', dateFrom: '', dateTo: '' }
 
 const ACTION_UI = {
-  CREATE: ['green', FilePlus2], UPDATE: ['blue', Pencil], DELETE: ['red', FileX2],
+  CREATE: ['green', FilePlus2], UPDATE: ['blue', Pencil], DELETE: ['red', FileX2], RESTORE: ['green', RotateCcw],
   ASSIGN: ['violet', PackageCheck], RETURN: ['cyan', RotateCcw], OPEN: ['blue', Ticket],
   START_PROGRESS: ['amber', Wrench], ON_HOLD: ['amber', CirclePause], RESOLVE: ['green', CheckCircle2],
   CLOSE: ['slate', XCircle], LOGIN: ['cyan', LogIn], EXPORT_REPORT: ['violet', FileDown],
 }
-const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
+const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Employee: Users, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
 
 function AuditSkeleton() {
   return <div className="audit-skeleton" aria-label="กำลังโหลด Audit Log" aria-busy="true">{[1, 2, 3, 4].map((item) => <div className="audit-shimmer" key={item} />)}</div>

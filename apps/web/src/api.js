@@ -121,6 +121,12 @@ export const api = {
     list: (params) => request(`/users${toQueryString(params)}`),
   },
 
+  // v1.1.0 Phase 1: ข้อมูลพนักงานแยกจากบัญชี User — Assignment ยังอ้าง User เหมือนเดิม
+  employees: {
+    ...createEntityApi('/employees'),
+    restore: (id) => request(`/employees/${id}/restore`, { method: 'POST' }),
+  },
+
   // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
   dashboard: {
     get: () => request('/dashboard'),

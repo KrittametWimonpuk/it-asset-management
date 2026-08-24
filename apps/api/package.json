@@ -1,6 +1,6 @@
 {
   "name": "starter-api",
-  "version": "1.0.0",
+  "version": "1.1.0-alpha.1",
   "description": "Backend API — Express + Prisma + PostgreSQL",
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "migrate:dev": "prisma migrate dev",
     "seed": "node prisma/seed.js",
     "lint": "eslint .",
+    "test": "node --test",
     "validate": "prisma validate",
     "build": "prisma generate"
   },

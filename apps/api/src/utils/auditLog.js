@@ -12,7 +12,7 @@ import { prisma } from '../db.js'
 
 // action ที่รองรับ — ครอบคลุมทุก business action ที่ spec ต้องการให้ตรวจสอบย้อนหลังได้
 export const AUDIT_ACTIONS = [
-  'CREATE', 'UPDATE', 'DELETE',
+  'CREATE', 'UPDATE', 'DELETE', 'RESTORE',
   'ASSIGN', 'RETURN',
   'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE',
   'LOGIN', 'EXPORT_REPORT',
@@ -20,7 +20,7 @@ export const AUDIT_ACTIONS = [
 
 // entityType ที่รองรับ
 export const AUDIT_ENTITY_TYPES = [
-  'Asset', 'Assignment', 'Ticket',
+  'Asset', 'Assignment', 'Ticket', 'Employee',
   'Category', 'Department', 'Location', 'Vendor',
   'User', 'Report',
 ]

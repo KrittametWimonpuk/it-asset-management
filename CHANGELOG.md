@@ -5,6 +5,36 @@
 
 ---
 
+## [v1.1.0-alpha.1] — Employee Management Foundation
+
+เฟสแรกของ v1.1.0 เพิ่มทะเบียนพนักงานแบบ incremental โดยแยก `Employee` ออกจากบัญชี `User` อย่างชัดเจน
+และคง `Assignment.userId` เดิมไว้ทั้งหมด เพื่อให้ระบบเดิม backward-compatible และพร้อมต่อยอด Phase 2
+
+### Added
+- Prisma model/enum `Employee`/`EmployeeStatus` พร้อม migration `0009_employee_management`, unique
+  `employeeCode`, relation แบบ optional กับ Department และ soft delete (`deletedAt`)
+- REST API 6 endpoint: list/detail/create/update/archive/restore พร้อม response envelope, pagination,
+  sorting, filter, search (รหัส/ชื่อเต็ม/อีเมล/โทรศัพท์), Zod validation และ duplicate conflict `409`
+- RBAC: ADMIN ทำได้ครบทุก action, IT_STAFF อ่าน/สร้าง/แก้ไข, EMPLOYEE ไม่มีสิทธิ์เข้าถึง
+- Audit Log entity `Employee` และ action `RESTORE`; บันทึก CREATE/UPDATE/DELETE/RESTORE พร้อม before/after values
+- หน้า Employee Management ใช้ Design System เดิม รองรับ search/filter/pagination, status badges,
+  Department/Position, Create/Edit/Archive/Restore, loading/empty/error states, responsive และ dark mode
+- OpenAPI/Swagger schemas และ paths สำหรับ Employee ทั้งหมด
+- Node test suite สำหรับ validation, search/filter, RBAC และ audit policy พร้อมเพิ่ม `npm test` ใน CI
+
+### Testing
+- Migration `0009` apply สำเร็จบน PostgreSQL 16 ผ่าน Docker Compose; API container healthy
+- Integration CRUD/RBAC ผ่านครบ: EMPLOYEE `403`, IT_STAFF create/update แต่ archive `403`, ADMIN archive/restore
+- ยืนยัน unique employee code `409`, search/pagination, active/archive scopes และ Audit Log ครบ 4 action
+- Prisma validate/generate, backend test/lint, frontend lint/build และ OpenAPI generation ผ่าน
+
+### Known Limitations
+- Employee ยังไม่เชื่อมกับ User และ Assignment ยังอ้าง User ตามเดิมโดยตั้งใจ; การเชื่อมเป็นงาน Phase 2
+- ยังไม่มี Borrow Request, Approval Workflow, HR Integration หรือ employee notifications ใน alpha นี้
+- Automated integration test กับฐานข้อมูลและ browser E2E ยังไม่รันใน CI; รอบนี้ตรวจ integration ผ่าน Docker แบบ manual
+
+---
+
 ## [v1.0.0-rc3] — Release Candidate 3: Production Deployment & Operations
 
 Milestone ด้าน production deployment/operations ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มี API/schema

@@ -20,6 +20,7 @@ const Assignments = lazy(() => import('./pages/Assignments.jsx'))
 const Tickets = lazy(() => import('./pages/Tickets.jsx'))
 const Reports = lazy(() => import('./pages/Reports.jsx'))
 const AuditLog = lazy(() => import('./pages/AuditLog.jsx'))
+const Employees = lazy(() => import('./pages/Employees.jsx'))
 const MasterDataPage = lazy(() => import('./pages/MasterDataPage.jsx'))
 
 function PageLoading() {
@@ -50,7 +51,7 @@ export default function App() {
   const [user, setUser] = useState(null)      // ข้อมูลผู้ใช้ที่ล็อกอินอยู่
   const [view, setView] = useState('showcase') // 'showcase' | 'login' | 'register'
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('dashboard') // 'dashboard' | 'assets' | 'assignments' | 'tickets' | 'categories' | 'locations' | 'departments' | 'vendors'
+  const [tab, setTab] = useState('dashboard') // dashboard/assets/assignments/tickets/employees/reports/audit/master data
 
   // Milestone 5: asset ที่จะกรองไว้ล่วงหน้าตอนเปิดแท็บ "การมอบหมาย" (มาจาก Assets.jsx ปุ่ม "ดูประวัติ")
   const [assignmentsAssetFilter, setAssignmentsAssetFilter] = useState('')
@@ -155,6 +156,7 @@ export default function App() {
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}
           {tab === 'audit' && canManageMasterData && <AuditLog />}
+          {tab === 'employees' && canManageMasterData && <Employees role={user.role} />}
           {activeMaster && <MasterDataPage {...activeMaster.config} />}
         </Suspense>
       </div>

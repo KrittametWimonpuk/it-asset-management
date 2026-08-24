@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชันปัจจุบัน:** `v1.0.0` (Stable Release)
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.1`
 
 ---
 
@@ -29,14 +29,15 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
+| **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน โดย Assignment เดิมยังอ้าง User เหมือนเดิม |
 | **Asset Assignment & Lifecycle** | มอบหมาย/รับคืนครุภัณฑ์ พร้อมประวัติเต็มรูปแบบ (ห้ามแก้/ลบประวัติเก่า), "ผู้ถือครองปัจจุบัน" คำนวณจากประวัติเสมอ ไม่ใช่ field ที่แก้ตรง ๆ ได้ |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 6 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน (ช่วงวันที่/หมวดหมู่/สถานที่/แผนก/ผู้ขาย/สถานะ/ค้นหา) — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที สร้างไฟล์ที่ backend ทั้งหมด ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 49 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 57 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
-| **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint backend/frontend, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
+| **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
 | **Deploy** | สอง production path: (1) Docker Compose self-hosted (`docker-compose.prod.yml` — nginx reverse proxy + security headers + gzip) หรือ (2) สคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB — ดู [🚀 Production Deployment & Operations](#-production-deployment--operations-release-candidate-3) |
 
 ---
@@ -57,7 +58,7 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0007_tickets`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0009_employee_management`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -65,6 +66,9 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
 - **RBAC ที่ backend เสมอ**: ทุก query ที่ scope ตาม role (เช่น EMPLOYEE เห็นเฉพาะของตัวเอง) กรองใน
   Prisma `where` โดยตรง ไม่ใช่กรองที่ frontend แล้วซ่อน UI — frontend ซ่อนปุ่ม/แท็บเป็นแค่ UX เสริม
   ไม่ใช่ชั้นความปลอดภัยจริง
+- **Employee ≠ User (v1.1 Phase 1)**: `Employee` เป็นข้อมูลบุคลากรสำหรับ workflow รุ่นถัดไป ส่วน `User`
+  ยังคงเป็นบัญชีสำหรับ Authentication/RBAC ทั้งสองโมเดลยังไม่เชื่อมกัน และ `Assignment.userId` ยังอ้าง
+  `User` ตามเดิมทุกประการ เพื่อให้การเพิ่ม foundation ครั้งนี้ backward-compatible
 - **Ticket lifecycle (Milestone 7)**: วงจรสถานะบังคับจริงที่ backend ([ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
   `TICKET_TRANSITIONS`) ไม่ใช่แค่ UI ซ่อนตัวเลือก — transition ที่ไม่อยู่ในตารางนี้ถูกปฏิเสธด้วย `400` เสมอ:
 
@@ -108,17 +112,17 @@ webapp-starter/
 │   │   ├── assets/fonts/       ฟอนต์ Sarabun (SIL OFL) ที่ใช้ render ข้อความไทยใน PDF export
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   นิยามตาราง/ความสัมพันธ์ทั้งหมด
-│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0008)
+│   │   │   ├── migrations/     ประวัติการเปลี่ยนโครงสร้างฐานข้อมูล (0001 → 0009)
 │   │   │   └── seed.js         ข้อมูลตัวอย่าง (3 role, ครุภัณฑ์+ประวัติมอบหมาย+ใบแจ้งซ่อม)
 │   │   └── src/
-│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/tickets/dashboard/reports/audit/...)
+│   │       ├── routes/         1 ไฟล์ต่อ 1 resource (assets/assignments/employees/tickets/reports/audit/...)
 │   │       ├── middleware/     requireAuth / requireRole
 │   │       ├── utils/          โค้ดที่ใช้ร่วมกันหลาย route (validation, pagination, response envelope,
 │   │       │                    ticketHelpers, reportHelpers, auditLog — logAudit()/attachPerformer())
 │   │       └── docs/           OpenAPI/Swagger config + คอมเมนต์เอกสาร endpoint (paths/*.js) — ไม่แตะ route file
 │   └── web/                    Frontend (React + Vite)
 │       └── src/
-│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Tickets/Reports/AuditLog/...)
+│           ├── pages/          1 หน้าจอต่อ 1 ไฟล์ (Dashboard/Assets/Assignments/Employees/Tickets/...)
 │           ├── components/     ฟอร์ม/ชิ้นส่วน UI ที่ใช้ซ้ำ
 │           ├── hooks/          logic ที่ใช้ร่วมกันหลายหน้าจอ (เช่น useMasterDataOptions)
 │           └── api.js          จุดเดียวที่คุยกับ backend
@@ -430,6 +434,26 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
+## 👥 Employee Management (v1.1.0-alpha.1)
+
+Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` สำหรับเตรียม Borrow/Return/Approval/HR workflow ในรุ่นถัดไป
+หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
+กรองสถานะ/แผนก, แบ่งหน้า และ Archive/Restore แบบ soft delete
+
+| Method | Endpoint | ADMIN | IT_STAFF | EMPLOYEE |
+|--------|----------|-------|----------|----------|
+| GET | `/api/employees` | อ่าน | อ่าน | 403 |
+| GET | `/api/employees/:id` | อ่าน | อ่าน | 403 |
+| POST | `/api/employees` | สร้าง | สร้าง | 403 |
+| PUT | `/api/employees/:id` | แก้ไข | แก้ไข | 403 |
+| DELETE | `/api/employees/:id` | Archive | 403 | 403 |
+| POST | `/api/employees/:id/restore` | Restore | 403 | 403 |
+
+`employeeCode` ไม่ซ้ำทั้งรายการปัจจุบันและ Archive, `fullName` คำนวณจากชื่อ/นามสกุลที่ backend และการลบ
+ไม่เคยลบแถวจริง ข้อสำคัญคือ Phase 1 **ยังไม่เชื่อม Employee กับ User** และ **ไม่เปลี่ยน Assignment** เดิม
+
+---
+
 ## 📘 API Documentation (Swagger)
 
 เอกสาร API แบบ interactive อยู่ที่ **`/docs`** (เช่น `http://localhost:4000/docs` ตอน dev หรือ
@@ -439,8 +463,8 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (49 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Assets, Assignments,
-   Dashboard, Master Data, Tickets, Reports, Health — แต่ละอันมี summary, description, พารามิเตอร์,
+3. Endpoint ทั้งหมด (57 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+   Assignments, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
 ### วิธี Authorize (ทดลองยิง endpoint ที่ต้องล็อกอิน)
@@ -456,7 +480,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 - เอกสารทั้งหมดอยู่แยกที่ `apps/api/src/docs/` (`openapi.js` = config หลัก + schema ที่ใช้ซ้ำได้,
   `paths/*.js` = คอมเมนต์ `@openapi` ล้วน ๆ 1 ไฟล์ต่อ 1 module) **ไม่มีการแก้ route file ใด ๆ เลยแม้แต่บรรทัดเดียว**
   — เอกสารอ่าน route/validation/response จริงจากซอร์สโค้ดที่มีอยู่แล้วเท่านั้น ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง
-- Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Asset`, `Assignment`, `Ticket`, `MasterDataItem`,
+- Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Employee`, `Asset`, `Assignment`, `Ticket`, `MasterDataItem`,
   `Vendor`, `DashboardResponse`, รายงานทั้ง 6 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
   ทุก endpoint ที่ตอบโครงสร้างเดียวกัน (เช่น response envelope `{success, data}` / `{success, message, errors}`)
   อ้างอิง (`$ref`) กลับไปที่ schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ
@@ -481,14 +505,15 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 (`oldValues`/`newValues`) เป็น JSON ที่จัดรูปแบบอ่านง่าย เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable) — ไม่มี
 endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้แต่ตัวเดียว
 
-**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Category, Department, Location, Vendor, User, Report
+**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Employee, Category, Department, Location, Vendor, User, Report
 
 **Actions ที่รองรับ:** `CREATE`, `UPDATE`, `DELETE`, `ASSIGN`, `RETURN`, `OPEN`, `START_PROGRESS`, `ON_HOLD`,
-`RESOLVE`, `CLOSE`, `LOGIN`, `EXPORT_REPORT`
+`RESOLVE`, `CLOSE`, `RESTORE`, `LOGIN`, `EXPORT_REPORT`
 
 | เหตุการณ์ | Action ที่บันทึก | จุดที่เรียก |
 |-----------|------------------|-------------|
 | สร้าง/แก้ไข/ลบครุภัณฑ์ | `CREATE` / `UPDATE` / `DELETE` | `routes/assets.js` |
+| สร้าง/แก้ไข/Archive/Restore พนักงาน | `CREATE` / `UPDATE` / `DELETE` / `RESTORE` | `routes/employees.js` |
 | สร้าง/แก้ไข/ลบ master data (Category/Location/Department/Vendor) | `CREATE` / `UPDATE` / `DELETE` | `utils/masterDataRouter.js` (จุดเดียว ใช้ร่วมกันทั้ง 4 entity) |
 | มอบหมาย / แก้ไขรายละเอียด / รับคืนครุภัณฑ์ | `ASSIGN` / `UPDATE` / `RETURN` | `routes/assignments.js` |
 | แจ้งปัญหาใหม่ / เริ่มดำเนินการ / พักงาน / แก้ไขสำเร็จ / ปิดงาน | `OPEN` / `START_PROGRESS` / `ON_HOLD` / `RESOLVE` / `CLOSE` | `routes/tickets.js` (action ตาม target status ของแต่ละ transition) |
@@ -513,7 +538,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v0.9.0`, ปัจจุบัน `v1.0.0-rc1`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.1`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -568,9 +593,10 @@ push หรือเปิด/อัปเดต pull request — ดู workflo
 | 3 | Install dependencies | `npm ci` ทั้ง `apps/api` และ `apps/web` แยกกัน (clean install จาก package-lock.json) |
 | 4 | Validate Prisma schema | `prisma validate` — ตรวจ syntax ของ `schema.prisma` เท่านั้น **ไม่ migrate/เชื่อมต่อฐานข้อมูลจริง** |
 | 5 | Lint | ESLint ทั้ง backend และ frontend แยกกัน |
-| 6 | Build Backend | `prisma generate` — สร้าง Prisma Client (ยืนยันว่า schema ใช้งานได้จริง) |
-| 7 | Build Frontend | `vite build` — build production bundle |
-| 8 | Success summary | สรุปผลลัพธ์ทั้งหมดใน GitHub Actions job summary (แสดงเฉพาะตอนทุกขั้นตอนผ่าน) |
+| 6 | Test Backend | `node --test` — validation/search/filter/RBAC/audit policy โดยไม่เชื่อมฐานข้อมูลจริง |
+| 7 | Build Backend | `prisma generate` — สร้าง Prisma Client (ยืนยันว่า schema ใช้งานได้จริง) |
+| 8 | Build Frontend | `vite build` — build production bundle |
+| 9 | Success summary | สรุปผลลัพธ์ทั้งหมดใน GitHub Actions job summary (แสดงเฉพาะตอนทุกขั้นตอนผ่าน) |
 
 ### เกิดอะไรขึ้นเมื่อ CI ล้มเหลว
 - Job หยุดทันทีที่ step แรกที่ error (ไม่มี step ไหนตั้ง `continue-on-error` — ตาม design ที่ตั้งใจให้ "fail fast")
@@ -586,11 +612,12 @@ push หรือเปิด/อัปเดต pull request — ดู workflo
 # Backend (จาก apps/api)
 npm run validate    # ตรวจ schema.prisma (เหมือน step 4 ใน CI)
 npm run lint        # ESLint (เหมือน step 5)
-npm run build        # prisma generate (เหมือน step 6)
+npm test            # Node test runner (เหมือน step 6)
+npm run build        # prisma generate (เหมือน step 7)
 
 # Frontend (จาก apps/web)
 npm run lint         # ESLint (เหมือน step 5)
-npm run build         # vite build (เหมือน step 7)
+npm run build         # vite build (เหมือน step 8)
 ```
 
 **หมายเหตุ:** `prisma validate`/`prisma generate` ต้องมี `DATABASE_URL` อยู่ใน environment (แค่ต้อง "ตั้งค่าไว้"
@@ -658,7 +685,8 @@ cd deploy
 - **ไม่มี endpoint ลบประวัติการมอบหมาย** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติต้องอยู่ครบเสมอ) ไม่ใช่ข้อจำกัดทางเทคนิค
 - **Master data ที่ถูกลบยังผูกกับ asset เก่าได้** — ตั้งใจให้ asset เก่าที่อ้างอิง category/location ที่ถูกลบไปแล้ว
   ยังแสดงชื่อได้ถูกต้อง แต่หมายความว่าการลบ master data ไม่ cascade ไปเช็ก asset ที่ใช้อยู่
-- **ไม่มี automated test suite** — การตรวจสอบคุณภาพทั้งหมดในตอนนี้เป็น manual regression testing
+- **Automated tests ยังครอบคลุมเฉพาะ Employee foundation** — มี unit/policy tests สำหรับ validation,
+  search/filter, RBAC และ audit dictionary แล้ว แต่ module เดิมและ browser E2E ยังไม่มี coverage อัตโนมัติเต็มระบบ
 - **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
@@ -689,11 +717,10 @@ cd deploy
   หน่วง response ของ business action หลัก) หมายความว่าในกรณีที่หายากมาก ๆ (เช่น DB connection หลุดพอดีตอนนั้น)
   business action อาจสำเร็จแต่ audit record เขียนไม่สำเร็จ (log error ไว้ที่ server console เท่านั้น) — ไม่มี
   retry queue หรือ dead-letter mechanism ในตอนนี้
-- **CI ไม่มีขั้นตอนรัน automated test** — เพราะโปรเจกต์นี้ยังไม่มี test suite เลย (ดู Roadmap) `ci.yml` จึงตรวจแค่
-  schema validity + lint + build เท่านั้น เมื่อมี test suite ในอนาคต ควรเพิ่ม step "Test" ต่อจาก Lint ก่อน Build
-- **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` ไม่เชื่อมต่อ
-  ฐานข้อมูลจริงเลย (ตามที่ milestone นี้ระบุ "Do not migrate database") จึงตรวจจับได้แค่ปัญหาระดับ syntax/
-  compile-time เท่านั้น ไม่ใช่ปัญหาที่เกิดตอน runtime จริงกับข้อมูลจริง
+- **CI test ยังไม่เชื่อมฐานข้อมูลจริง** — step `npm test` เป็น unit/policy test ที่ deterministic; migration และ
+  CRUD integration ต้องตรวจผ่าน Docker Compose แยกต่างหากเพื่อไม่ให้ pipeline เบื้องต้นซับซ้อนเกินจำเป็น
+- **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` และ unit tests
+  ไม่เชื่อมฐานข้อมูลจริง จึงยังต้องตรวจ migration/CRUD runtime ผ่าน Docker Compose ก่อน release
 - **Rate limit เก็บสถานะไว้ในหน่วยความจำของแต่ละ instance (ไม่ใช่ distributed)** — ถ้า deploy หลาย instance
   พร้อมกัน (`desired-count` > 1) โควตาจะนับแยกอิสระต่อ instance ไม่รวมกัน (เช่น ตั้ง max 10 ครั้ง แต่มี
   2 instance = ผู้โจมตีมีโอกาสยิงได้จริงสูงสุด ~20 ครั้งถ้ากระจาย request ไปสองฝั่งพอดี) ปัจจุบัน deploy
@@ -717,13 +744,15 @@ cd deploy
 
 ## 🗺️ Roadmap
 
+- [x] Employee Management Foundation — model/migration, REST API, RBAC, Audit Log และ responsive UI (`v1.1.0-alpha.1`)
+- [ ] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม
+- [ ] Borrow Request / Return / Approval Workflow / Notifications / HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
 - [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request
 - [ ] จัดการผู้ใช้เต็มรูปแบบ (สร้าง/แก้ไข/ปิดใช้งาน/เปลี่ยน role) — เฉพาะ ADMIN
-- [ ] Automated test suite (unit + integration) สำหรับ backend routes — โครง CI (`.github/workflows/ci.yml`)
-  พร้อมรับ step "Test" อยู่แล้ว แค่ยังไม่มี test ให้รัน
+- [ ] ขยาย automated test suite ให้ครอบคลุม module เดิมทั้งหมดและเพิ่ม database/browser E2E ใน CI
 - [ ] Refresh token / revoke token เมื่อเปลี่ยน role ทันที
 - [ ] router library (เช่น react-router-dom) เมื่อแอปโตขึ้นจนต้องการ deep-link
 
