@@ -1,17 +1,35 @@
-// ---------------------------------------------------------------------------
-// หน้าการมอบหมายครุภัณฑ์ — list + search + filter + sort + pagination + มอบหมายใหม่ + แก้ไข + รับคืน
-// Milestone 5: Asset Assignment & Lifecycle
-//
-// ADMIN/IT_STAFF จัดการได้เต็มที่ (มอบหมาย/แก้ไข/รับคืน) ส่วน EMPLOYEE ดูได้อย่างเดียว และ
-// backend คืนเฉพาะรายการที่ตัวเองเป็นผู้ถือครองมาให้แล้ว (ดู routes/assignments.js: scopeForRead)
-// ---------------------------------------------------------------------------
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Boxes,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Edit3,
+  History,
+  Inbox,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  SearchX,
+  Undo2,
+  UserCheck,
+  Users,
+  Wrench,
+} from 'lucide-react'
 import { api } from '../api.js'
 import AssignmentForm from '../components/AssignmentForm.jsx'
 import ReturnAssignmentForm, { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 import { formatDate } from '../utils/format.js'
+import './Assignments.css'
 
 const PAGE_SIZE = 20
+const EMPTY_FILTERS = { status: '', assetId: '', userId: '' }
 
 const SORT_COLUMNS = [
   { field: 'assignedAt', label: 'วันที่มอบหมาย' },
@@ -19,34 +37,67 @@ const SORT_COLUMNS = [
   { field: 'status', label: 'สถานะ' },
 ]
 
-const EMPTY_FILTERS = { status: '', assetId: '', userId: '' }
-
-function statusLabel(status) {
-  return ASSIGNMENT_STATUS_OPTIONS.find((s) => s.value === status)?.label || status
+const STATUS_META = {
+  ASSIGNED: { label: 'กำลังถือครอง', icon: UserCheck, tone: 'blue' },
+  RETURNED: { label: 'คืนแล้ว', icon: CheckCircle2, tone: 'green' },
+  LOST: { label: 'สูญหาย', icon: AlertTriangle, tone: 'red' },
+  DAMAGED: { label: 'เสียหาย', icon: Wrench, tone: 'amber' },
 }
 
-// initialAssetId — Milestone 5: มาจาก Assets.jsx "ดูประวัติ" (กรองมาเฉพาะ asset นั้นตั้งแต่เปิดหน้า)
+function statusLabel(status) {
+  return ASSIGNMENT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status
+}
+
+function pagesFor(current, total) {
+  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1)
+  return [...new Set([1, current - 1, current, current + 1, total])]
+    .filter((page) => page > 0 && page <= total)
+    .sort((a, b) => a - b)
+}
+
+function AssignmentsSkeleton() {
+  return (
+    <div className="assignments-skeleton" aria-label="กำลังโหลดข้อมูลการมอบหมาย" aria-busy="true">
+      <div className="assignments-skeleton-filters assignment-shimmer" />
+      <div className="assignments-status-grid">
+        {Array.from({ length: 5 }, (_, index) => <div className="assignments-skeleton-card assignment-shimmer" key={index} />)}
+      </div>
+      <div className="assignments-overview-grid">
+        <div className="assignments-skeleton-panel assignment-shimmer" />
+        <div className="assignments-skeleton-panel assignment-shimmer" />
+      </div>
+      <div className="assignments-skeleton-table assignment-shimmer" />
+    </div>
+  )
+}
+
+function SortHeader({ field, label, sortBy, sortOrder, refreshing, onSort }) {
+  const active = field === sortBy
+  return (
+    <th aria-sort={active ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button className={`assignment-sort-button${active ? ' is-active' : ''}`} onClick={() => onSort(field)} disabled={refreshing}>
+        {label}{active ? (sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />) : null}
+      </button>
+    </th>
+  )
+}
+
 export default function Assignments({ role, initialAssetId }) {
   const canManage = role === 'ADMIN' || role === 'IT_STAFF'
   const [assignments, setAssignments] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
   const [error, setError] = useState('')
-
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState('assignedAt')
   const [sortOrder, setSortOrder] = useState('desc')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState(() => ({ ...EMPTY_FILTERS, assetId: initialAssetId || '' }))
-
   const [formOpen, setFormOpen] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState(null)
   const [returnTarget, setReturnTarget] = useState(null)
-
-  // ตัวเลือกของตัวกรอง Asset/Current Holder — โหลดครั้งเดียว (Current Holder เฉพาะ canManage เท่านั้นที่ใช้)
   const [assetOptions, setAssetOptions] = useState(null)
   const [userOptions, setUserOptions] = useState(null)
 
@@ -55,12 +106,12 @@ export default function Assignments({ role, initialAssetId }) {
     const requests = [api.listAssets({ pageSize: 100, sortBy: 'assetTag', sortOrder: 'asc' })]
     if (canManage) requests.push(api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' }))
     Promise.all(requests)
-      .then(([assetsRes, usersRes]) => {
+      .then(([assetsResponse, usersResponse]) => {
         if (cancelled) return
-        setAssetOptions(assetsRes.items)
-        if (usersRes) setUserOptions(usersRes.items)
+        setAssetOptions(assetsResponse.items)
+        if (usersResponse) setUserOptions(usersResponse.items)
       })
-      .catch(() => {}) // ตัวเลือกตัวกรองโหลดไม่สำเร็จไม่ critical — ยังกรองด้วย search/สถานะได้ตามปกติ
+      .catch(() => {})
     return () => { cancelled = true }
   }, [canManage])
 
@@ -70,25 +121,45 @@ export default function Assignments({ role, initialAssetId }) {
   }, [searchInput])
 
   useEffect(() => { setPage(1) }, [search, sortBy, sortOrder, filters])
-  useEffect(() => { load() }, [page, sortBy, sortOrder, search, filters])
 
-  async function load() {
+  const load = useCallback(async () => {
     setRefreshing(true)
     try {
-      const res = await api.assignments.list({ page, pageSize: PAGE_SIZE, sortBy, sortOrder, search, ...filters })
-      setAssignments(res.items)
-      setMeta(res)
+      const response = await api.assignments.list({ page, pageSize: PAGE_SIZE, sortBy, sortOrder, search, ...filters })
+      setAssignments(response.items)
+      setMeta(response)
       setError('')
-    } catch (err) {
-      setError(err.message)
+    } catch (requestError) {
+      setError(requestError.message)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [page, sortBy, sortOrder, search, filters])
+
+  useEffect(() => { load() }, [load])
+
+  const currentHolders = useMemo(
+    () => assignments.filter((assignment) => assignment.status === 'ASSIGNED').slice(0, 4),
+    [assignments],
+  )
+  const recentTimeline = useMemo(
+    () => [...assignments]
+      .sort((left, right) => new Date(right.returnedAt || right.assignedAt) - new Date(left.returnedAt || left.assignedAt))
+      .slice(0, 5),
+    [assignments],
+  )
+  const statusCounts = useMemo(
+    () => Object.fromEntries(Object.keys(STATUS_META).map((status) => [status, assignments.filter((item) => item.status === status).length])),
+    [assignments],
+  )
+  const hasActiveFilters = search.length > 0 || Object.values(filters).some(Boolean)
+  const activeFilterCount = (search ? 1 : 0) + Object.values(filters).filter(Boolean).length
+  const isEmpty = !loading && assignments.length === 0
+  const paginationPages = pagesFor(meta.page, meta.totalPages)
 
   function updateFilter(key, value) {
-    setFilters((f) => ({ ...f, [key]: value }))
+    setFilters((current) => ({ ...current, [key]: value }))
   }
 
   function resetFilters() {
@@ -99,9 +170,8 @@ export default function Assignments({ role, initialAssetId }) {
 
   function toggleSort(field) {
     if (refreshing) return
-    if (sortBy === field) {
-      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
-    } else {
+    if (sortBy === field) setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'))
+    else {
       setSortBy(field)
       setSortOrder('asc')
     }
@@ -118,11 +188,8 @@ export default function Assignments({ role, initialAssetId }) {
   }
 
   async function handleSubmit(payload) {
-    if (editingAssignment) {
-      await api.assignments.update(editingAssignment.id, payload)
-    } else {
-      await api.assignments.add(payload)
-    }
+    if (editingAssignment) await api.assignments.update(editingAssignment.id, payload)
+    else await api.assignments.add(payload)
     setFormOpen(false)
     setEditingAssignment(null)
     load()
@@ -134,188 +201,172 @@ export default function Assignments({ role, initialAssetId }) {
     load()
   }
 
-  const hasSearch = search.length > 0
-  const hasActiveFilters = hasSearch || Object.values(filters).some(Boolean)
-  const isEmpty = !loading && assignments.length === 0
-
   return (
-    <div>
-      <div className="between">
-        <h2 className="section-title">การมอบหมายครุภัณฑ์</h2>
-      </div>
+    <div className="assignments-page">
+      <header className="assignments-page-header">
+        <div>
+          <span className="assignments-eyebrow"><PackageCheck size={15} /> ASSET LIFECYCLE</span>
+          <h1>การมอบหมายครุภัณฑ์</h1>
+          <p>ติดตามผู้ถือครองปัจจุบัน ประวัติการใช้งาน และสถานะการรับคืนในมุมมองเดียว</p>
+        </div>
+        {canManage && <button type="button" className="assignment-create-button" onClick={openCreate}><Plus size={18} /> มอบหมายครุภัณฑ์</button>}
+      </header>
 
-      <div className="filter-bar mt">
-        <div className="filter-field">
-          <label htmlFor="assignment-search">ค้นหา</label>
+      <section className="assignments-filter-card" aria-label="ค้นหาและกรองรายการมอบหมาย">
+        <div className="assignment-search-wrap">
+          <Search size={18} aria-hidden="true" />
           <input
             id="assignment-search"
-            type="text"
-            className="search-input"
-            placeholder="ค้นหา Asset Tag, ชื่อครุภัณฑ์, ชื่อพนักงาน, Hostname, Serial Number..."
+            type="search"
+            placeholder="ค้นหา Asset Tag, ครุภัณฑ์, พนักงาน, Hostname หรือ Serial Number..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(event) => setSearchInput(event.target.value)}
+            aria-label="ค้นหารายการมอบหมาย"
           />
         </div>
-
-        <div className="filter-field">
+        <div className="assignment-filter-field">
           <label htmlFor="assignment-filter-status">สถานะ</label>
-          <select id="assignment-filter-status" value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
-            <option value="">ทั้งหมด</option>
-            {ASSIGNMENT_STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
+          <select id="assignment-filter-status" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}>
+            <option value="">ทุกสถานะ</option>
+            {ASSIGNMENT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
-
-        <div className="filter-field">
+        <div className="assignment-filter-field assignment-asset-filter">
           <label htmlFor="assignment-filter-asset">ครุภัณฑ์</label>
-          <select
-            id="assignment-filter-asset"
-            value={filters.assetId}
-            onChange={(e) => updateFilter('assetId', e.target.value)}
-            disabled={!assetOptions}
-          >
-            <option value="">ทั้งหมด</option>
-            {assetOptions?.map((a) => (
-              <option key={a.id} value={a.id}>{a.assetTag} — {a.name}</option>
-            ))}
+          <select id="assignment-filter-asset" value={filters.assetId} onChange={(event) => updateFilter('assetId', event.target.value)} disabled={!assetOptions}>
+            <option value="">ทุกครุภัณฑ์</option>
+            {assetOptions?.map((asset) => <option key={asset.id} value={asset.id}>{asset.assetTag} — {asset.name}</option>)}
           </select>
         </div>
-
         {canManage && (
-          <div className="filter-field">
+          <div className="assignment-filter-field">
             <label htmlFor="assignment-filter-holder">ผู้ถือครอง</label>
-            <select
-              id="assignment-filter-holder"
-              value={filters.userId}
-              onChange={(e) => updateFilter('userId', e.target.value)}
-              disabled={!userOptions}
-            >
-              <option value="">ทั้งหมด</option>
-              {userOptions?.map((u) => (
-                <option key={u.id} value={u.id}>{u.name || u.email}</option>
-              ))}
+            <select id="assignment-filter-holder" value={filters.userId} onChange={(event) => updateFilter('userId', event.target.value)} disabled={!userOptions}>
+              <option value="">ทุกคน</option>
+              {userOptions?.map((user) => <option key={user.id} value={user.id}>{user.name || user.email}</option>)}
             </select>
           </div>
         )}
+        <button type="button" className="assignment-reset-button" onClick={resetFilters} disabled={!activeFilterCount}>
+          <RotateCcw size={16} /> รีเซ็ต
+        </button>
+      </section>
 
-        <div className="filter-actions">
-          <button type="button" className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
-          {canManage && <button type="button" onClick={openCreate}>+ มอบหมายครุภัณฑ์ใหม่</button>}
+      {error && <div className="assignment-error" role="alert"><AlertTriangle size={18} /><span>{error}</span><button type="button" onClick={load}><RefreshCw size={15} /> ลองใหม่</button></div>}
+
+      {loading ? <AssignmentsSkeleton /> : isEmpty ? (
+        <div className="assignment-empty-state">
+          <span>{hasActiveFilters ? <SearchX size={32} /> : <Inbox size={32} />}</span>
+          <h2>{hasActiveFilters ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีรายการมอบหมาย'}</h2>
+          <p>{hasActiveFilters ? 'ลองเปลี่ยนคำค้นหาหรือรีเซ็ตตัวกรองเพื่อดูผลลัพธ์เพิ่มเติม' : (canManage ? 'เริ่มต้นติดตามวงจรครุภัณฑ์ด้วยการสร้างรายการมอบหมายแรก' : 'ยังไม่มีครุภัณฑ์ที่มอบหมายให้คุณ')}</p>
+          {hasActiveFilters ? <button type="button" className="assignment-empty-secondary" onClick={resetFilters}><RotateCcw size={16} /> รีเซ็ตตัวกรอง</button> : canManage ? <button type="button" onClick={openCreate}><Plus size={16} /> มอบหมายครุภัณฑ์</button> : null}
         </div>
-      </div>
-
-      {!loading && <p className="muted mt">แสดง {assignments.length} จาก {meta.totalItems} รายการ</p>}
-
-      {error && <p className="error mt">{error}</p>}
-
-      {loading ? (
-        <p className="muted mt">กำลังโหลด...</p>
-      ) : isEmpty ? (
-        hasActiveFilters ? (
-          <div className="empty-state mt">
-            <h3>ไม่พบผลลัพธ์</h3>
-            <p className="muted">ไม่พบรายการมอบหมายที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือรีเซ็ตตัวกรอง</p>
-            <button className="secondary" onClick={resetFilters}>รีเซ็ตตัวกรอง</button>
-          </div>
-        ) : (
-          <div className="empty-state mt">
-            <h3>ยังไม่มีรายการมอบหมาย</h3>
-            <p className="muted">
-              {canManage ? 'เริ่มต้นมอบหมายครุภัณฑ์ให้พนักงานถือครอง' : 'ยังไม่มีครุภัณฑ์ที่มอบหมายให้คุณ'}
-            </p>
-            {canManage && <button onClick={openCreate}>+ มอบหมายครุภัณฑ์ใหม่</button>}
-          </div>
-        )
       ) : (
         <>
-          <div className={`table-wrap mt${refreshing ? ' is-refreshing' : ''}`}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Asset Tag</th>
+          <section className="assignments-status-grid" aria-label="สรุปสถานะการมอบหมายในหน้าปัจจุบัน">
+            <button type="button" className={`assignment-status-card tone-all${!filters.status ? ' is-active' : ''}`} onClick={() => updateFilter('status', '')}>
+              <span><History size={19} /></span><div><small>ผลลัพธ์ทั้งหมด</small><strong>{meta.totalItems.toLocaleString('th-TH')}</strong><em>ทุกสถานะ</em></div>
+            </button>
+            {Object.entries(STATUS_META).map(([status, config]) => {
+              const StatusIcon = config.icon
+              return (
+                <button type="button" className={`assignment-status-card tone-${config.tone}${filters.status === status ? ' is-active' : ''}`} key={status} onClick={() => updateFilter('status', status)}>
+                  <span><StatusIcon size={19} /></span><div><small>{config.label}</small><strong>{statusCounts[status]}</strong><em>ในหน้าปัจจุบัน</em></div>
+                </button>
+              )
+            })}
+          </section>
+
+          <div className="assignments-overview-grid">
+            <section className="assignment-overview-card current-holders-card">
+              <div className="assignment-section-heading">
+                <div><span><Users size={18} /></span><div><h2>ผู้ถือครองปัจจุบัน</h2><p>รายการที่กำลังใช้งานล่าสุด</p></div></div>
+                <strong>{statusCounts.ASSIGNED}</strong>
+              </div>
+              {currentHolders.length === 0 ? (
+                <div className="assignment-panel-empty"><UserCheck size={25} /><span>ไม่มีผู้ถือครองในผลลัพธ์นี้</span></div>
+              ) : (
+                <div className="current-holder-list">
+                  {currentHolders.map((assignment) => (
+                    <article className="current-holder-item" key={assignment.id}>
+                      <span className="holder-avatar">{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span>
+                      <div className="holder-copy"><strong>{assignment.user?.name || assignment.user?.email}</strong><span>{assignment.asset?.assetTag} · {assignment.asset?.name}</span></div>
+                      <time><Clock3 size={13} /> {formatDate(assignment.assignedAt)}</time>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="assignment-overview-card timeline-card">
+              <div className="assignment-section-heading">
+                <div><span><History size={18} /></span><div><h2>Lifecycle Timeline</h2><p>เหตุการณ์มอบหมายล่าสุด</p></div></div>
+              </div>
+              <ol className="assignment-timeline">
+                {recentTimeline.map((assignment) => {
+                  const config = STATUS_META[assignment.status] || STATUS_META.ASSIGNED
+                  const TimelineIcon = config.icon
+                  return (
+                    <li className={`tone-${config.tone}`} key={assignment.id}>
+                      <span className="timeline-marker"><TimelineIcon size={14} /></span>
+                      <div><strong>{assignment.asset?.assetTag} · {statusLabel(assignment.status)}</strong><p>{assignment.user?.name || assignment.user?.email} · {assignment.asset?.name}</p></div>
+                      <time>{formatDate(assignment.returnedAt || assignment.assignedAt)}</time>
+                    </li>
+                  )
+                })}
+              </ol>
+            </section>
+          </div>
+
+          <section className="assignment-history-card" aria-label="ประวัติการมอบหมาย">
+            <header className="assignment-history-header">
+              <div><span><History size={18} /></span><div><h2>ประวัติการมอบหมาย</h2><p>แสดง {assignments.length} จาก {meta.totalItems} รายการ</p></div></div>
+              {refreshing && <span className="assignment-refreshing"><RefreshCw size={15} /> กำลังอัปเดต</span>}
+            </header>
+            <div className={`assignment-table-scroll${refreshing ? ' is-refreshing' : ''}`}>
+              <table className="assignment-data-table">
+                <thead><tr>
                   <th>ครุภัณฑ์</th>
                   <th>ผู้ถือครอง</th>
                   <th>มอบหมายโดย</th>
-                  {SORT_COLUMNS.map((col) => (
-                    <th key={col.field} className="sortable" onClick={() => toggleSort(col.field)}>
-                      {col.label}
-                      {sortBy === col.field && <span className="sort-arrow">{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>}
-                    </th>
-                  ))}
-                  <th>วันที่คาดว่าจะคืน</th>
+                  {SORT_COLUMNS.map((column) => <SortHeader key={column.field} {...column} sortBy={sortBy} sortOrder={sortOrder} refreshing={refreshing} onSort={toggleSort} />)}
+                  <th>กำหนดคืน</th>
                   {canManage && <th>จัดการ</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {assignments.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.asset?.assetTag}</td>
-                    <td>{a.asset?.name}</td>
-                    <td>{a.user?.name || a.user?.email}</td>
-                    <td>{a.assignedBy?.name || a.assignedBy?.email}</td>
-                    <td>{formatDate(a.assignedAt)}</td>
-                    <td>{a.returnedAt ? formatDate(a.returnedAt) : '-'}</td>
-                    <td><span className={`badge badge-${a.status.toLowerCase()}`}>{statusLabel(a.status)}</span></td>
-                    <td>{a.expectedReturnDate ? formatDate(a.expectedReturnDate) : '-'}</td>
-                    {canManage && (
-                      <td>
-                        <div className="row">
-                          {a.status === 'ASSIGNED' && (
-                            <>
-                              <button className="link" onClick={() => openEdit(a)}>แก้ไข</button>
-                              <button className="link" onClick={() => setReturnTarget(a)}>รับคืน</button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="row between mt">
-            <span className="muted">
-              หน้า {meta.page} จาก {meta.totalPages} • ทั้งหมด {meta.totalItems} รายการ
-              {refreshing && ' • กำลังโหลด...'}
-            </span>
-            <div className="row">
-              <button
-                className="secondary"
-                disabled={refreshing || meta.page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ก่อนหน้า
-              </button>
-              <button
-                className="secondary"
-                disabled={refreshing || meta.page >= meta.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                ถัดไป
-              </button>
+                </tr></thead>
+                <tbody>
+                  {assignments.map((assignment) => {
+                    const config = STATUS_META[assignment.status] || STATUS_META.ASSIGNED
+                    const StatusIcon = config.icon
+                    return (
+                      <tr key={assignment.id}>
+                        <td><div className="assignment-asset-cell"><span><Boxes size={17} /></span><div><strong>{assignment.asset?.assetTag}</strong><small>{assignment.asset?.name}</small></div></div></td>
+                        <td><div className="assignment-holder-cell"><span>{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span><div><strong>{assignment.user?.name || assignment.user?.email}</strong><small>{assignment.status === 'ASSIGNED' ? 'ผู้ถือครองปัจจุบัน' : 'ผู้ถือครองในอดีต'}</small></div></div></td>
+                        <td>{assignment.assignedBy?.name || assignment.assignedBy?.email}</td>
+                        <td>{formatDate(assignment.assignedAt)}</td>
+                        <td>{assignment.returnedAt ? formatDate(assignment.returnedAt) : <span className="assignment-muted">—</span>}</td>
+                        <td><span className={`assignment-status-badge tone-${config.tone}`}><StatusIcon size={13} />{statusLabel(assignment.status)}</span></td>
+                        <td>{assignment.expectedReturnDate ? formatDate(assignment.expectedReturnDate) : <span className="assignment-muted">ไม่ระบุ</span>}</td>
+                        {canManage && <td className="assignment-row-actions">{assignment.status === 'ASSIGNED' ? <><button type="button" onClick={() => openEdit(assignment)} title="แก้ไข" aria-label={`แก้ไข ${assignment.asset?.assetTag}`}><Edit3 size={16} /></button><button type="button" className="return-action" onClick={() => setReturnTarget(assignment)} title="รับคืน" aria-label={`รับคืน ${assignment.asset?.assetTag}`}><Undo2 size={16} /></button></> : <span>—</span>}</td>}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          </div>
+            <footer className="assignment-pagination">
+              <span>หน้า <strong>{meta.page}</strong> จาก <strong>{meta.totalPages}</strong> · ทั้งหมด {meta.totalItems} รายการ</span>
+              <nav aria-label="แบ่งหน้าประวัติการมอบหมาย">
+                <button type="button" disabled={refreshing || meta.page <= 1} onClick={() => setPage((current) => current - 1)} aria-label="หน้าก่อนหน้า"><ChevronLeft size={17} /></button>
+                {paginationPages.map((pageNumber, index) => <span className={`assignment-page-wrap${pageNumber === meta.page ? ' is-current-wrap' : ''}`} key={pageNumber}>{index > 0 && pageNumber - paginationPages[index - 1] > 1 && <i>…</i>}<button type="button" className={pageNumber === meta.page ? 'is-current' : ''} onClick={() => setPage(pageNumber)} aria-current={pageNumber === meta.page ? 'page' : undefined}>{pageNumber}</button></span>)}
+                <button type="button" disabled={refreshing || meta.page >= meta.totalPages} onClick={() => setPage((current) => current + 1)} aria-label="หน้าถัดไป"><ChevronRight size={17} /></button>
+              </nav>
+            </footer>
+          </section>
         </>
       )}
 
-      {formOpen && (
-        <AssignmentForm
-          assignment={editingAssignment}
-          onSubmit={handleSubmit}
-          onCancel={() => { setFormOpen(false); setEditingAssignment(null) }}
-        />
-      )}
-
-      {returnTarget && (
-        <ReturnAssignmentForm
-          assignment={returnTarget}
-          onSubmit={handleReturn}
-          onCancel={() => setReturnTarget(null)}
-        />
-      )}
+      {formOpen && <AssignmentForm assignment={editingAssignment} onSubmit={handleSubmit} onCancel={() => { setFormOpen(false); setEditingAssignment(null) }} />}
+      {returnTarget && <ReturnAssignmentForm assignment={returnTarget} onSubmit={handleReturn} onCancel={() => setReturnTarget(null)} />}
     </div>
   )
 }
