@@ -1,106 +1,48 @@
-/* สไตล์เรียบ ๆ ให้แอปดูสะอาดตา — ปรับแต่งได้ตามใจ */
-* { box-sizing: border-box; }
+@import "./design-system.css";
 
-body {
-  margin: 0;
-  font-family: -apple-system, "Segoe UI", "Sarabun", Tahoma, sans-serif;
-  background: #f4f5f7;
-  color: #1f2933;
-}
+/* Existing application layout and feature-specific patterns. */
 
 .container {
   max-width: 480px;
-  margin: 48px auto;
-  padding: 0 16px;
+  margin: var(--space-12) auto;
+  padding: 0 var(--space-4);
 }
 
 .container.wide {
   max-width: 1040px;
 }
 
-.card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-h1 { font-size: 22px; margin-top: 0; }
-
-label { display: block; font-size: 14px; margin: 12px 0 4px; font-weight: 600; }
-
-input[type="text"], input[type="email"], input[type="password"] {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d2d6dc;
-  border-radius: 8px;
-  font-size: 15px;
-}
-input.invalid { border-color: #dc2626; }
-input:disabled, select:disabled, button:disabled { opacity: 0.6; cursor: not-allowed; }
-
-button {
-  cursor: pointer;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: 15px;
-  font-weight: 600;
-  background: #2563eb;
-  color: #fff;
-}
-button:hover { background: #1d4ed8; }
-button.secondary { background: #e5e7eb; color: #1f2933; }
-button.danger { background: transparent; color: #dc2626; padding: 4px 8px; }
-button.danger-solid { background: #dc2626; color: #fff; }
-button.danger-solid:hover { background: #b91c1c; }
-
-.row { display: flex; gap: 8px; align-items: center; }
+.row { display: flex; gap: var(--space-2); align-items: center; }
 .row.end { justify-content: flex-end; }
 .row .grow { flex: 1; }
 .between { display: flex; justify-content: space-between; align-items: center; }
-.mt { margin-top: 16px; }
-.muted { color: #6b7280; font-size: 14px; }
-.error { color: #dc2626; font-size: 14px; margin-top: 8px; }
-.field-error { color: #dc2626; font-size: 13px; margin: 4px 0 0; }
-.link { background: none; color: #2563eb; padding: 0; font-weight: 400; }
-
-select, textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d2d6dc;
-  border-radius: 8px;
-  font-size: 15px;
-  background: #fff;
-  font-family: inherit;
-}
-textarea.invalid { border-color: #dc2626; }
+.mt { margin-top: var(--space-4); }
+.muted { color: var(--color-text-secondary); font-size: 14px; }
+.error { color: var(--color-danger-strong); font-size: 14px; margin-top: 8px; }
+.field-error { color: var(--color-danger-strong); font-size: 13px; margin: 4px 0 0; }
+.link { font-weight: var(--font-weight-regular); }
 
 /* ---- ตารางรายการครุภัณฑ์ ---- */
-.table-wrap { overflow-x: auto; transition: opacity 0.15s; }
 .table-wrap.is-refreshing { opacity: 0.5; pointer-events: none; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #eef0f2; white-space: nowrap; }
-th { color: #6b7280; font-weight: 600; font-size: 13px; }
 th.sortable { cursor: pointer; user-select: none; }
-th.sortable:hover { color: #1f2933; }
-.sort-arrow { color: #2563eb; }
+th.sortable:hover { color: var(--color-text); }
+.sort-arrow { color: var(--color-primary); }
 
 /* ---- ตรึงหัวตารางไว้ตอนเลื่อนหน้าจอ (Milestone 4.1) ---- */
-.table-wrap thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+.table-wrap thead th { position: sticky; top: 0; z-index: 1; }
 
 /* ---- toolbar: กล่องค้นหา + ปุ่มเพิ่ม ---- */
-.toolbar { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.toolbar { display: flex; gap: var(--space-3); align-items: center; justify-content: space-between; }
 .search-input { max-width: 360px; }
 
 /* ---- filter bar: ค้นหา + ตัวกรอง + คอลัมน์ + เพิ่มครุภัณฑ์ (Milestone 4.1) ----
    Desktop: แถวเดียว (flex-wrap ช่วยไล่ลงแถวใหม่เองถ้าพื้นที่ไม่พอ = พฤติกรรม tablet)
    Mobile (<600px): บังคับเรียงเป็นแนวตั้งทั้งหมด */
-.filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
-.filter-field { display: flex; flex-direction: column; gap: 4px; min-width: 160px; flex: 1 1 160px; }
-.filter-field label { margin: 0; font-size: 13px; color: #4b5563; }
+.filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3) var(--space-4); }
+.filter-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 160px; flex: 1 1 160px; }
+.filter-field label { margin: 0; font-size: 13px; color: var(--color-text-secondary); }
 .filter-field:first-child { flex: 2 1 240px; }
-.filter-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+.filter-actions { display: flex; gap: var(--space-2); align-items: center; margin-left: auto; flex-wrap: wrap; }
 
 @media (max-width: 600px) {
   .filter-bar { flex-direction: column; align-items: stretch; }
@@ -112,9 +54,9 @@ th.sortable:hover { color: #1f2933; }
 .columns-picker { position: relative; }
 .columns-panel {
   position: absolute; right: 0; top: calc(100% + 6px);
-  background: #fff; border: 1px solid #d2d6dc; border-radius: 8px;
-  padding: 10px 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); z-index: 20;
-  display: flex; flex-direction: column; gap: 8px; min-width: 170px;
+  background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: var(--space-3); box-shadow: var(--shadow-md); z-index: 20;
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 170px;
 }
 .columns-panel-item { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; margin: 0; white-space: nowrap; }
 .columns-panel-item input { width: auto; }
@@ -122,79 +64,70 @@ th.sortable:hover { color: #1f2933; }
 /* ---- empty state ---- */
 .empty-state {
   text-align: center;
-  padding: 48px 16px;
-  border: 1px dashed #d2d6dc;
-  border-radius: 12px;
+  padding: var(--space-12) var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
 }
 .empty-state h3 { margin: 0 0 6px; font-size: 17px; }
 .empty-state button { margin-top: 16px; }
 
 /* ---- สรุปรายการที่กำลังจะลบ ในกล่องยืนยัน ---- */
 .delete-summary {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 12px 14px;
+  background: var(--color-background);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
 }
 .delete-summary-tag { font-weight: 700; font-size: 15px; }
-.delete-summary-name { color: #4b5563; font-size: 14px; margin-top: 2px; }
+.delete-summary-name { color: var(--color-text-secondary); font-size: 14px; margin-top: 2px; }
 
-/* ---- badge สถานะครุภัณฑ์ ---- */
-.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.badge-available { background: #dcfce7; color: #15803d; }
-.badge-in_use { background: #dbeafe; color: #1d4ed8; }
-.badge-repair { background: #fef3c7; color: #b45309; }
-.badge-disposed { background: #f3f4f6; color: #6b7280; }
-
-/* ---- badge วันหมดประกัน (Milestone 3) ---- */
-.badge-warranty-expired { background: #fee2e2; color: #b91c1c; margin-left: 6px; }
-.badge-warranty-soon { background: #fef3c7; color: #b45309; margin-left: 6px; }
-
-/* ---- badge สถานะการมอบหมาย (Milestone 5) ---- */
-.badge-assigned { background: #dbeafe; color: #1d4ed8; }
-.badge-returned { background: #dcfce7; color: #15803d; }
-.badge-lost { background: #fee2e2; color: #b91c1c; }
-.badge-damaged { background: #fef3c7; color: #b45309; }
-
-/* ---- badge ประเภทกิจกรรมล่าสุด (Milestone 6) ---- */
-.badge-assignment { background: #dbeafe; color: #1d4ed8; }
-.badge-return { background: #dcfce7; color: #15803d; }
-.badge-new-asset { background: #ede9fe; color: #6d28d9; }
-
-/* ---- badge สถานะใบแจ้งซ่อม (Milestone 7) ---- */
-.badge-ticket-open { background: #dbeafe; color: #1d4ed8; }
-.badge-ticket-in_progress { background: #fef3c7; color: #b45309; }
-.badge-ticket-on_hold { background: #f3f4f6; color: #6b7280; }
-.badge-ticket-resolved { background: #dcfce7; color: #15803d; }
-.badge-ticket-closed { background: #e5e7eb; color: #374151; }
-
-/* ---- badge ระดับความสำคัญใบแจ้งซ่อม (Milestone 7) ---- */
-.badge-priority-low { background: #f3f4f6; color: #6b7280; }
-.badge-priority-medium { background: #dbeafe; color: #1d4ed8; }
-.badge-priority-high { background: #fef3c7; color: #b45309; }
-.badge-priority-critical { background: #fee2e2; color: #b91c1c; }
+/* Existing status names mapped to the shared semantic badge system. */
+.badge-available, .badge-returned, .badge-return, .badge-ticket-resolved,
+.badge-audit-return, .badge-audit-resolve {
+  background: var(--color-success-soft); color: var(--color-success-text);
+}
+.badge-repair, .badge-warranty-soon, .badge-damaged, .badge-ticket-in_progress,
+.badge-priority-high, .badge-audit-update, .badge-audit-start-progress {
+  background: var(--color-warning-soft); color: var(--color-warning-text);
+}
+.badge-warranty-expired, .badge-lost, .badge-priority-critical, .badge-audit-delete {
+  background: var(--color-danger-soft); color: var(--color-danger-strong);
+}
+.badge-in_use, .badge-assigned, .badge-assignment, .badge-ticket-open,
+.badge-priority-medium, .badge-audit-create, .badge-audit-assign,
+.badge-audit-open, .badge-audit-login {
+  background: var(--color-info-soft); color: var(--color-info-text);
+}
+.badge-disposed, .badge-ticket-on_hold, .badge-ticket-closed,
+.badge-priority-low, .badge-audit-on-hold, .badge-audit-close {
+  background: var(--color-neutral-soft); color: var(--color-neutral-text);
+}
+.badge-new-asset, .badge-audit-export-report {
+  background: var(--color-accent-soft); color: var(--color-accent-text);
+}
+.badge-warranty-expired, .badge-warranty-soon { margin-left: 6px; }
 
 /* ---- overlay + modal สำหรับฟอร์ม/ยืนยันการลบ ---- */
 .overlay {
-  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+  position: fixed; inset: 0; background: var(--color-overlay);
   display: flex; align-items: center; justify-content: center;
   padding: 16px; z-index: 50;
 }
 .modal { max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
 
 /* ---- แท็บสลับหน้า (ครุภัณฑ์ / master data ต่าง ๆ) ---- */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid #eef0f2; flex-wrap: wrap; }
+.tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
 .tab {
-  background: none; color: #6b7280; font-weight: 600; font-size: 14px;
-  padding: 10px 14px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent;
+  background: none; color: var(--color-text-secondary); font-weight: 600; font-size: 14px;
+  padding: 10px 14px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; border-bottom: 2px solid transparent;
 }
-.tab:hover { background: #f9fafb; color: #1f2933; }
-.tab.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+.tab:hover { background: var(--color-background); color: var(--color-text); }
+.tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .section-title { font-size: 17px; margin: 0; }
 
 /* ---- หัวข้อกลุ่มฟิลด์ในฟอร์ม (เช่น "การจัดซื้อ", "ฮาร์ดแวร์") — Milestone 3 ---- */
 .form-section-title {
   font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: #6b7280; margin: 20px 0 4px; padding-top: 14px; border-top: 1px solid #eef0f2;
+  color: var(--color-text-secondary); margin: 20px 0 4px; padding-top: 14px; border-top: 1px solid var(--color-border);
 }
 .form-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
@@ -204,7 +137,7 @@ th.sortable:hover { color: #1f2933; }
 
 /* ---- dropdown ที่ยังไม่มีตัวเลือก (master data ว่าง) ---- */
 .empty-dropdown {
-  border: 1px dashed #d2d6dc; border-radius: 8px;
+  border: 1px dashed var(--color-border); border-radius: var(--radius-sm);
   padding: 10px 12px; text-align: center;
 }
 .empty-dropdown p { margin: 0 0 4px; }
@@ -220,10 +153,10 @@ th.sortable:hover { color: #1f2933; }
 @media (max-width: 600px) { .stat-cards { grid-template-columns: 1fr; } }
 
 .stat-card {
-  background: #fff; border: 1px solid #eef0f2; border-radius: 10px;
+  background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md);
   padding: 14px 16px;
 }
-.stat-card-label { color: #6b7280; font-size: 13px; margin: 0 0 6px; }
+.stat-card-label { color: var(--color-text-secondary); font-size: 13px; margin: 0 0 6px; }
 .stat-card-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
 
 /* ---- กราฟแบบ bar เรียบ ๆ ด้วย CSS ล้วน (ไม่ผูกกับ chart library ใด ๆ) ---- */
@@ -233,47 +166,32 @@ th.sortable:hover { color: #1f2933; }
 .bar-chart { display: flex; flex-direction: column; gap: 10px; }
 .bar-chart-row { display: flex; align-items: center; gap: 10px; }
 .bar-chart-label {
-  width: 40%; flex-shrink: 0; font-size: 13px; color: #4b5563;
+  width: 40%; flex-shrink: 0; font-size: 13px; color: var(--color-text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.bar-chart-track { flex: 1; background: #eef0f2; border-radius: 4px; height: 10px; overflow: hidden; }
-.bar-chart-fill { height: 100%; background: #2563eb; border-radius: 4px; }
+.bar-chart-track { flex: 1; background: var(--color-border); border-radius: var(--space-1); height: 10px; overflow: hidden; }
+.bar-chart-fill { height: 100%; background: var(--color-primary); border-radius: var(--space-1); }
 .bar-chart-value { width: 36px; flex-shrink: 0; text-align: right; font-size: 13px; font-weight: 600; }
 
 /* ---- กิจกรรมล่าสุด ---- */
 .activity-list { display: flex; flex-direction: column; }
 .activity-item {
   display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-  padding: 10px 0; border-bottom: 1px solid #eef0f2; font-size: 14px;
+  padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 14px;
 }
 .activity-item:last-child { border-bottom: none; }
-.activity-time { color: #6b7280; font-size: 12px; white-space: nowrap; }
+.activity-time { color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; }
 
 /* ---- การ์ดเลือกรายงาน (Milestone 8) — ใช้ grid เดียวกับ .stat-cards แต่เป็น <button> ที่คลิกได้ ----
    รีเซ็ต style ปุ่มเริ่มต้นให้หน้าตาเหมือน .card ปกติ ต่างแค่กดได้ + มี hover ----*/
 .report-card {
   text-align: left; cursor: pointer; font: inherit; color: inherit;
   display: block; width: 100%; border: 1px solid transparent;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
-.report-card:hover { border-color: #2563eb; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12); }
+.report-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-md); }
 .report-card h3 { margin: 0 0 6px; font-size: 15px; }
 .report-card p { margin: 0; }
-
-/* ---- badge การกระทำใน Audit Log (Milestone 9) — สีตามกลุ่มความหมาย: สร้าง/เข้าสู่ระบบ = ฟ้า,
-   แก้ไข/พักงาน = เหลือง, ลบ = แดง, สำเร็จ/ปิดงาน/รับคืน = เขียว, ส่งออก = ม่วง ---- */
-.badge-audit-create { background: #dbeafe; color: #1d4ed8; }
-.badge-audit-update { background: #fef3c7; color: #b45309; }
-.badge-audit-delete { background: #fee2e2; color: #b91c1c; }
-.badge-audit-assign { background: #dbeafe; color: #1d4ed8; }
-.badge-audit-return { background: #dcfce7; color: #15803d; }
-.badge-audit-open { background: #dbeafe; color: #1d4ed8; }
-.badge-audit-start-progress { background: #fef3c7; color: #b45309; }
-.badge-audit-on-hold { background: #f3f4f6; color: #6b7280; }
-.badge-audit-resolve { background: #dcfce7; color: #15803d; }
-.badge-audit-close { background: #e5e7eb; color: #374151; }
-.badge-audit-login { background: #dbeafe; color: #1d4ed8; }
-.badge-audit-export-report { background: #ede9fe; color: #6d28d9; }
 
 /* ---- กล่องรายละเอียด Audit Log (Milestone 9) — กว้างกว่า .modal ปกติ เพราะต้องโชว์ JSON 2 คอลัมน์ ---- */
 .audit-detail-modal { max-width: 720px; }
@@ -284,7 +202,7 @@ th.sortable:hover { color: #1f2933; }
 
 /* ---- ตัวแสดง JSON แบบ pretty-print — ใช้ font monospace อ่านง่าย ไม่ใช้ syntax-highlight library ---- */
 .json-viewer {
-  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+  background: var(--color-background); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
   padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
   line-height: 1.5; overflow-x: auto; white-space: pre; margin: 0;
 }
