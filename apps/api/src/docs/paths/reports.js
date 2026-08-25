@@ -139,6 +139,53 @@
 
 /**
  * @openapi
+ * /api/reports/returns:
+ *   get:
+ *     tags: [Reports]
+ *     summary: รายงานการรับคืนครุภัณฑ์ (Return Report)
+ *     description: ADMIN/IT_STAFF เห็นทั้งองค์กร ส่วน EMPLOYEE เห็นเฉพาะประวัติของตัวเอง รองรับ Preview และ CSV/Excel/PDF
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema: { type: string, enum: [csv, xlsx, pdf] }
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/PageSizeParam'
+ *       - $ref: '#/components/parameters/SearchParam'
+ *       - in: query
+ *         name: dateFrom
+ *         schema: { type: string, format: date }
+ *         description: กรองจากวันที่เริ่มรับคืน
+ *       - in: query
+ *         name: dateTo
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: sortBy
+ *         schema: { type: string, enum: [returnStartedAt, inspectedAt, returnedAt, returnStatus] }
+ *     responses:
+ *       200:
+ *         description: รายงานแบบ JSON หรือไฟล์ส่งออก
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     items: { type: array, items: { $ref: '#/components/schemas/ReturnReportRow' } }
+ *                     page: { type: integer }
+ *                     pageSize: { type: integer }
+ *                     totalItems: { type: integer }
+ *                     totalPages: { type: integer }
+ *           text/csv: { schema: { type: string, format: binary } }
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+ *           application/pdf: { schema: { type: string, format: binary } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+
+/**
+ * @openapi
  * /api/reports/warranty:
  *   get:
  *     tags: [Reports]

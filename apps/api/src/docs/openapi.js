@@ -328,6 +328,19 @@ const assetSchemas = {
 
 const assignmentSchemas = {
   AssignmentStatus: { type: 'string', enum: ['ASSIGNED', 'RETURNED', 'LOST', 'DAMAGED'] },
+  ReturnWorkflowStatus: { type: 'string', enum: ['PENDING_INSPECTION', 'PASSED', 'FAILED', 'RETURNED', 'DAMAGED', 'LOST'] },
+  ReturnInspectionResult: { type: 'string', enum: ['PASSED', 'FAILED'] },
+  AssignmentReturnEvent: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      status: { $ref: '#/components/schemas/ReturnWorkflowStatus' },
+      condition: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
+      notes: { type: 'string', nullable: true },
+      createdAt: { type: 'string', format: 'date-time' },
+      actorUser: { type: 'object', nullable: true, properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string', nullable: true }, email: { type: 'string' } } },
+    },
+  },
   Assignment: {
     type: 'object',
     properties: {
@@ -342,6 +355,13 @@ const assignmentSchemas = {
       status: { $ref: '#/components/schemas/AssignmentStatus' },
       conditionBefore: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
       conditionAfter: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
+      returnStatus: { allOf: [{ $ref: '#/components/schemas/ReturnWorkflowStatus' }], nullable: true },
+      returnStartedAt: { type: 'string', format: 'date-time', nullable: true },
+      inspectionResult: { allOf: [{ $ref: '#/components/schemas/ReturnInspectionResult' }], nullable: true },
+      inspectedById: { type: 'string', format: 'uuid', nullable: true },
+      inspectionNotes: { type: 'string', nullable: true },
+      inspectedAt: { type: 'string', format: 'date-time', nullable: true },
+      returnEvents: { type: 'array', items: { $ref: '#/components/schemas/AssignmentReturnEvent' } },
       remark: { type: 'string', nullable: true },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
@@ -414,12 +434,27 @@ const assignmentSchemas = {
   },
   AssignmentReturnRequest: {
     type: 'object',
-    description: 'ทางเดียวที่จะปิดรายการมอบหมาย (ตั้ง returnedAt) — ผลลัพธ์เป็น RETURNED/LOST/DAMAGED',
+    description: 'API เดิมแบบ atomic inspection สำหรับ client ที่ยังไม่ใช้ start/inspect — ผลลัพธ์เป็น RETURNED/LOST/DAMAGED',
     properties: {
       status: { type: 'string', enum: ['RETURNED', 'LOST', 'DAMAGED'], default: 'RETURNED' },
       conditionAfter: { $ref: '#/components/schemas/AssetCondition' },
       returnedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = ใช้วันที่ปัจจุบัน' },
       remark: { type: 'string', nullable: true },
+    },
+  },
+  AssignmentReturnStartRequest: {
+    type: 'object',
+    properties: { notes: { type: 'string', nullable: true, description: 'หมายเหตุเริ่มกระบวนการตรวจรับ' } },
+  },
+  AssignmentReturnInspectionRequest: {
+    type: 'object',
+    required: ['status', 'inspectionNotes'],
+    properties: {
+      status: { type: 'string', enum: ['RETURNED', 'DAMAGED', 'LOST'] },
+      conditionAfter: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], description: 'บังคับสำหรับ RETURNED/DAMAGED; ไม่บังคับสำหรับ LOST' },
+      inspectionNotes: { type: 'string', minLength: 1, maxLength: 2000 },
+      inspectedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = เวลาปัจจุบัน' },
+      returnedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = inspectedAt' },
     },
   },
 }
@@ -660,6 +695,13 @@ const dashboardSchemas = {
         type: 'object',
         properties: { pending: { type: 'integer' }, approvedToday: { type: 'integer' }, rejectedToday: { type: 'integer' }, averageApprovalTimeHours: { type: 'number' } },
       },
+      returns: {
+        type: 'object',
+        properties: {
+          pendingInspections: { type: 'integer' }, completedToday: { type: 'integer' },
+          damaged: { type: 'integer' }, lost: { type: 'integer' }, averageProcessingTimeHours: { type: 'number' },
+        },
+      },
       charts: {
         type: 'object',
         description: 'array ว่างทั้งหมดสำหรับ EMPLOYEE (เป็นข้อมูลภาพรวมองค์กรล้วน ๆ)',
@@ -719,6 +761,14 @@ const reportSchemas = {
       conditionBefore: { type: 'string', example: 'สภาพดี' },
       conditionAfter: { type: 'string', example: '-' },
       remark: { type: 'string', example: 'มอบให้ทีมพัฒนาใช้งานประจำ' },
+    },
+  },
+  ReturnReportRow: {
+    type: 'object',
+    properties: {
+      employee: { type: 'string' }, asset: { type: 'string' }, returnDate: { type: 'string' },
+      inspector: { type: 'string' }, condition: { type: 'string' }, inspectionResult: { type: 'string' },
+      returnStatus: { type: 'string' }, processingTimeHours: { oneOf: [{ type: 'number' }, { type: 'string', enum: ['-'] }] },
     },
   },
   WarrantyReportRow: {
@@ -794,7 +844,7 @@ const reportSchemas = {
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST'],
   },
   AuditEntityType: {
     type: 'string',
@@ -827,7 +877,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-alpha.4',
+    version: '1.1.0-alpha.5',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +

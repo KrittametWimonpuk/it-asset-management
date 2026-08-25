@@ -5,6 +5,45 @@
 
 ---
 
+## [v1.1.0-alpha.5] — Return Workflow Enhancement
+
+เฟส 5 ขยายการรับคืนเดิมเป็น workflow ตรวจรับที่ติดตามได้ครบ โดยคง `Assignment.status`, Authentication,
+RBAC, ผู้ถือครองแบบ Employee และ endpoint `/api/assignments/:id/return` เดิมไว้ทั้งหมด
+
+### Added
+- Migration expand-only `0013_return_workflow_enhancement`: เพิ่มสถานะ/ข้อมูลสรุปการตรวจรับแบบ nullable และ
+  `AssignmentReturnEvent` สำหรับ Timeline append-only พร้อม backfill ประวัติปิด Assignment เดิมโดยไม่สร้างผู้ตรวจปลอม
+- API `POST /api/assignments/:id/return/start` และ `/return/inspect`; ผู้ตรวจมาจาก User ที่ล็อกอินเท่านั้น
+- ผลตรวจบังคับ condition/notes/date สำหรับการคืนจริง, ปิด Assignment อัตโนมัติเมื่อผ่าน และอัปเดต
+  `Asset.assetCondition` เมื่อชำรุด
+- Return dialog รองรับเริ่มตรวจ, บันทึก condition/notes/inspector/timestamps, status badges, timeline/history,
+  keyboard focus, responsive และ dark mode
+- Dashboard เพิ่ม Pending Inspections, Completed Returns Today, Damaged Returns, Lost Assets และ Average Return Processing Time
+- Return Report แสดง Employee, Asset, Return Date, Inspector, Condition, Inspection Result และ Processing Time
+  พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `RETURN_STARTED`, `RETURN_INSPECTED`, `RETURN_COMPLETED`, `RETURN_DAMAGED`, `RETURN_LOST`
+- OpenAPI/Swagger อัปเดตเป็น 69 methods พร้อม schema สำหรับ Return Workflow และ Return Report
+
+### Compatibility & Security
+- `/api/assignments/:id/return` เดิมยังรับ request body แบบเดิมและทำงานแบบ atomic inspection เพื่อไม่ทำให้ client เก่าพัง
+- ฟิลด์ใหม่ทั้งหมด nullable และไม่ลบ/เปลี่ยน `userId`, `employeeId`, `AssignmentStatus` หรือข้อมูลเดิม
+- ADMIN/IT_STAFF เท่านั้นที่เริ่มและตรวจรับ; EMPLOYEE ยังคง read-only ตาม scope เดิม
+
+### Testing
+- Prisma validate/generate, API lint, frontend lint (0 errors), backend tests `25/25` และ production build ผ่าน
+- Migration `0013` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 13 migrations
+- Docker E2E ผ่าน Start/Inspect/Return, normal/damaged/lost, API `/return` เดิม, ADMIN/IT_STAFF,
+  EMPLOYEE 403, Dashboard metrics, Return Report และ Audit actions ครบ 5 รายการ
+- ล้างข้อมูล E2E marker หลังทดสอบและยืนยัน Asset/Employee/Assignment คงเหลือ `0/0/0`
+
+### Known Limitations
+- Workflow เป็นการตรวจรับหนึ่งขั้นโดยผู้ตรวจคนเดียว ยังไม่มี re-inspection, checklist รายชิ้น, attachment หรือ e-signature
+- ประวัติก่อน alpha.5 ไม่มีข้อมูล inspector/result เดิม จึงแสดงว่าไม่มีข้อมูลย้อนหลัง แต่วันคืน สภาพ หมายเหตุ และสถานะยังอยู่ครบ
+- รอบตรวจนี้ไม่มี browser session เชื่อมต่อ จึงตรวจ accessibility จาก semantic markup/focus handling/lint/build
+  แต่ยังไม่ได้ทำ screen-reader และ visual regression แบบ manual
+
+---
+
 ## [v1.1.0-alpha.4] — Approval Workflow Enhancement
 
 เฟส 4 เพิ่มข้อมูลประกอบการอนุมัติและประวัติการตัดสินใจบน Borrow Request เดิม โดยไม่เปลี่ยน Authentication,

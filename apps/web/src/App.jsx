@@ -153,7 +153,7 @@ export default function App() {
               onViewTickets={handleViewTickets}
             />
           )}
-          {tab === 'assignments' && <Assignments role={user.role} initialAssetId={assignmentsAssetFilter} />}
+          {tab === 'assignments' && <Assignments role={user.role} user={user} initialAssetId={assignmentsAssetFilter} />}
           {tab === 'borrowRequests' && <BorrowRequests role={user.role} />}
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}

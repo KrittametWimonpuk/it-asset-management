@@ -114,6 +114,8 @@ export const api = {
     add: (body) => request('/assignments', { method: 'POST', body: JSON.stringify(body) }),
     update: (id, body) => request(`/assignments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     return: (id, body) => request(`/assignments/${id}/return`, { method: 'POST', body: JSON.stringify(body) }),
+    startReturn: (id, body = {}) => request(`/assignments/${id}/return/start`, { method: 'POST', body: JSON.stringify(body) }),
+    inspectReturn: (id, body) => request(`/assignments/${id}/return/inspect`, { method: 'POST', body: JSON.stringify(body) }),
   },
 
   // Milestone 5: รายชื่อผู้ใช้ (ดูอย่างเดียว) — ใช้เลือก "พนักงาน" ตอนมอบหมายครุภัณฑ์
@@ -168,6 +170,7 @@ export const api = {
     vendors: (params) => request(`/reports/vendors${toQueryString(params)}`),
     borrowRequests: (params) => request(`/reports/borrow-requests${toQueryString(params)}`),
     approvals: (params) => request(`/reports/approvals${toQueryString(params)}`),
+    returns: (params) => request(`/reports/returns${toQueryString(params)}`),
     download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
 

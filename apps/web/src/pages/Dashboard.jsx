@@ -81,6 +81,14 @@ const BORROW_REQUEST_SUMMARY_CARDS = [
   { key: 'averageApprovalTimeHours', label: 'เวลาอนุมัติเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่ส่งถึงอนุมัติ', suffix: ' ชม.' },
 ]
 
+const RETURN_SUMMARY_CARDS = [
+  { key: 'pendingInspections', label: 'รอตรวจรับคืน', icon: Clock3, tone: 'amber', detail: 'Assignment ที่รอดำเนินการ' },
+  { key: 'completedToday', label: 'คืนเสร็จวันนี้', icon: CheckCircle2, tone: 'green', detail: 'ปิดกระบวนการแล้ว' },
+  { key: 'damaged', label: 'รับคืนแบบชำรุด', icon: AlertTriangle, tone: 'amber', detail: 'รายการสะสม' },
+  { key: 'lost', label: 'ครุภัณฑ์สูญหาย', icon: XCircle, tone: 'red', detail: 'รายการสะสม' },
+  { key: 'averageProcessingTimeHours', label: 'เวลารับคืนเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่เริ่มตรวจถึงปิดงาน', suffix: ' ชม.' },
+]
+
 const ACTIVITY_TYPE_LABELS = {
   ASSIGNMENT: 'มอบหมาย',
   RETURN: 'รับคืน',
@@ -301,6 +309,19 @@ export default function Dashboard({ role }) {
             return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
               <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
               <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
+      </section>
+
+      <section id="dashboard-returns" className="dashboard-block">
+        <SectionHeading icon={RotateCcw} title="Return Workflow Summary" description="ภาพรวมการตรวจรับคืนครุภัณฑ์" />
+        <div className="dashboard-kpi-grid dashboard-return-grid">
+          {RETURN_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.returns?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
             </article>
           })}
         </div>

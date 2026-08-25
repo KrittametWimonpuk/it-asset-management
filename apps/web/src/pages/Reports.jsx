@@ -13,7 +13,7 @@ import {
   AlertCircle, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Boxes, Building2,
   ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, FileSpreadsheet,
   FileText, FilterX, Headphones, RefreshCw, Search, SearchX,
-  ShieldCheck, Sparkles, Store, TableProperties, FileClock, UserCheck,
+  ShieldCheck, Sparkles, Store, TableProperties, FileClock, UserCheck, RotateCcw,
 } from 'lucide-react'
 import { api } from '../api.js'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
@@ -47,6 +47,7 @@ const EXPORT_FORMATS = [
 const REPORT_UI = {
   assets: { icon: Boxes, tone: 'blue', short: 'ครุภัณฑ์' },
   assignments: { icon: ClipboardList, tone: 'violet', short: 'การมอบหมาย' },
+  returns: { icon: RotateCcw, tone: 'green', short: 'การรับคืน' },
   warranty: { icon: ShieldCheck, tone: 'green', short: 'การรับประกัน' },
   helpdesk: { icon: Headphones, tone: 'amber', short: 'Helpdesk' },
   borrowRequests: { icon: FileClock, tone: 'blue', short: 'คำขอยืม' },
@@ -122,6 +123,30 @@ const REPORT_DEFS = [
       { key: 'conditionBefore', label: 'สภาพก่อนมอบหมาย' },
       { key: 'conditionAfter', label: 'สภาพหลังคืน' },
       { key: 'remark', label: 'หมายเหตุ' },
+    ],
+  },
+  {
+    key: 'returns',
+    title: 'Return Report',
+    description: 'ประวัติการตรวจรับคืน ผู้ตรวจ สภาพ ผลการตรวจ และระยะเวลาดำเนินการ',
+    apiFn: api.reports.returns,
+    paginated: true,
+    filterFields: ['dateRange', 'search'],
+    sortColumns: [
+      { field: 'returnStartedAt', label: 'วันที่เริ่มรับคืน' },
+      { field: 'inspectedAt', label: 'วันที่ตรวจรับ' },
+      { field: 'returnedAt', label: 'วันที่คืน' },
+      { field: 'returnStatus', label: 'สถานะการรับคืน' },
+    ],
+    columns: [
+      { key: 'employee', label: 'พนักงาน' },
+      { key: 'asset', label: 'ครุภัณฑ์' },
+      { key: 'returnDate', label: 'วันที่คืน' },
+      { key: 'inspector', label: 'ผู้ตรวจรับ' },
+      { key: 'condition', label: 'สภาพหลังคืน' },
+      { key: 'inspectionResult', label: 'ผลการตรวจ' },
+      { key: 'returnStatus', label: 'สถานะการรับคืน' },
+      { key: 'processingTimeHours', label: 'ระยะเวลา (ชั่วโมง)' },
     ],
   },
   {

@@ -24,6 +24,11 @@ export const ACTION_LABELS = {
   APPROVAL_STARTED: 'เริ่มกระบวนการอนุมัติ',
   APPROVAL_APPROVED: 'ตัดสินใจอนุมัติ',
   APPROVAL_REJECTED: 'ตัดสินใจปฏิเสธ',
+  RETURN_STARTED: 'เริ่มตรวจรับคืน',
+  RETURN_INSPECTED: 'ตรวจสภาพคืน',
+  RETURN_COMPLETED: 'คืนเสร็จสมบูรณ์',
+  RETURN_DAMAGED: 'รับคืนแบบชำรุด',
+  RETURN_LOST: 'บันทึกสูญหาย',
 }
 
 export const ENTITY_TYPE_LABELS = {

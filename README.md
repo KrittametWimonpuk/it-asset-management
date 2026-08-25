@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.4`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.5`
 
 ---
 
@@ -30,12 +30,12 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
 | **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
-| **Asset Assignment & Lifecycle** | Employee เป็น business identity ของผู้ถือครอง, User เป็นผู้ทำรายการและบัญชี RBAC; รองรับค้นหา/เลือก Employee, มอบหมาย/รับคืน และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
+| **Asset Assignment & Return Inspection** | Employee เป็น business identity ของผู้ถือครอง, User เป็น operator/RBAC; รองรับมอบหมาย, เริ่มตรวจรับ, สภาพ/ผลตรวจ/ผู้ตรวจ/เวลา, Return Timeline และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
 | **Borrow Request & Approval Workflow (v1.1 Alpha 4)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
-| **Reports & Export** | 8 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Borrow Request, Approval, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 66 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **Reports & Export** | 9 รายงาน (Asset Inventory, Assignment, Return, Warranty, Helpdesk, Borrow Request, Approval, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 69 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
@@ -59,7 +59,7 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0010_assignment_employee_integration`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0013_return_workflow_enhancement`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -404,15 +404,18 @@ Documentation/Operations/Release process — ดู
 
 ## 📊 Reports & Export
 
-หน้า "รายงาน" มีการ์ดให้เลือก 8 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
+หน้า "รายงาน" มีการ์ดให้เลือก 9 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
 CSV / Excel / PDF ที่มุมขวาบนของตาราง ทุกรายงานอ่านจากตารางที่มีอยู่แล้วเท่านั้น ไม่มีการคำนวณ/เก็บข้อมูลใหม่
 
 | รายงาน | คอลัมน์ | ตัวกรองที่รองรับ | ขอบเขต EMPLOYEE |
 |--------|---------|-------------------|-------------------|
 | **Asset Inventory** | Asset Tag, ชื่ออุปกรณ์, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย/ผู้ผลิต, สถานะ, ผู้ถือครองปัจจุบัน, วันหมดประกัน, วันที่ซื้อ, ราคาซื้อ | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, สถานะ, ค้นหา | เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่ |
 | **Asset Assignment** | ครุภัณฑ์, พนักงาน, วันที่มอบหมาย, วันที่คืน, สถานะการมอบหมาย, สภาพก่อน/หลัง, หมายเหตุ | ช่วงวันที่มอบหมาย, หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, สถานะการมอบหมาย, ค้นหา | เฉพาะประวัติที่ตัวเองเป็นผู้ถือครอง |
+| **Return Report** | พนักงาน, ครุภัณฑ์, วันที่คืน, ผู้ตรวจรับ, สภาพ, ผลตรวจ, สถานะ, ระยะเวลาดำเนินการ | ช่วงวันที่เริ่มรับคืน, ค้นหา | เฉพาะประวัติการรับคืนของตัวเอง |
 | **Warranty Report** | Asset Tag, ชื่ออุปกรณ์, หมวดหมู่, แผนก, ผู้ขาย/ผู้ผลิต, วันหมดประกัน, จำนวนวันคงเหลือ, สถานะประกัน | สถานะประกัน (หมดแล้ว/ใกล้หมด 30/90 วัน/ปกติ), หมวดหมู่, สถานที่ตั้ง, แผนก, ผู้ขาย, ค้นหา | เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่ |
 | **Helpdesk Report** | เลขที่ใบแจ้ง, ครุภัณฑ์, ความสำคัญ, สถานะ, ผู้ดูแล, วันที่แจ้ง/แก้ไขสำเร็จ/ปิดงาน, ระยะเวลาแก้ไข (ชั่วโมง) | ช่วงวันที่แจ้ง, หมวดหมู่/สถานที่/แผนก/ผู้ขายของครุภัณฑ์ที่ผูกอยู่, สถานะตั๋ว, หมวดหมู่ปัญหา, ค้นหา | เฉพาะตั๋วที่ตัวเองแจ้ง |
+| **Borrow Request Report** | เลขคำขอ, พนักงาน, ครุภัณฑ์, วันที่ขอ/คืน, สถานะ, ผู้อนุมัติ, เหตุผล | ช่วงวันที่ขอ, สถานะ, ค้นหา | เฉพาะคำขอของตัวเอง |
+| **Approval Report** | คำขอ, ผู้พิจารณา, ผลตัดสินใจ, เวลา, ระยะเวลาอนุมัติ, ความคิดเห็น | ช่วงวันที่ขอ, ผลตัดสินใจ, ค้นหา | **เข้าไม่ได้ (403)** — ภาพรวมผู้อนุมัติ |
 | **Department Summary** | แผนก, จำนวนครุภัณฑ์, กำลังมอบหมายอยู่ (active), จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, ผู้ขาย | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
 | **Vendor Summary** | ผู้ขาย/ผู้ผลิต, จำนวนครุภัณฑ์, หมดประกันแล้ว, ใกล้หมดประกัน (90 วัน), ประกันปกติ, จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, แผนก | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
 
@@ -436,7 +439,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
-## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.4)
+## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.5)
 
 Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` และเป็น business identity ของผู้ถือครองครุภัณฑ์
 หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
@@ -483,6 +486,28 @@ Report กับ Approval Report ซึ่งแสดง Approval Duration แ�
 
 ---
 
+## 🔄 Return Inspection Workflow (v1.1.0-alpha.5)
+
+การรับคืนยังเริ่มจากหน้า **การมอบหมาย** เดิม แต่เพิ่มขั้นตรวจรับก่อนปิด Assignment:
+
+`ASSIGNED → PENDING_INSPECTION → PASSED/FAILED → RETURNED/DAMAGED/LOST`
+
+ADMIN/IT_STAFF เริ่มตรวจรับและบันทึกสภาพ, หมายเหตุ, วันที่ตรวจ/คืน โดยระบบกำหนด Inspector จากบัญชี
+ที่ล็อกอินและเก็บ `AssignmentReturnEvent` แบบ append-only สำหรับ Timeline ทุกขั้น เมื่อผ่านจะปิด Assignment
+ตามปกติ; เมื่อชำรุดจะอัปเดต `Asset.assetCondition`; เมื่อสูญหายจะบันทึก Audit event เฉพาะทาง
+
+| Method | Endpoint | หน้าที่ |
+|--------|----------|--------|
+| POST | `/api/assignments/:id/return/start` | เริ่มสถานะ `PENDING_INSPECTION` โดยยังไม่ปิด Assignment |
+| POST | `/api/assignments/:id/return/inspect` | บันทึกผลตรวจ ผู้ตรวจ เวลา และปิดผลลัพธ์ |
+| POST | `/api/assignments/:id/return` | API เดิมแบบ atomic inspection สำหรับ backward compatibility |
+| GET | `/api/reports/returns` | Preview/Export Return Report ตามขอบเขต RBAC |
+
+Dashboard แสดง Pending Inspections, Completed Returns Today, Damaged Returns, Lost Assets และ Average Return
+Processing Time ส่วนข้อมูลก่อน alpha.5 จะถูก backfill เฉพาะสิ่งที่ทราบจริงและไม่สร้าง Inspector/Result ย้อนหลัง
+
+---
+
 ## 📘 API Documentation (Swagger)
 
 เอกสาร API แบบ interactive อยู่ที่ **`/docs`** (เช่น `http://localhost:4000/docs` ตอน dev หรือ
@@ -492,7 +517,7 @@ Report กับ Approval Report ซึ่งแสดง Approval Duration แ�
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (66 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+3. Endpoint ทั้งหมด (69 endpoint methods) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
    Assignments, Borrow Requests, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
@@ -510,7 +535,7 @@ Report กับ Approval Report ซึ่งแสดง Approval Duration แ�
   `paths/*.js` = คอมเมนต์ `@openapi` ล้วน ๆ 1 ไฟล์ต่อ 1 module) **ไม่มีการแก้ route file ใด ๆ เลยแม้แต่บรรทัดเดียว**
   — เอกสารอ่าน route/validation/response จริงจากซอร์สโค้ดที่มีอยู่แล้วเท่านั้น ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง
 - Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Employee`, `Asset`, `Assignment`, `BorrowRequest`, `Ticket`, `MasterDataItem`,
-  `Vendor`, `DashboardResponse`, รายงานทั้ง 7 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
+  `Vendor`, `DashboardResponse`, รายงานทั้ง 9 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
   ทุก endpoint ที่ตอบโครงสร้างเดียวกัน (เช่น response envelope `{success, data}` / `{success, message, errors}`)
   อ้างอิง (`$ref`) กลับไปที่ schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ
 - JWT Bearer authentication ประกาศเป็น reusable security scheme (`components.securitySchemes.bearerAuth`)
@@ -572,7 +597,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.4`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.5`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -783,7 +808,8 @@ cd deploy
 - [x] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม (`v1.1.0-alpha.2`)
 - [x] Borrow Request Workflow — submit/approve/reject/cancel, auto Assignment, Dashboard, Report และ Audit (`v1.1.0-alpha.3`)
 - [x] Approval Workflow Enhancement — comments, reviewer, decision time, timeline, dashboard SLA metrics และ Approval Report (`v1.1.0-alpha.4`)
-- [ ] Return Workflow / Notifications / HR Integration บน Employee foundation
+- [x] Return Workflow Enhancement — inspection, inspector, timeline, dashboard metrics, report และ audit (`v1.1.0-alpha.5`)
+- [ ] Notifications / HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว

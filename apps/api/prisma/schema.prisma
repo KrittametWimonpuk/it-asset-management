@@ -32,6 +32,8 @@ model User {
   ticketsAssigned Ticket[] @relation("TicketAssignedTo") // ตั๋วที่ตัวเองถูกมอบหมายให้ดูแล (เฉพาะ ADMIN/IT_STAFF)
   approvedBorrowRequests BorrowRequest[] @relation("BorrowRequestApprovedBy")
   borrowRequestApprovalActions BorrowRequestApproval[] @relation("BorrowRequestApprovalActor")
+  assignmentsInspected Assignment[] @relation("AssignmentInspector")
+  assignmentReturnEvents AssignmentReturnEvent[] @relation("AssignmentReturnActor")
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -258,6 +260,20 @@ enum AssignmentStatus {
   DAMAGED // เสียหายระหว่างถือครอง
 }
 
+enum ReturnWorkflowStatus {
+  PENDING_INSPECTION
+  PASSED
+  FAILED
+  RETURNED
+  DAMAGED
+  LOST
+}
+
+enum ReturnInspectionResult {
+  PASSED
+  FAILED
+}
+
 model Assignment {
   id String @id @default(uuid())
 
@@ -285,6 +301,15 @@ model Assignment {
   conditionBefore AssetCondition? // สภาพตอนมอบหมาย (ใช้ enum เดียวกับ Asset.assetCondition)
   conditionAfter  AssetCondition? // สภาพตอนคืน — มีค่าก็ต่อเมื่อคืนแล้วเท่านั้น
 
+  returnStatus      ReturnWorkflowStatus?
+  returnStartedAt   DateTime?
+  inspectionResult  ReturnInspectionResult?
+  inspectedById     String?
+  inspectedBy       User?                   @relation("AssignmentInspector", fields: [inspectedById], references: [id], onDelete: SetNull)
+  inspectionNotes   String?
+  inspectedAt       DateTime?
+  returnEvents      AssignmentReturnEvent[]
+
   remark String?
 
   createdAt DateTime  @default(now())
@@ -297,6 +322,24 @@ model Assignment {
   @@index([employeeId])
   @@index([assignedById])
   @@index([status])
+  @@index([returnStatus])
+  @@index([inspectedById])
+}
+
+model AssignmentReturnEvent {
+  id           String               @id @default(uuid())
+  assignmentId String
+  assignment   Assignment           @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  status       ReturnWorkflowStatus
+  actorUserId  String?
+  actorUser    User?                @relation("AssignmentReturnActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  condition    AssetCondition?
+  notes        String?
+  createdAt    DateTime             @default(now())
+
+  @@index([assignmentId, createdAt])
+  @@index([actorUserId])
+  @@index([status, createdAt])
 }
 
 // ---------------------------------------------------------------------------

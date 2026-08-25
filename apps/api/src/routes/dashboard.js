@@ -187,6 +187,11 @@ async function buildOrgWideDashboard() {
     approvedBorrowRequestsToday,
     rejectedBorrowRequestsToday,
     approvalDurationRows,
+    pendingInspections,
+    completedReturnsToday,
+    damagedReturns,
+    lostAssets,
+    returnDurationRows,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -265,6 +270,15 @@ async function buildOrgWideDashboard() {
       SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("approvedAt" - "requestedAt")) / 3600), 0)::double precision AS "averageHours"
       FROM "BorrowRequest"
       WHERE "deletedAt" IS NULL AND "approvedAt" IS NOT NULL
+    `,
+    prisma.assignment.count({ where: { ...notDeleted, returnStatus: 'PENDING_INSPECTION', returnedAt: null } }),
+    prisma.assignment.count({ where: { ...notDeleted, returnedAt: todayRange(now) } }),
+    prisma.assignment.count({ where: { ...notDeleted, status: 'DAMAGED' } }),
+    prisma.assignment.count({ where: { ...notDeleted, status: 'LOST' } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("returnedAt" - "returnStartedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "Assignment"
+      WHERE "deletedAt" IS NULL AND "returnedAt" IS NOT NULL AND "returnStartedAt" IS NOT NULL
     `,
   ])
 
@@ -350,6 +364,13 @@ async function buildOrgWideDashboard() {
       rejectedToday: rejectedBorrowRequestsToday,
       averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
     },
+    returns: {
+      pendingInspections,
+      completedToday: completedReturnsToday,
+      damaged: damagedReturns,
+      lost: lostAssets,
+      averageProcessingTimeHours: Math.round(Number(returnDurationRows[0]?.averageHours || 0) * 10) / 10,
+    },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
         label: categoryNameById[g.categoryId] || NOT_SET_LABEL,
@@ -407,6 +428,11 @@ async function buildEmployeeDashboard(user) {
     approvedBorrowRequestsToday,
     rejectedBorrowRequestsToday,
     approvalDurationRows,
+    pendingInspections,
+    completedReturnsToday,
+    damagedReturns,
+    lostAssets,
+    returnDurations,
   ] = await Promise.all([
     prisma.employee.findFirst({
       where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
@@ -444,6 +470,14 @@ async function buildEmployeeDashboard(user) {
         AND br."approvedAt" IS NOT NULL
         AND LOWER(employee."email") = LOWER(${user.email})
     `,
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnStatus: 'PENDING_INSPECTION', returnedAt: null } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnedAt: todayRange(now) } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, status: 'DAMAGED' } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, status: 'LOST' } }),
+    prisma.assignment.findMany({
+      where: { ...holderScope, deletedAt: null, returnedAt: { not: null }, returnStartedAt: { not: null } },
+      select: { returnedAt: true, returnStartedAt: true },
+    }),
   ])
 
   // จำนวน asset ที่ถือครองอยู่มักมีไม่กี่ชิ้นต่อคน — คำนวณ warranty bucket ในหน่วยความจำได้โดยไม่กระทบ performance
@@ -501,6 +535,15 @@ async function buildEmployeeDashboard(user) {
       approvedToday: approvedBorrowRequestsToday,
       rejectedToday: rejectedBorrowRequestsToday,
       averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
+    },
+    returns: {
+      pendingInspections,
+      completedToday: completedReturnsToday,
+      damaged: damagedReturns,
+      lost: lostAssets,
+      averageProcessingTimeHours: returnDurations.length
+        ? Math.round((returnDurations.reduce((sum, item) => sum + ((item.returnedAt - item.returnStartedAt) / 3600000), 0) / returnDurations.length) * 10) / 10
+        : 0,
     },
     charts: {
       assetsByCategory: [],

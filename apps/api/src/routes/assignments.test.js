@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createSchema, scopeForRead } from './assignments.js'
+import { createSchema, returnInspectionSchema, returnStartSchema, scopeForRead } from './assignments.js'
 import {
   assignmentHolderName,
   assignmentHolderScopeForAccount,
 } from '../utils/assignmentHelpers.js'
+import { AUDIT_ACTIONS } from '../utils/auditLog.js'
 
 const ASSET_ID = 'b155382e-94a0-4f0e-a58c-bd376b30860e'
 const EMPLOYEE_ID = 'de60c4f7-4e3f-4534-a635-4148c14a34a3'
@@ -51,4 +52,40 @@ test('migration adds nullable Employee relation, preserves userId, and performs 
   assert.match(sql, /ALTER COLUMN "userId" DROP NOT NULL/)
   assert.match(sql, /HAVING COUNT\(\*\) = 1/)
   assert.doesNotMatch(sql, /DROP COLUMN "userId"/)
+})
+
+test('return inspection requires notes and physical condition for returned assets', () => {
+  const valid = returnInspectionSchema.safeParse({
+    status: 'RETURNED', conditionAfter: 'GOOD', inspectionNotes: 'ตรวจอุปกรณ์และอุปกรณ์เสริมครบ',
+  })
+  assert.equal(valid.success, true)
+
+  const missingCondition = returnInspectionSchema.safeParse({ status: 'RETURNED', inspectionNotes: 'ตรวจแล้ว' })
+  assert.equal(missingCondition.success, false)
+  assert.ok(missingCondition.error.issues.some((issue) => issue.path[0] === 'conditionAfter'))
+
+  const missingNotes = returnInspectionSchema.safeParse({ status: 'DAMAGED', conditionAfter: 'DAMAGED' })
+  assert.equal(missingNotes.success, false)
+  assert.ok(missingNotes.error.issues.some((issue) => issue.path[0] === 'inspectionNotes'))
+})
+
+test('lost workflow can be inspected without a physical condition', () => {
+  assert.equal(returnInspectionSchema.safeParse({ status: 'LOST', inspectionNotes: 'ยืนยันการสูญหายตามรายงาน' }).success, true)
+  assert.equal(returnStartSchema.safeParse({}).success, true)
+})
+
+test('return migration is expand-only and backfills legacy closed assignments safely', async () => {
+  const migrationUrl = new URL('../../prisma/migrations/0013_return_workflow_enhancement/migration.sql', import.meta.url)
+  const sql = await readFile(migrationUrl, 'utf8')
+  assert.match(sql, /ADD COLUMN "returnStatus"/)
+  assert.match(sql, /CREATE TABLE "AssignmentReturnEvent"/)
+  assert.match(sql, /WHERE "returnedAt" IS NOT NULL/)
+  assert.doesNotMatch(sql, /DROP COLUMN|ALTER COLUMN .*NOT NULL/)
+  assert.doesNotMatch(sql, /DROP TYPE "AssignmentStatus"/)
+})
+
+test('audit dictionary covers the complete return lifecycle', () => {
+  for (const action of ['RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST']) {
+    assert.ok(AUDIT_ACTIONS.includes(action), `missing ${action}`)
+  }
 })

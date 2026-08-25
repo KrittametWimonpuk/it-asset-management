@@ -244,6 +244,83 @@ router.get('/assignments', asyncHandler(async (req, res) => {
 }))
 
 // ---------------------------------------------------------------------------
+// v1.1.0 Phase 5: Return Report
+// ---------------------------------------------------------------------------
+const RETURN_REPORT_COLUMNS = [
+  { key: 'employee', label: 'พนักงาน' },
+  { key: 'asset', label: 'ครุภัณฑ์' },
+  { key: 'returnDate', label: 'วันที่คืน' },
+  { key: 'inspector', label: 'ผู้ตรวจรับ' },
+  { key: 'condition', label: 'สภาพหลังคืน' },
+  { key: 'inspectionResult', label: 'ผลการตรวจ' },
+  { key: 'returnStatus', label: 'สถานะการรับคืน' },
+  { key: 'processingTimeHours', label: 'ระยะเวลาดำเนินการ (ชั่วโมง)' },
+]
+const RETURN_REPORT_SORTABLE = ['returnStartedAt', 'inspectedAt', 'returnedAt', 'returnStatus']
+const RETURN_STATUS_LABELS = {
+  PENDING_INSPECTION: 'รอตรวจรับ', PASSED: 'ผ่านการตรวจ', FAILED: 'ไม่ผ่านการตรวจ',
+  RETURNED: 'คืนเสร็จสมบูรณ์', DAMAGED: 'ชำรุด', LOST: 'สูญหาย',
+}
+
+function shapeReturnRow(assignment) {
+  const duration = assignment.returnStartedAt && assignment.returnedAt
+    ? Math.max(0, (assignment.returnedAt - assignment.returnStartedAt) / 3600000)
+    : null
+  return {
+    employee: `${assignment.employee?.employeeCode || '-'} — ${assignmentHolderName(assignment)}`,
+    asset: `${assignment.asset?.assetTag || '-'} — ${assignment.asset?.name || '-'}`,
+    returnDate: fmtDate(assignment.returnedAt),
+    inspector: assignment.inspectedBy?.name || assignment.inspectedBy?.email || 'ไม่ทราบผู้ตรวจ',
+    condition: assignment.conditionAfter ? (ASSET_CONDITION_LABELS[assignment.conditionAfter] || assignment.conditionAfter) : '-',
+    inspectionResult: assignment.inspectionResult ? (RETURN_STATUS_LABELS[assignment.inspectionResult] || assignment.inspectionResult) : 'ไม่มีข้อมูลย้อนหลัง',
+    returnStatus: RETURN_STATUS_LABELS[assignment.returnStatus] || assignment.returnStatus || '-',
+    processingTimeHours: duration === null ? '-' : Math.round(duration * 10) / 10,
+  }
+}
+
+function buildReturnReportWhere(req, f) {
+  const constraints = [
+    { OR: [{ returnStatus: { not: null } }, { returnedAt: { not: null } }] },
+  ]
+  const readScope = assignmentScopeForRead(req.user)
+  if (Object.keys(readScope).length) constraints.push(readScope)
+  if (f.search) constraints.push({ OR: [
+    ...ASSIGNMENT_ASSET_SEARCH_FIELDS.map((field) => ({ asset: { [field]: { contains: f.search, mode: 'insensitive' } } })),
+    { employee: { employeeCode: { contains: f.search, mode: 'insensitive' } } },
+    { employee: { fullName: { contains: f.search, mode: 'insensitive' } } },
+    { user: { name: { contains: f.search, mode: 'insensitive' } } },
+    { inspectedBy: { name: { contains: f.search, mode: 'insensitive' } } },
+  ] })
+  return { deletedAt: null, ...dateRangeWhere('returnStartedAt', f.dateFrom, f.dateTo), AND: constraints }
+}
+
+const RETURN_REPORT_INCLUDE = {
+  include: {
+    asset: { select: { assetTag: true, name: true } },
+    employee: { select: EMPLOYEE_SUMMARY_SELECT },
+    user: { select: LEGACY_HOLDER_SELECT },
+    inspectedBy: { select: { id: true, name: true, email: true } },
+  },
+}
+
+router.get('/returns', asyncHandler(async (req, res) => {
+  const f = parseReportQuery(req.query)
+  const where = buildReturnReportWhere(req, f)
+  if (!f.format) {
+    const pagination = parsePagination(req.query)
+    const orderBy = parseSort(req.query, RETURN_REPORT_SORTABLE, 'returnStartedAt')
+    const [items, totalItems] = await Promise.all([
+      prisma.assignment.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...RETURN_REPORT_INCLUDE }),
+      prisma.assignment.count({ where }),
+    ])
+    return ok(res, { items: items.map(shapeReturnRow), ...buildPageMeta(pagination, totalItems) })
+  }
+  const rows = await prisma.assignment.findMany({ where, orderBy: { returnStartedAt: 'desc' }, ...RETURN_REPORT_INCLUDE })
+  logReportExport(req, 'การรับคืนครุภัณฑ์', f.format)
+  return sendExport(res, f.format, 'return-report', 'รายงานการรับคืนครุภัณฑ์', RETURN_REPORT_COLUMNS, rows.map(shapeReturnRow))
+}))
+
+// ---------------------------------------------------------------------------
 // รายงานที่ 3: Warranty
 // ---------------------------------------------------------------------------
 const WARRANTY_REPORT_COLUMNS = [
