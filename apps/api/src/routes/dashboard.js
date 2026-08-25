@@ -29,6 +29,7 @@ import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
 import { attachPerformer } from '../utils/auditLog.js'
+import { generateDueRemindersForUser } from '../services/notificationService.js'
 
 // Milestone 9 — จำนวน audit event ล่าสุดที่แนบไปกับแดชบอร์ด (เฉพาะ ADMIN/IT_STAFF — ดู recentAuditLogs ด้านล่าง)
 const RECENT_AUDIT_LOGS_LIMIT = 10
@@ -151,7 +152,7 @@ function mergeRecentActivities(assignments, returns, newAssets, limit) {
 }
 
 // ---- ภาพรวมทั้งองค์กร (ADMIN / IT_STAFF) ----
-async function buildOrgWideDashboard() {
+async function buildOrgWideDashboard(user) {
   const now = new Date()
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
   const notDeleted = { deletedAt: null }
@@ -192,6 +193,8 @@ async function buildOrgWideDashboard() {
     damagedReturns,
     lostAssets,
     returnDurationRows,
+    unreadNotifications,
+    overdueAssets,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -280,6 +283,8 @@ async function buildOrgWideDashboard() {
       FROM "Assignment"
       WHERE "deletedAt" IS NULL AND "returnedAt" IS NOT NULL AND "returnStartedAt" IS NOT NULL
     `,
+    prisma.notification.count({ where: { userId: user.id, isRead: false, deletedAt: null } }),
+    prisma.assignment.count({ where: { ...notDeleted, returnedAt: null, expectedReturnDate: { lt: now } } }),
   ])
 
   const recentAuditLogs = await attachPerformer(recentAuditLogRows)
@@ -371,6 +376,11 @@ async function buildOrgWideDashboard() {
       lost: lostAssets,
       averageProcessingTimeHours: Math.round(Number(returnDurationRows[0]?.averageHours || 0) * 10) / 10,
     },
+    notifications: {
+      unread: unreadNotifications,
+      overdueAssets,
+      pendingActions: pendingBorrowRequests + pendingInspections,
+    },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
         label: categoryNameById[g.categoryId] || NOT_SET_LABEL,
@@ -433,6 +443,8 @@ async function buildEmployeeDashboard(user) {
     damagedReturns,
     lostAssets,
     returnDurations,
+    unreadNotifications,
+    overdueAssets,
   ] = await Promise.all([
     prisma.employee.findFirst({
       where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
@@ -478,6 +490,8 @@ async function buildEmployeeDashboard(user) {
       where: { ...holderScope, deletedAt: null, returnedAt: { not: null }, returnStartedAt: { not: null } },
       select: { returnedAt: true, returnStartedAt: true },
     }),
+    prisma.notification.count({ where: { userId, isRead: false, deletedAt: null } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnedAt: null, expectedReturnDate: { lt: now } } }),
   ])
 
   // จำนวน asset ที่ถือครองอยู่มักมีไม่กี่ชิ้นต่อคน — คำนวณ warranty bucket ในหน่วยความจำได้โดยไม่กระทบ performance
@@ -545,6 +559,11 @@ async function buildEmployeeDashboard(user) {
         ? Math.round((returnDurations.reduce((sum, item) => sum + ((item.returnedAt - item.returnStartedAt) / 3600000), 0) / returnDurations.length) * 10) / 10
         : 0,
     },
+    notifications: {
+      unread: unreadNotifications,
+      overdueAssets,
+      pendingActions: pendingBorrowRequests + pendingInspections,
+    },
     charts: {
       assetsByCategory: [],
       assetsByDepartment: [],
@@ -574,9 +593,10 @@ async function buildEmployeeDashboard(user) {
 }
 
 router.get('/', asyncHandler(async (req, res) => {
+  await generateDueRemindersForUser(req.user)
   const data = req.user.role === 'EMPLOYEE'
     ? await buildEmployeeDashboard(req.user)
-    : await buildOrgWideDashboard()
+    : await buildOrgWideDashboard(req.user)
   ok(res, data)
 }))
 

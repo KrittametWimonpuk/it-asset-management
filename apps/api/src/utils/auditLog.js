@@ -20,13 +20,14 @@ export const AUDIT_ACTIONS = [
   'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED',
   'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED',
   'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST',
+  'NOTIFICATION_SENT', 'NOTIFICATION_READ',
 ]
 
 // entityType ที่รองรับ
 export const AUDIT_ENTITY_TYPES = [
   'Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest',
   'Category', 'Department', 'Location', 'Vendor',
-  'User', 'Report',
+  'User', 'Report', 'Notification',
 ]
 
 // ดึงข้อมูลบริบทของผู้ทำรายการจาก request — ใช้ร่วมกับทุกจุดที่เรียก logAudit()

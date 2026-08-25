@@ -48,6 +48,7 @@ import {
 import {
   BORROW_REQUEST_RELATIONS, BORROW_REQUEST_STATUSES, borrowRequestScopeForAccount,
 } from '../utils/borrowRequestHelpers.js'
+import { NOTIFICATION_PRIORITIES, NOTIFICATION_TYPES } from '../services/notificationService.js'
 
 const router = Router()
 
@@ -73,7 +74,7 @@ function fmtDate(v) {
   return v ? new Date(v).toISOString().slice(0, 10) : ''
 }
 
-// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 8 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
+// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 10 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
 // (เรียกก่อน sendExport เสมอ ไม่ await เพราะเป็น fire-and-forget — ไม่หน่วงการดาวน์โหลดไฟล์)
 function logReportExport(req, reportLabel, format) {
   logAudit({
@@ -318,6 +319,60 @@ router.get('/returns', asyncHandler(async (req, res) => {
   const rows = await prisma.assignment.findMany({ where, orderBy: { returnStartedAt: 'desc' }, ...RETURN_REPORT_INCLUDE })
   logReportExport(req, 'การรับคืนครุภัณฑ์', f.format)
   return sendExport(res, f.format, 'return-report', 'รายงานการรับคืนครุภัณฑ์', RETURN_REPORT_COLUMNS, rows.map(shapeReturnRow))
+}))
+
+// ---------------------------------------------------------------------------
+// v1.1.0 Beta 1: Notification Summary — always scoped to the signed-in recipient.
+// ---------------------------------------------------------------------------
+const NOTIFICATION_REPORT_COLUMNS = [
+  { key: 'type', label: 'ประเภท' },
+  { key: 'priority', label: 'ความสำคัญ' },
+  { key: 'total', label: 'ทั้งหมด' },
+  { key: 'unread', label: 'ยังไม่อ่าน' },
+  { key: 'read', label: 'อ่านแล้ว' },
+]
+const NOTIFICATION_TYPE_LABELS = {
+  BORROW_REQUEST: 'คำขอยืม', APPROVAL: 'การอนุมัติ', ASSIGNMENT: 'การมอบหมาย',
+  RETURN: 'การรับคืน', REMINDER: 'การแจ้งเตือนกำหนด', SYSTEM: 'ระบบ',
+}
+const NOTIFICATION_PRIORITY_LABELS = { LOW: 'ต่ำ', NORMAL: 'ปกติ', HIGH: 'สูง', CRITICAL: 'วิกฤต' }
+
+function notificationSummaryRows(notifications) {
+  const summary = new Map()
+  for (const notification of notifications) {
+    const key = `${notification.type}:${notification.priority}`
+    const row = summary.get(key) || {
+      type: NOTIFICATION_TYPE_LABELS[notification.type] || notification.type,
+      priority: NOTIFICATION_PRIORITY_LABELS[notification.priority] || notification.priority,
+      total: 0, unread: 0, read: 0,
+    }
+    row.total += 1
+    row[notification.isRead ? 'read' : 'unread'] += 1
+    summary.set(key, row)
+  }
+  return [...summary.values()].sort((a, b) => b.total - a.total || a.type.localeCompare(b.type, 'th'))
+}
+
+router.get('/notifications', asyncHandler(async (req, res) => {
+  const f = parseReportQuery(req.query)
+  const where = {
+    userId: req.user.id,
+    deletedAt: null,
+    ...dateRangeWhere('createdAt', f.dateFrom, f.dateTo),
+  }
+  if (NOTIFICATION_TYPES.includes(f.notificationType)) where.type = f.notificationType
+  if (NOTIFICATION_PRIORITIES.includes(f.notificationPriority)) where.priority = f.notificationPriority
+  if (f.search) where.OR = [
+    { title: { contains: f.search, mode: 'insensitive' } },
+    { message: { contains: f.search, mode: 'insensitive' } },
+  ]
+  const notifications = await prisma.notification.findMany({
+    where, select: { type: true, priority: true, isRead: true },
+  })
+  const rows = notificationSummaryRows(notifications)
+  if (!f.format) return ok(res, { items: rows })
+  logReportExport(req, 'สรุปการแจ้งเตือน', f.format)
+  return sendExport(res, f.format, 'notification-summary-report', 'รายงานสรุปการแจ้งเตือน', NOTIFICATION_REPORT_COLUMNS, rows)
 }))
 
 // ---------------------------------------------------------------------------

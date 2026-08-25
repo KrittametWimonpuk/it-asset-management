@@ -29,6 +29,7 @@ import {
 } from '../utils/assignmentHelpers.js'
 import { ASSET_CONDITIONS } from './assets.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
+import { notifyEmployee, notifyStaff } from '../services/notificationService.js'
 
 const router = Router()
 
@@ -137,6 +138,27 @@ function finalAuditActionFor(status) {
   if (status === 'DAMAGED') return 'RETURN_DAMAGED'
   if (status === 'LOST') return 'RETURN_LOST'
   return 'RETURN_COMPLETED'
+}
+
+function returnNotificationPayload(assignment, status, req) {
+  const outcomes = {
+    RETURNED: {
+      title: `รับคืน ${assignment.asset.assetTag} เรียบร้อย`,
+      message: `${assignment.asset.name} ผ่านการตรวจและปิดรายการรับคืนแล้ว`,
+      priority: 'NORMAL',
+    },
+    DAMAGED: {
+      title: `รับคืนแบบชำรุด: ${assignment.asset.assetTag}`,
+      message: `${assignment.asset.name} ไม่ผ่านการตรวจและบันทึกเป็นครุภัณฑ์ชำรุด`,
+      priority: 'HIGH',
+    },
+    LOST: {
+      title: `บันทึกครุภัณฑ์สูญหาย: ${assignment.asset.assetTag}`,
+      message: `${assignment.asset.name} ถูกปิดรายการด้วยสถานะสูญหาย`,
+      priority: 'CRITICAL',
+    },
+  }
+  return { ...outcomes[status], type: 'RETURN', auditContext: auditContext(req) }
 }
 
 function ensureReturnDateIsValid(res, date, assignedAt, field = 'returnedAt') {
@@ -326,6 +348,12 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
     newValues: { assetId, employeeId: targetEmployee.id, userId: legacyUser?.id || null, ...rest },
   })
 
+  await notifyEmployee(targetEmployee.id, {
+    title: `ได้รับมอบหมาย ${assignment.asset.assetTag}`,
+    message: `คุณเป็นผู้ถือครอง ${assignment.asset.name}${assignment.expectedReturnDate ? ` ถึงวันที่ ${new Intl.DateTimeFormat('th-TH').format(assignment.expectedReturnDate)}` : ''}`,
+    type: 'ASSIGNMENT', priority: 'NORMAL', auditContext: auditContext(req),
+  })
+
   ok(res, assignment, 201)
 }))
 
@@ -401,6 +429,11 @@ router.post('/:id/return/start', manageAssignments, asyncHandler(async (req, res
     description: `เริ่มตรวจรับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignmentHolderName(assignment)}`,
     newValues: { returnStatus: 'PENDING_INSPECTION', returnStartedAt: startedAt, employeeId: assignment.employeeId },
   })
+  await notifyStaff({
+    title: `รอตรวจรับคืน ${assignment.asset.assetTag}`,
+    message: `${assignmentHolderName(assignment)} ส่งคืน ${assignment.asset.name} และรอการตรวจสภาพ`,
+    type: 'RETURN', priority: 'HIGH', auditContext: auditContext(req),
+  })
   ok(res, assignment)
 }))
 
@@ -440,6 +473,7 @@ router.post('/:id/return/inspect', manageAssignments, asyncHandler(async (req, r
     req, assignment, parsed.data.status, inspectionResultFor(parsed.data.status),
     parsed.data.conditionAfter, parsed.data.inspectionNotes, inspectedAt, returnedAt,
   )
+  await notifyEmployee(assignment.employeeId, returnNotificationPayload(assignment, parsed.data.status, req))
   ok(res, assignment)
 }))
 
@@ -477,6 +511,8 @@ router.post('/:id/return', manageAssignments, asyncHandler(async (req, res) => {
     newValues: { returnedAt, status, conditionAfter, remark: parsed.data.remark, employeeId: assignment.employeeId, employeeCode: assignment.employee?.employeeCode || null },
   })
   logInspectionAudit(req, assignment, status, inspectionResultFor(status), conditionAfter, inspectionNotes, returnedAt, returnedAt)
+
+  await notifyEmployee(assignment.employeeId, returnNotificationPayload(assignment, status, req))
 
   ok(res, assignment)
 }))

@@ -34,6 +34,7 @@ model User {
   borrowRequestApprovalActions BorrowRequestApproval[] @relation("BorrowRequestApprovalActor")
   assignmentsInspected Assignment[] @relation("AssignmentInspector")
   assignmentReturnEvents AssignmentReturnEvent[] @relation("AssignmentReturnActor")
+  notifications Notification[]
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -106,6 +107,42 @@ model Department {
   assets      Asset[]
   employees   Employee[]
 
+  @@index([deletedAt])
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  BORROW_REQUEST
+  APPROVAL
+  ASSIGNMENT
+  RETURN
+  REMINDER
+  SYSTEM
+}
+
+// v1.1.0 Beta 1 — operational communication scoped to the recipient account.
+// Notifications are never hard-deleted; DELETE only sets deletedAt.
+model Notification {
+  id        String               @id @default(uuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String
+  message   String
+  type      NotificationType
+  priority  NotificationPriority @default(NORMAL)
+  isRead    Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  readAt    DateTime?
+  deletedAt DateTime?
+
+  @@index([userId, isRead, deletedAt, createdAt])
+  @@index([type, priority, createdAt])
   @@index([deletedAt])
 }
 

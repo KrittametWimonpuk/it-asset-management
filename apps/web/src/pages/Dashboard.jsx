@@ -6,6 +6,7 @@ import {
   Archive,
   ArrowRight,
   BarChart3,
+  BellRing,
   Boxes,
   Building2,
   CalendarDays,
@@ -18,6 +19,7 @@ import {
   Headphones,
   History,
   MapPin,
+  ListTodo,
   PackageCheck,
   PackageOpen,
   RefreshCw,
@@ -87,6 +89,12 @@ const RETURN_SUMMARY_CARDS = [
   { key: 'damaged', label: 'รับคืนแบบชำรุด', icon: AlertTriangle, tone: 'amber', detail: 'รายการสะสม' },
   { key: 'lost', label: 'ครุภัณฑ์สูญหาย', icon: XCircle, tone: 'red', detail: 'รายการสะสม' },
   { key: 'averageProcessingTimeHours', label: 'เวลารับคืนเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่เริ่มตรวจถึงปิดงาน', suffix: ' ชม.' },
+]
+
+const NOTIFICATION_SUMMARY_CARDS = [
+  { key: 'unread', label: 'การแจ้งเตือนที่ยังไม่อ่าน', icon: BellRing, tone: 'blue', detail: 'รายการที่ส่งถึงคุณ' },
+  { key: 'overdueAssets', label: 'ครุภัณฑ์เกินกำหนด', icon: TriangleAlert, tone: 'red', detail: 'รายการที่ต้องติดตาม' },
+  { key: 'pendingActions', label: 'งานที่รอดำเนินการ', icon: ListTodo, tone: 'amber', detail: 'คำขอและการตรวจรับ' },
 ]
 
 const ACTIVITY_TYPE_LABELS = {
@@ -309,6 +317,19 @@ export default function Dashboard({ role }) {
             return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
               <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
               <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
+      </section>
+
+      <section id="dashboard-notifications" className="dashboard-block">
+        <SectionHeading icon={BellRing} title="Notification & Action Summary" description="การสื่อสารและรายการที่ต้องดำเนินการของคุณ" />
+        <div className="dashboard-kpi-grid">
+          {NOTIFICATION_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.notifications?.[card.key] || 0).toLocaleString('th-TH')}</strong><small>{card.detail}</small>
             </article>
           })}
         </div>

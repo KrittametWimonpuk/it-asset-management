@@ -22,6 +22,7 @@ const Reports = lazy(() => import('./pages/Reports.jsx'))
 const AuditLog = lazy(() => import('./pages/AuditLog.jsx'))
 const Employees = lazy(() => import('./pages/Employees.jsx'))
 const BorrowRequests = lazy(() => import('./pages/BorrowRequests.jsx'))
+const Notifications = lazy(() => import('./pages/Notifications.jsx'))
 const MasterDataPage = lazy(() => import('./pages/MasterDataPage.jsx'))
 
 function PageLoading() {
@@ -155,6 +156,7 @@ export default function App() {
           )}
           {tab === 'assignments' && <Assignments role={user.role} user={user} initialAssetId={assignmentsAssetFilter} />}
           {tab === 'borrowRequests' && <BorrowRequests role={user.role} />}
+          {tab === 'notifications' && <Notifications />}
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}
           {tab === 'audit' && canManageMasterData && <AuditLog />}

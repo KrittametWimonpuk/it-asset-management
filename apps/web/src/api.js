@@ -140,6 +140,15 @@ export const api = {
     availableAssets: (params) => request(`/borrow-requests/options/assets${toQueryString(params)}`),
   },
 
+  // v1.1.0 Beta 1: user-scoped operational notifications
+  notifications: {
+    list: (params) => request(`/notifications${toQueryString(params)}`),
+    unreadCount: () => request('/notifications/unread-count'),
+    markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+    markAllRead: () => request('/notifications/read-all', { method: 'POST' }),
+    remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  },
+
   // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
   dashboard: {
     get: () => request('/dashboard'),
@@ -171,6 +180,7 @@ export const api = {
     borrowRequests: (params) => request(`/reports/borrow-requests${toQueryString(params)}`),
     approvals: (params) => request(`/reports/approvals${toQueryString(params)}`),
     returns: (params) => request(`/reports/returns${toQueryString(params)}`),
+    notifications: (params) => request(`/reports/notifications${toQueryString(params)}`),
     download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
 

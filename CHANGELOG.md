@@ -5,6 +5,48 @@
 
 ---
 
+## [v1.1.0-beta.1] — Notifications & Reminder System
+
+Beta 1 เพิ่มชั้นการสื่อสารบน lifecycle เดิม โดย Notification เป็น best-effort หลังธุรกรรมสำเร็จ จึงไม่ทำให้
+Borrow Request, Approval, Assignment หรือ Return ล้มเหลวหากการแจ้งเตือนมีปัญหา
+
+### Added
+- Migration expand-only `0014_notifications_reminders`: เพิ่ม `Notification`, `NotificationType`,
+  `NotificationPriority`, recipient index และ soft delete โดยไม่แก้ตาราง lifecycle เดิม
+- REST API สำหรับ list/unread count/read/read-all/soft delete ทุก endpoint จำกัดด้วย `userId` ของ JWT
+- Workflow hooks สำหรับคำขอใหม่, อนุมัติ/ปฏิเสธ, มอบหมาย, รอตรวจรับ และผลคืนปกติ/ชำรุด/สูญหาย
+- Due reminder 3 วันและ overdue reminder แบบ idempotent โดย generate เมื่อเปิด Notification/Dashboard
+- กระดิ่ง unread badge/dropdown, หน้า Notification พร้อม search/filter/pagination/read/archive,
+  responsive, dark mode, semantic list และ live status สำหรับ assistive technology
+- Dashboard เพิ่ม Unread Notifications, Overdue Assets, Pending Actions
+- Notification Summary Report พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `NOTIFICATION_SENT`, `NOTIFICATION_READ` และ entity `Notification`
+- OpenAPI/Swagger อัปเดตเป็น 75 methods พร้อม schema และ path ของ Notification
+
+### Compatibility & Security
+- Notification ทำงานหลัง core transaction และ helper จับ error ภายในเสมอ จึงไม่เปลี่ยนผลลัพธ์ workflow เดิม
+- User ทุก role เห็น/อ่าน/ลบได้เฉพาะ notification ที่ส่งถึงบัญชีตนเอง; staff ได้เฉพาะ approval/pending inspection/
+  overdue ที่เกี่ยวข้องกับงานฝ่ายดูแล
+- Helpdesk notification เดิมในกระดิ่งยังคงอยู่และถูกผสานกับ Notification API
+
+### Testing
+- Prisma validate/generate, API/frontend lint, frontend production build และ backend tests `31/31` ผ่าน
+- Migration `0014` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 14 migrations
+- Docker E2E ผ่าน 23 assertions: workflow events, ไม่แจ้งผู้ส่งคำขอ, recipient scope/cross-user 404,
+  unread/read/read-all, soft delete, upcoming/overdue/idempotency, return pending/completed, Dashboard,
+  Notification Report, Audit และ unauthenticated 401
+- ล้าง E2E marker หลังทดสอบและยืนยันเหลือ `0` รายการ
+
+### Known Limitations
+- Reminder รุ่น Beta ใช้ on-access sweep ยังไม่มี background scheduler จึงถูกสร้างเมื่อผู้ใช้เปิด Dashboard/
+  Notification แทนการส่งตรงตามวินาทีขณะไม่มีผู้ใช้งาน
+- Employee ที่ไม่มี User account อีเมลตรงกันจะไม่มีช่องทางรับ in-app notification
+- ยังไม่มี email/push/WebSocket delivery และไม่มี source key สำหรับ dedupe ระดับ database
+- Environment รอบนี้ไม่มี browser session เชื่อมต่อ จึงยืนยัน accessibility จาก semantic markup,
+  keyboard-operable native controls, responsive CSS, lint/build แต่ยังไม่ได้ทดสอบด้วย NVDA และ visual regression จริง
+
+---
+
 ## [v1.1.0-alpha.5] — Return Workflow Enhancement
 
 เฟส 5 ขยายการรับคืนเดิมเป็น workflow ตรวจรับที่ติดตามได้ครบ โดยคง `Assignment.status`, Authentication,

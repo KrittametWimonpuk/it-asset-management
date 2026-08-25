@@ -702,6 +702,12 @@ const dashboardSchemas = {
           damaged: { type: 'integer' }, lost: { type: 'integer' }, averageProcessingTimeHours: { type: 'number' },
         },
       },
+      notifications: {
+        type: 'object',
+        properties: {
+          unread: { type: 'integer' }, overdueAssets: { type: 'integer' }, pendingActions: { type: 'integer' },
+        },
+      },
       charts: {
         type: 'object',
         description: 'array ว่างทั้งหมดสำหรับ EMPLOYEE (เป็นข้อมูลภาพรวมองค์กรล้วน ๆ)',
@@ -817,6 +823,13 @@ const reportSchemas = {
       comment: { type: 'string' }, rejectedReason: { type: 'string' },
     },
   },
+  NotificationSummaryReportRow: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', example: 'การอนุมัติ' }, priority: { type: 'string', example: 'สูง' },
+      total: { type: 'integer' }, unread: { type: 'integer' }, read: { type: 'integer' },
+    },
+  },
   DepartmentSummaryRow: {
     type: 'object',
     properties: {
@@ -839,16 +852,33 @@ const reportSchemas = {
   },
 }
 
+const notificationSchemas = {
+  NotificationType: { type: 'string', enum: ['BORROW_REQUEST', 'APPROVAL', 'ASSIGNMENT', 'RETURN', 'REMINDER', 'SYSTEM'] },
+  NotificationPriority: { type: 'string', enum: ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] },
+  Notification: {
+    type: 'object',
+    required: ['id', 'userId', 'title', 'message', 'type', 'priority', 'isRead', 'createdAt'],
+    properties: {
+      id: { type: 'string', format: 'uuid' }, userId: { type: 'string', format: 'uuid' },
+      title: { type: 'string' }, message: { type: 'string' },
+      type: { $ref: '#/components/schemas/NotificationType' },
+      priority: { $ref: '#/components/schemas/NotificationPriority' },
+      isRead: { type: 'boolean' }, createdAt: { type: 'string', format: 'date-time' },
+      readAt: { type: 'string', format: 'date-time', nullable: true }, deletedAt: { type: 'string', format: 'date-time', nullable: true },
+    },
+  },
+}
+
 // ---- Audit Log (Milestone 9) — record เดียวใช้ทั้ง GET /api/audit, GET /api/audit/:id และ
 // DashboardResponse.recentAuditLogs (โครงสร้างเดียวกันทุกจุด) ----
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST', 'NOTIFICATION_SENT', 'NOTIFICATION_READ'],
   },
   AuditEntityType: {
     type: 'string',
-    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
+    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report', 'Notification'],
   },
   AuditLog: {
     type: 'object',
@@ -877,7 +907,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-alpha.5',
+    version: '1.1.0-beta.1',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
@@ -899,6 +929,7 @@ const definition = {
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
     { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ ความคิดเห็น Timeline และการสร้าง Assignment อัตโนมัติ' },
+    { name: 'Notifications', description: 'การแจ้งเตือนส่วนตัว การอ่าน และ soft delete พร้อม reminder กำหนดคืน' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },
@@ -926,6 +957,7 @@ const definition = {
       ...assignmentSchemas,
       ...ticketSchemas,
       ...borrowRequestSchemas,
+      ...notificationSchemas,
       ...dashboardSchemas,
       ...reportSchemas,
       ...auditSchemas,

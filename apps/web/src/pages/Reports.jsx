@@ -14,6 +14,7 @@ import {
   ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, FileSpreadsheet,
   FileText, FilterX, Headphones, RefreshCw, Search, SearchX,
   ShieldCheck, Sparkles, Store, TableProperties, FileClock, UserCheck, RotateCcw,
+  BellRing,
 } from 'lucide-react'
 import { api } from '../api.js'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
@@ -38,6 +39,16 @@ const BORROW_REQUEST_STATUS_OPTIONS = [
   { value: 'COMPLETED', label: 'ดำเนินการเสร็จสิ้น' },
 ]
 
+const NOTIFICATION_TYPE_OPTIONS = [
+  { value: 'BORROW_REQUEST', label: 'คำขอยืม' }, { value: 'APPROVAL', label: 'การอนุมัติ' },
+  { value: 'ASSIGNMENT', label: 'การมอบหมาย' }, { value: 'RETURN', label: 'การรับคืน' },
+  { value: 'REMINDER', label: 'แจ้งเตือนกำหนด' }, { value: 'SYSTEM', label: 'ระบบ' },
+]
+const NOTIFICATION_PRIORITY_OPTIONS = [
+  { value: 'LOW', label: 'ต่ำ' }, { value: 'NORMAL', label: 'ปกติ' },
+  { value: 'HIGH', label: 'สูง' }, { value: 'CRITICAL', label: 'วิกฤต' },
+]
+
 const EXPORT_FORMATS = [
   { value: 'csv', label: 'CSV', icon: FileText },
   { value: 'xlsx', label: 'Excel', icon: FileSpreadsheet },
@@ -52,6 +63,7 @@ const REPORT_UI = {
   helpdesk: { icon: Headphones, tone: 'amber', short: 'Helpdesk' },
   borrowRequests: { icon: FileClock, tone: 'blue', short: 'คำขอยืม' },
   approvals: { icon: UserCheck, tone: 'violet', short: 'การอนุมัติ' },
+  notifications: { icon: BellRing, tone: 'cyan', short: 'การแจ้งเตือน' },
   departments: { icon: Building2, tone: 'cyan', short: 'แผนก' },
   vendors: { icon: Store, tone: 'rose', short: 'ผู้ขาย' },
 }
@@ -69,9 +81,11 @@ const FILTER_PARAM_KEYS = {
   ticketStatus: ['ticketStatus'],
   ticketCategory: ['ticketCategory'],
   borrowRequestStatus: ['borrowRequestStatus'],
+  notificationType: ['notificationType'],
+  notificationPriority: ['notificationPriority'],
 }
 
-// นิยามรายงานทั้ง 8 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
+// นิยามรายงานทั้ง 10 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
 const REPORT_DEFS = [
   {
     key: 'assets',
@@ -248,6 +262,18 @@ const REPORT_DEFS = [
       { key: 'assetsCount', label: 'จำนวนครุภัณฑ์' },
       { key: 'activeAssignmentsCount', label: 'กำลังมอบหมายอยู่' },
       { key: 'ticketsCount', label: 'จำนวนใบแจ้งซ่อมทั้งหมด' },
+    ],
+  },
+  {
+    key: 'notifications',
+    title: 'Notification Summary',
+    description: 'สรุปการแจ้งเตือนที่ส่งถึงคุณ แยกตามประเภท ความสำคัญ และสถานะการอ่าน',
+    apiFn: api.reports.notifications,
+    paginated: false,
+    filterFields: ['dateRange', 'notificationType', 'notificationPriority', 'search'],
+    columns: [
+      { key: 'type', label: 'ประเภท' }, { key: 'priority', label: 'ความสำคัญ' },
+      { key: 'total', label: 'ทั้งหมด' }, { key: 'unread', label: 'ยังไม่อ่าน' }, { key: 'read', label: 'อ่านแล้ว' },
     ],
   },
   {
@@ -512,6 +538,26 @@ function ReportView({ report }) {
             <select id="report-borrow-status" value={filters.borrowRequestStatus} onChange={(e) => updateFilter('borrowRequestStatus', e.target.value)}>
               <option value="">ทั้งหมด</option>
               {BORROW_REQUEST_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {report.filterFields.includes('notificationType') && (
+          <div className="filter-field">
+            <label htmlFor="report-notification-type">ประเภทการแจ้งเตือน</label>
+            <select id="report-notification-type" value={filters.notificationType} onChange={(e) => updateFilter('notificationType', e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              {NOTIFICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {report.filterFields.includes('notificationPriority') && (
+          <div className="filter-field">
+            <label htmlFor="report-notification-priority">ความสำคัญ</label>
+            <select id="report-notification-priority" value={filters.notificationPriority} onChange={(e) => updateFilter('notificationPriority', e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              {NOTIFICATION_PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         )}

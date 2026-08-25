@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.5`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-beta.1`
 
 ---
 
@@ -32,10 +32,11 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
 | **Asset Assignment & Return Inspection** | Employee เป็น business identity ของผู้ถือครอง, User เป็น operator/RBAC; รองรับมอบหมาย, เริ่มตรวจรับ, สภาพ/ผลตรวจ/ผู้ตรวจ/เวลา, Return Timeline และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
 | **Borrow Request & Approval Workflow (v1.1 Alpha 4)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
+| **Notifications & Reminders (v1.1 Beta 1)** | การแจ้งเตือน in-app สำหรับคำขอ/อนุมัติ/มอบหมาย/รับคืน พร้อม unread badge, reminder ก่อนกำหนด 3 วัน, overdue, search/filter/pagination, soft delete และ recipient-scoped RBAC |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
-| **Reports & Export** | 9 รายงาน (Asset Inventory, Assignment, Return, Warranty, Helpdesk, Borrow Request, Approval, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 69 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **Reports & Export** | 10 รายงาน (เพิ่ม Notification Summary จาก 9 รายงานเดิม) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 75 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
@@ -404,7 +405,7 @@ Documentation/Operations/Release process — ดู
 
 ## 📊 Reports & Export
 
-หน้า "รายงาน" มีการ์ดให้เลือก 9 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
+หน้า "รายงาน" มีการ์ดให้เลือก 10 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
 CSV / Excel / PDF ที่มุมขวาบนของตาราง ทุกรายงานอ่านจากตารางที่มีอยู่แล้วเท่านั้น ไม่มีการคำนวณ/เก็บข้อมูลใหม่
 
 | รายงาน | คอลัมน์ | ตัวกรองที่รองรับ | ขอบเขต EMPLOYEE |
@@ -416,6 +417,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 | **Helpdesk Report** | เลขที่ใบแจ้ง, ครุภัณฑ์, ความสำคัญ, สถานะ, ผู้ดูแล, วันที่แจ้ง/แก้ไขสำเร็จ/ปิดงาน, ระยะเวลาแก้ไข (ชั่วโมง) | ช่วงวันที่แจ้ง, หมวดหมู่/สถานที่/แผนก/ผู้ขายของครุภัณฑ์ที่ผูกอยู่, สถานะตั๋ว, หมวดหมู่ปัญหา, ค้นหา | เฉพาะตั๋วที่ตัวเองแจ้ง |
 | **Borrow Request Report** | เลขคำขอ, พนักงาน, ครุภัณฑ์, วันที่ขอ/คืน, สถานะ, ผู้อนุมัติ, เหตุผล | ช่วงวันที่ขอ, สถานะ, ค้นหา | เฉพาะคำขอของตัวเอง |
 | **Approval Report** | คำขอ, ผู้พิจารณา, ผลตัดสินใจ, เวลา, ระยะเวลาอนุมัติ, ความคิดเห็น | ช่วงวันที่ขอ, ผลตัดสินใจ, ค้นหา | **เข้าไม่ได้ (403)** — ภาพรวมผู้อนุมัติ |
+| **Notification Summary** | ประเภท, ความสำคัญ, ทั้งหมด, ยังไม่อ่าน, อ่านแล้ว | ช่วงวันที่, ประเภท, ความสำคัญ, ค้นหา | เฉพาะรายการที่ส่งถึงบัญชีตนเอง |
 | **Department Summary** | แผนก, จำนวนครุภัณฑ์, กำลังมอบหมายอยู่ (active), จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, ผู้ขาย | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
 | **Vendor Summary** | ผู้ขาย/ผู้ผลิต, จำนวนครุภัณฑ์, หมดประกันแล้ว, ใกล้หมดประกัน (90 วัน), ประกันปกติ, จำนวนใบแจ้งซ่อมทั้งหมด | ช่วงวันที่ซื้อ, หมวดหมู่, สถานที่ตั้ง, แผนก | **เข้าไม่ได้ (403)** — ภาพรวมองค์กรล้วน ๆ |
 
@@ -508,6 +510,26 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 
 ---
 
+## 🔔 Notifications & Reminder System (v1.1.0-beta.1)
+
+ระบบสร้าง Notification หลัง workflow สำเร็จสำหรับคำขอยืม, ผลอนุมัติ, การมอบหมาย, รอตรวจรับ และผลการคืน
+โดยความล้มเหลวของชั้นการสื่อสารไม่ rollback ธุรกรรม lifecycle เดิม ผู้ใช้ทุก role เห็นเฉพาะรายการที่ส่งถึง
+`userId` ของตนเอง และ DELETE เป็น soft delete เสมอ
+
+| Method | Endpoint | หน้าที่ |
+|--------|----------|--------|
+| GET | `/api/notifications` | ค้นหา/กรอง/แบ่งหน้ารายการของตนเอง |
+| GET | `/api/notifications/unread-count` | จำนวนที่ยังไม่อ่านสำหรับ badge |
+| POST | `/api/notifications/:id/read` | อ่านหนึ่งรายการ |
+| POST | `/api/notifications/read-all` | อ่านทั้งหมด |
+| DELETE | `/api/notifications/:id` | เก็บเข้าคลังแบบ soft delete |
+
+Reminder ก่อนกำหนด 3 วันและ overdue ใช้ on-access sweep แบบ idempotent เมื่อเปิด Dashboard หรือ Notification
+ใน Beta 1 เพื่อไม่เพิ่ม scheduler/service ใหม่ให้สถาปัตยกรรมเดิม เมื่อเข้าสู่ production ที่ต้องส่งตรงเวลาขณะไม่มี
+ผู้ใช้งาน ควรเรียก reminder generator ผ่าน scheduled worker/cron เพิ่มภายหลัง
+
+---
+
 ## 📘 API Documentation (Swagger)
 
 เอกสาร API แบบ interactive อยู่ที่ **`/docs`** (เช่น `http://localhost:4000/docs` ตอน dev หรือ
@@ -517,8 +539,8 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (69 endpoint methods) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
-   Assignments, Borrow Requests, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
+3. Endpoint ทั้งหมด (75 endpoint methods) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+   Assignments, Borrow Requests, Notifications, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
 ### วิธี Authorize (ทดลองยิง endpoint ที่ต้องล็อกอิน)
@@ -535,7 +557,7 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
   `paths/*.js` = คอมเมนต์ `@openapi` ล้วน ๆ 1 ไฟล์ต่อ 1 module) **ไม่มีการแก้ route file ใด ๆ เลยแม้แต่บรรทัดเดียว**
   — เอกสารอ่าน route/validation/response จริงจากซอร์สโค้ดที่มีอยู่แล้วเท่านั้น ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง
 - Schema ที่ใช้ซ้ำได้ (`components.schemas`): `User`, `Employee`, `Asset`, `Assignment`, `BorrowRequest`, `Ticket`, `MasterDataItem`,
-  `Vendor`, `DashboardResponse`, รายงานทั้ง 9 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
+  `Vendor`, `DashboardResponse`, รายงานทั้ง 10 แบบ, `ErrorResponse`, `ValidationError`, `Pagination` ฯลฯ —
   ทุก endpoint ที่ตอบโครงสร้างเดียวกัน (เช่น response envelope `{success, data}` / `{success, message, errors}`)
   อ้างอิง (`$ref`) กลับไปที่ schema เดียวกันเสมอ ไม่มีการนิยามซ้ำ
 - JWT Bearer authentication ประกาศเป็น reusable security scheme (`components.securitySchemes.bearerAuth`)
@@ -559,12 +581,12 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 (`oldValues`/`newValues`) เป็น JSON ที่จัดรูปแบบอ่านง่าย เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable) — ไม่มี
 endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้แต่ตัวเดียว
 
-**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Employee, BorrowRequest, Category, Department, Location, Vendor, User, Report
+**Entity types ที่รองรับ:** Asset, Assignment, Ticket, Employee, BorrowRequest, Notification, Category, Department, Location, Vendor, User, Report
 
 **Actions ที่รองรับ:** `CREATE`, `UPDATE`, `DELETE`, `ASSIGN`, `RETURN`, `OPEN`, `START_PROGRESS`, `ON_HOLD`,
 `RESOLVE`, `CLOSE`, `RESTORE`, `LOGIN`, `EXPORT_REPORT`, `BORROW_REQUEST_CREATED`,
 `BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`, `BORROW_REQUEST_CANCELLED`, `APPROVAL_STARTED`,
-`APPROVAL_APPROVED`, `APPROVAL_REJECTED`
+`APPROVAL_APPROVED`, `APPROVAL_REJECTED`, `NOTIFICATION_SENT`, `NOTIFICATION_READ`
 
 | เหตุการณ์ | Action ที่บันทึก | จุดที่เรียก |
 |-----------|------------------|-------------|
@@ -577,6 +599,7 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 | แจ้งปัญหาใหม่ / เริ่มดำเนินการ / พักงาน / แก้ไขสำเร็จ / ปิดงาน | `OPEN` / `START_PROGRESS` / `ON_HOLD` / `RESOLVE` / `CLOSE` | `routes/tickets.js` (action ตาม target status ของแต่ละ transition) |
 | สมัครสมาชิก / เข้าสู่ระบบ | `CREATE` (entityType `User`) / `LOGIN` | `routes/auth.js` |
 | ส่งออกรายงาน (CSV/Excel/PDF) | `EXPORT_REPORT` | `routes/reports.js` (ทุก endpoint ที่ `?format=` มา) |
+| ส่งและอ่านการแจ้งเตือน | `NOTIFICATION_SENT` / `NOTIFICATION_READ` | `services/notificationService.js` / `routes/notifications.js` |
 
 **กฎการบันทึก:** log เฉพาะการกระทำที่สำเร็จจริงเท่านั้น — validation ที่ล้มเหลว (400) หรือสิทธิ์ไม่พอ (403)
 ไม่ถูกบันทึก การดำเนินการ Borrow Request อาจมีทั้ง lifecycle audit เดิมและ approval audit ใหม่ เพื่อรักษา
@@ -597,7 +620,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.5`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-beta.1`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -809,7 +832,8 @@ cd deploy
 - [x] Borrow Request Workflow — submit/approve/reject/cancel, auto Assignment, Dashboard, Report และ Audit (`v1.1.0-alpha.3`)
 - [x] Approval Workflow Enhancement — comments, reviewer, decision time, timeline, dashboard SLA metrics และ Approval Report (`v1.1.0-alpha.4`)
 - [x] Return Workflow Enhancement — inspection, inspector, timeline, dashboard metrics, report และ audit (`v1.1.0-alpha.5`)
-- [ ] Notifications / HR Integration บน Employee foundation
+- [x] Notifications & Reminder System — workflow events, unread/read, due/overdue, Dashboard, Report และ Audit (`v1.1.0-beta.1`)
+- [ ] HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว

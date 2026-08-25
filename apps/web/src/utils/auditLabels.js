@@ -29,6 +29,8 @@ export const ACTION_LABELS = {
   RETURN_COMPLETED: 'คืนเสร็จสมบูรณ์',
   RETURN_DAMAGED: 'รับคืนแบบชำรุด',
   RETURN_LOST: 'บันทึกสูญหาย',
+  NOTIFICATION_SENT: 'ส่งการแจ้งเตือน',
+  NOTIFICATION_READ: 'อ่านการแจ้งเตือน',
 }
 
 export const ENTITY_TYPE_LABELS = {
@@ -43,4 +45,5 @@ export const ENTITY_TYPE_LABELS = {
   Vendor: 'ผู้ขาย/ผู้ผลิต',
   User: 'ผู้ใช้',
   Report: 'รายงาน',
+  Notification: 'การแจ้งเตือน',
 }
