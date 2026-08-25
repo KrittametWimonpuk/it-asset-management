@@ -5,6 +5,41 @@
 
 ---
 
+## [v1.1.0-alpha.4] — Approval Workflow Enhancement
+
+เฟส 4 เพิ่มข้อมูลประกอบการอนุมัติและประวัติการตัดสินใจบน Borrow Request เดิม โดยไม่เปลี่ยน Authentication,
+RBAC หรือสถาปัตยกรรม Assignment
+
+### Added
+- `BorrowRequestApproval` และ enum `BorrowRequestApprovalAction` สำหรับ Timeline แบบ append-only พร้อม
+  migration `0012_borrow_request_approval_history` ที่ backfill ข้อมูลคำขอเดิมเท่าที่ระบุผู้ดำเนินการได้
+- Approve/Reject รองรับความคิดเห็น พร้อมผู้พิจารณาและเวลาตัดสินใจ; Reject ยังคงบังคับเหตุผลเหมือนเดิม
+- Approval Queue มีแท็บ Pending/Approved/Rejected และ Timeline modal ที่แสดง reviewer, timestamp และ comment
+- Dashboard เพิ่ม Average Approval Time โดยคำนวณที่ PostgreSQL; คง Pending/Approved Today/Rejected Today เดิม
+- Approval Report แสดงระยะเวลาพิจารณาและ Top Approvers พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `APPROVAL_STARTED`, `APPROVAL_APPROVED`, `APPROVAL_REJECTED`
+- OpenAPI/Swagger อัปเดตเป็น 66 methods พร้อม schema ของ approval history/report
+
+### Security & Compatibility
+- ADMIN/IT_STAFF เท่านั้นที่ Approve/Reject; EMPLOYEE ไม่ได้รับสิทธิ์ใหม่และยังเห็นเฉพาะคำขอของตนเอง
+- Approve ยังคงสร้าง Assignment ใน Serializable transaction เดิม และ request body แบบเดิมที่ไม่ส่ง comment
+  ยังทำงานได้
+- ไม่มีการแก้ Assignment schema, endpoint เดิม, Authentication หรือ role definitions
+
+### Testing
+- Prisma validate/generate, API lint, backend tests `21/21` และ frontend production build ผ่าน
+- Migration `0012` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 12 migrations
+- Docker E2E ผ่าน STARTED/APPROVED/REJECTED timeline, comments, reviewer, timestamps, automatic Assignment,
+  ADMIN/IT_STAFF permissions, EMPLOYEE 403, Dashboard average time, Approval Report/Top Approvers และ Audit
+- ล้างข้อมูล E2E ด้วย marker หลังทดสอบและยืนยัน BorrowRequest/Assignment/Approval คงเหลือ `0/0/0`
+
+### Known Limitations
+- เป็น single-step approval เท่านั้น ยังไม่มีหลายลำดับผู้อนุมัติ, delegation หรือ attachment
+- รายการ REJECTED ก่อน alpha.4 ไม่มี reviewer เก็บไว้ใน BorrowRequest เดิม จึง backfill ผู้พิจารณาไม่ได้และแสดง
+  "ไม่ทราบผู้ดำเนินการ"; เหตุผลและเวลายังคงอยู่ครบ
+
+---
+
 ## [v1.1.0-alpha.3] — Borrow Request Workflow
 
 เฟส 3 เพิ่มขั้นตอนคำขอยืมก่อนสร้าง Assignment โดยยังคง User authentication/RBAC และสถาปัตยกรรม

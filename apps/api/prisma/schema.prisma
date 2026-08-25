@@ -31,6 +31,7 @@ model User {
   ticketsReported Ticket[] @relation("TicketReportedBy") // ตั๋วที่ตัวเองเป็นผู้แจ้ง
   ticketsAssigned Ticket[] @relation("TicketAssignedTo") // ตั๋วที่ตัวเองถูกมอบหมายให้ดูแล (เฉพาะ ADMIN/IT_STAFF)
   approvedBorrowRequests BorrowRequest[] @relation("BorrowRequestApprovedBy")
+  borrowRequestApprovalActions BorrowRequestApproval[] @relation("BorrowRequestApprovalActor")
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -310,6 +311,12 @@ enum BorrowRequestStatus {
   COMPLETED
 }
 
+enum BorrowRequestApprovalAction {
+  STARTED
+  APPROVED
+  REJECTED
+}
+
 model BorrowRequest {
   id            String              @id @default(uuid())
   requestNumber String              @unique
@@ -330,6 +337,7 @@ model BorrowRequest {
   approvedAt       DateTime?
   rejectedReason   String?
   remark           String?
+  approvalHistory  BorrowRequestApproval[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -340,6 +348,23 @@ model BorrowRequest {
   @@index([approvedByUserId])
   @@index([status, requestedAt])
   @@index([deletedAt])
+}
+
+// ประวัติการอนุมัติแบบ append-only — แยกจาก BorrowRequest เพียงตารางเดียวเพื่อเก็บ Timeline
+// และผู้ตัดสินใจย้อนหลัง โดยไม่เปลี่ยน Assignment หรือสถานะ workflow เดิม
+model BorrowRequestApproval {
+  id              String                      @id @default(uuid())
+  borrowRequestId String
+  borrowRequest   BorrowRequest               @relation(fields: [borrowRequestId], references: [id], onDelete: Restrict)
+  action          BorrowRequestApprovalAction
+  actorUserId     String?
+  actorUser       User?                       @relation("BorrowRequestApprovalActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  comment         String?
+  createdAt       DateTime                    @default(now())
+
+  @@index([borrowRequestId, createdAt])
+  @@index([actorUserId])
+  @@index([action, createdAt])
 }
 
 // ---------------------------------------------------------------------------

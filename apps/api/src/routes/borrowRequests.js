@@ -33,7 +33,11 @@ export const borrowRequestCreateSchema = z.object({
 
 export const borrowRequestRejectSchema = z.object({
   rejectedReason: z.string().trim().min(3, 'กรุณาระบุเหตุผลที่ปฏิเสธอย่างน้อย 3 ตัวอักษร').max(1000, 'เหตุผลยาวเกินไป'),
-  remark: optionalText(),
+  comment: z.string().trim().max(1000, 'ความคิดเห็นยาวเกินไป').nullable().transform((value) => value || null).optional(),
+})
+
+export const borrowRequestApproveSchema = z.object({
+  comment: z.string().trim().max(1000, 'ความคิดเห็นยาวเกินไป').nullable().transform((value) => value || null).optional(),
 })
 
 export function buildBorrowRequestListWhere(query, user) {
@@ -52,6 +56,8 @@ export function buildBorrowRequestListWhere(query, user) {
       { asset: { name: { contains: search, mode: 'insensitive' } } },
       { reason: { contains: search, mode: 'insensitive' } },
       { remark: { contains: search, mode: 'insensitive' } },
+      { approvalHistory: { some: { comment: { contains: search, mode: 'insensitive' } } } },
+      { approvalHistory: { some: { actorUser: { name: { contains: search, mode: 'insensitive' } } } } },
     ] })
   }
 
@@ -129,7 +135,10 @@ router.post('/', employeeOnly, asyncHandler(async (req, res) => {
   const item = await prisma.$transaction(async (tx) => {
     const requestNumber = await nextBorrowRequestNumber(tx)
     return tx.borrowRequest.create({
-      data: { ...parsed.data, requestNumber, requestedAt, employeeId: employee.id },
+      data: {
+        ...parsed.data, requestNumber, requestedAt, employeeId: employee.id,
+        approvalHistory: { create: { action: 'STARTED', actorUserId: req.user.id } },
+      },
       ...BORROW_REQUEST_RELATIONS,
     })
   })
@@ -139,10 +148,17 @@ router.post('/', employeeOnly, asyncHandler(async (req, res) => {
     description: `สร้างคำขอยืม ${item.requestNumber}: ${asset.assetTag} — ${asset.name}`,
     newValues: { requestNumber: item.requestNumber, employeeId: employee.id, assetId: asset.id, status: 'PENDING' },
   })
+  logAudit({
+    ...auditContext(req), action: 'APPROVAL_STARTED', entityType: 'BorrowRequest', entityId: item.id,
+    description: `เริ่มกระบวนการอนุมัติ ${item.requestNumber}`,
+    newValues: { requestNumber: item.requestNumber, status: 'PENDING' },
+  })
   ok(res, item, 201)
 }))
 
 router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
+  const parsed = borrowRequestApproveSchema.safeParse(req.body || {})
+  if (!parsed.success) return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบความคิดเห็น', fromZodError(parsed.error))
   let result
   try {
     result = await prisma.$transaction(async (tx) => {
@@ -179,7 +195,16 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
         data: { status: 'COMPLETED', approvedByUserId: req.user.id, approvedAt: new Date() },
         ...BORROW_REQUEST_RELATIONS,
       })
-      return { item, assignment }
+      await tx.borrowRequestApproval.create({
+        data: {
+          borrowRequestId: request.id, action: 'APPROVED', actorUserId: req.user.id,
+          comment: parsed.data.comment,
+        },
+      })
+      const itemWithHistory = await tx.borrowRequest.findUnique({
+        where: { id: request.id }, ...BORROW_REQUEST_RELATIONS,
+      })
+      return { item: itemWithHistory || item, assignment }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   } catch (err) {
     if (err?.code === 'P2002' || err?.code === 'P2034') {
@@ -195,6 +220,12 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
     newValues: { status: 'COMPLETED', assignmentId: result.assignment.id, employeeId: result.item.employeeId, assetId: result.item.assetId },
   })
   logAudit({
+    ...auditContext(req), action: 'APPROVAL_APPROVED', entityType: 'BorrowRequest', entityId: result.item.id,
+    description: `ตัดสินใจอนุมัติ ${result.item.requestNumber}`,
+    oldValues: { status: 'PENDING' },
+    newValues: { status: 'COMPLETED', comment: parsed.data.comment, approvedAt: result.item.approvedAt },
+  })
+  logAudit({
     ...auditContext(req), action: 'ASSIGN', entityType: 'Assignment', entityId: result.assignment.id,
     description: `สร้างการมอบหมายอัตโนมัติจาก ${result.item.requestNumber}`,
     newValues: { borrowRequestId: result.item.id, employeeId: result.item.employeeId, assetId: result.item.assetId },
@@ -205,15 +236,31 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
 router.post('/:id/reject', approveOrReject, asyncHandler(async (req, res) => {
   const parsed = borrowRequestRejectSchema.safeParse(req.body)
   if (!parsed.success) return fail(res, 400, 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบฟอร์ม', fromZodError(parsed.error))
-  const changed = await prisma.borrowRequest.updateMany({
-    where: { id: req.params.id, status: 'PENDING', deletedAt: null }, data: { ...parsed.data, status: 'REJECTED' },
+  const item = await prisma.$transaction(async (tx) => {
+    const changed = await tx.borrowRequest.updateMany({
+      where: { id: req.params.id, status: 'PENDING', deletedAt: null },
+      data: { rejectedReason: parsed.data.rejectedReason, status: 'REJECTED' },
+    })
+    if (changed.count !== 1) return null
+    await tx.borrowRequestApproval.create({
+      data: {
+        borrowRequestId: req.params.id, action: 'REJECTED', actorUserId: req.user.id,
+        comment: parsed.data.comment,
+      },
+    })
+    return tx.borrowRequest.findUnique({ where: { id: req.params.id }, ...BORROW_REQUEST_RELATIONS })
   })
-  if (changed.count !== 1) return fail(res, 404, 'ไม่พบคำขอที่รออนุมัติ หรือคำขอนี้ถูกดำเนินการแล้ว')
-  const item = await prisma.borrowRequest.findUnique({ where: { id: req.params.id }, ...BORROW_REQUEST_RELATIONS })
+  if (!item) return fail(res, 404, 'ไม่พบคำขอที่รออนุมัติ หรือคำขอนี้ถูกดำเนินการแล้ว')
   logAudit({
     ...auditContext(req), action: 'BORROW_REQUEST_REJECTED', entityType: 'BorrowRequest', entityId: item.id,
     description: `ปฏิเสธคำขอยืม ${item.requestNumber}: ${item.rejectedReason}`,
     oldValues: { status: 'PENDING' }, newValues: { status: 'REJECTED', rejectedReason: item.rejectedReason },
+  })
+  logAudit({
+    ...auditContext(req), action: 'APPROVAL_REJECTED', entityType: 'BorrowRequest', entityId: item.id,
+    description: `ตัดสินใจปฏิเสธ ${item.requestNumber}`,
+    oldValues: { status: 'PENDING' },
+    newValues: { status: 'REJECTED', rejectedReason: item.rejectedReason, comment: parsed.data.comment },
   })
   ok(res, item)
 }))

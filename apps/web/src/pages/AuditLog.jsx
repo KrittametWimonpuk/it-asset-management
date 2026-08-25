@@ -24,6 +24,8 @@ const ACTION_UI = {
   CLOSE: ['slate', XCircle], LOGIN: ['cyan', LogIn], EXPORT_REPORT: ['violet', FileDown],
   BORROW_REQUEST_CREATED: ['blue', FilePlus2], BORROW_REQUEST_APPROVED: ['green', CheckCircle2],
   BORROW_REQUEST_REJECTED: ['red', XCircle], BORROW_REQUEST_CANCELLED: ['slate', CirclePause],
+  APPROVAL_STARTED: ['amber', Clock3], APPROVAL_APPROVED: ['green', CheckCircle2],
+  APPROVAL_REJECTED: ['red', XCircle],
 }
 const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Employee: Users, BorrowRequest: FileClock, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
 

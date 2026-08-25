@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Store,
   TicketCheck,
+  Timer,
   TriangleAlert,
   UserRound,
   UsersRound,
@@ -77,6 +78,7 @@ const BORROW_REQUEST_SUMMARY_CARDS = [
   { key: 'pending', label: 'คำขอรออนุมัติ', icon: Clock3, tone: 'amber', detail: 'รายการที่ต้องดำเนินการ' },
   { key: 'approvedToday', label: 'อนุมัติวันนี้', icon: CheckCircle2, tone: 'green', detail: 'สร้างการมอบหมายแล้ว' },
   { key: 'rejectedToday', label: 'ปฏิเสธวันนี้', icon: XCircle, tone: 'red', detail: 'คำขอที่ไม่ผ่านอนุมัติ' },
+  { key: 'averageApprovalTimeHours', label: 'เวลาอนุมัติเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่ส่งถึงอนุมัติ', suffix: ' ชม.' },
 ]
 
 const ACTIVITY_TYPE_LABELS = {
@@ -298,7 +300,7 @@ export default function Dashboard({ role }) {
             const CardIcon = card.icon
             return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
               <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
-              <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}</strong><small>{card.detail}</small>
+              <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
             </article>
           })}
         </div>

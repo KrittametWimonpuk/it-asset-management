@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // หน้า Reports — Milestone 8: Reports & Export
 //
-// การ์ดเลือกรายงาน (6 แบบ) -> คลิกแล้วเข้าโหมด preview: filter bar + ตาราง + ปุ่ม export (CSV/Excel/PDF)
+// การ์ดเลือกรายงาน -> คลิกแล้วเข้าโหมด preview: filter bar + ตาราง + ปุ่ม export (CSV/Excel/PDF)
 // ทุกอย่างขับเคลื่อนด้วย REPORT_DEFS ด้านล่าง (ไม่มีหน้าแยกทีละรายงาน) เพราะโครงหน้าตาเหมือนกันหมด
 // ต่างแค่ filter/columns ที่ใช้ — เหมือนแพทเทิร์นเดียวกับ MasterDataPage.jsx (config-driven)
 //
@@ -13,7 +13,7 @@ import {
   AlertCircle, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Boxes, Building2,
   ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, FileSpreadsheet,
   FileText, FilterX, Headphones, RefreshCw, Search, SearchX,
-  ShieldCheck, Sparkles, Store, TableProperties, FileClock,
+  ShieldCheck, Sparkles, Store, TableProperties, FileClock, UserCheck,
 } from 'lucide-react'
 import { api } from '../api.js'
 import { useMasterDataOptions } from '../hooks/useMasterDataOptions.js'
@@ -50,6 +50,7 @@ const REPORT_UI = {
   warranty: { icon: ShieldCheck, tone: 'green', short: 'การรับประกัน' },
   helpdesk: { icon: Headphones, tone: 'amber', short: 'Helpdesk' },
   borrowRequests: { icon: FileClock, tone: 'blue', short: 'คำขอยืม' },
+  approvals: { icon: UserCheck, tone: 'violet', short: 'การอนุมัติ' },
   departments: { icon: Building2, tone: 'cyan', short: 'แผนก' },
   vendors: { icon: Store, tone: 'rose', short: 'ผู้ขาย' },
 }
@@ -69,7 +70,7 @@ const FILTER_PARAM_KEYS = {
   borrowRequestStatus: ['borrowRequestStatus'],
 }
 
-// นิยามรายงานทั้ง 7 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
+// นิยามรายงานทั้ง 8 ตัว — key ของ columns ตรงกับที่ routes/reports.js shape ให้ทุกตัวอักษร
 const REPORT_DEFS = [
   {
     key: 'assets',
@@ -187,6 +188,26 @@ const REPORT_DEFS = [
       { key: 'status', label: 'สถานะ' }, { key: 'approvedBy', label: 'ผู้อนุมัติ' },
       { key: 'approvedAt', label: 'วันที่อนุมัติ' }, { key: 'reason', label: 'เหตุผลที่ขอ' },
       { key: 'rejectedReason', label: 'เหตุผลที่ปฏิเสธ' }, { key: 'remark', label: 'หมายเหตุ' },
+    ],
+  },
+  {
+    key: 'approvals',
+    title: 'Approval Report',
+    description: 'ผลการอนุมัติ ระยะเวลาพิจารณา และผู้อนุมัติที่ดำเนินการสูงสุด',
+    apiFn: api.reports.approvals,
+    paginated: true,
+    orgWideOnly: true,
+    filterFields: ['dateRange', 'borrowRequestStatus', 'search'],
+    sortColumns: [
+      { field: 'updatedAt', label: 'วันที่ตัดสินใจ' }, { field: 'requestedAt', label: 'วันที่ส่งคำขอ' }, { field: 'status', label: 'ผลการตัดสินใจ' },
+    ],
+    columns: [
+      { key: 'requestNumber', label: 'เลขที่คำขอ' }, { key: 'employeeName', label: 'พนักงาน' },
+      { key: 'department', label: 'แผนก' }, { key: 'asset', label: 'ครุภัณฑ์' },
+      { key: 'decision', label: 'ผลการตัดสินใจ' }, { key: 'reviewer', label: 'ผู้พิจารณา' },
+      { key: 'requestedAt', label: 'วันที่ส่งคำขอ' }, { key: 'decisionAt', label: 'วันที่ตัดสินใจ' },
+      { key: 'approvalDurationHours', label: 'ระยะเวลา (ชั่วโมง)' }, { key: 'comment', label: 'ความคิดเห็น' },
+      { key: 'rejectedReason', label: 'เหตุผลที่ปฏิเสธ' },
     ],
   },
   {
@@ -503,6 +524,10 @@ function ReportView({ report }) {
         </div>
       ) : (
         <>
+          {data.approvalSummary && <section className="approval-report-summary" aria-label="สรุปประสิทธิภาพการอนุมัติ">
+            <article><span>เวลาอนุมัติเฉลี่ย</span><strong>{data.approvalSummary.averageApprovalTimeHours.toLocaleString('th-TH')} ชม.</strong></article>
+            <article><span>ผู้พิจารณาสูงสุด</span><ol>{data.approvalSummary.topApprovers.length ? data.approvalSummary.topApprovers.map((approver) => <li key={approver.name}><span>{approver.name}</span><b>{approver.decisions} รายการ</b></li>) : <li><span>ยังไม่มีข้อมูล</span></li>}</ol></article>
+          </section>}
           <section className="report-chart-panel">
             <div className="report-section-head"><div><span><BarChart3 size={18} /></span><div><h2>ภาพรวมข้อมูล</h2><p>สัดส่วนจากข้อมูลในหน้าปัจจุบัน</p></div></div><b>{items.length} รายการ</b></div>
             <div className="report-bars">{chart.map((item, index) => <div className="report-bar" key={item.label}><div><span>{item.label}</span><strong>{item.value}</strong></div><i><span style={{ width: item.width, '--bar-index': index }} /></i></div>)}</div>
@@ -517,9 +542,9 @@ function ReportView({ report }) {
                   {report.columns.map((col) => {
                     const sortCol = report.sortColumns?.find((s) => s.label === col.label)
                     return sortCol ? (
-                      <th key={col.key}><button className="report-sort" onClick={() => toggleSort(sortCol.field)}>{col.label}{sortBy === sortCol.field && (sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}</button></th>
+                      <th scope="col" key={col.key}><button className="report-sort" onClick={() => toggleSort(sortCol.field)}>{col.label}{sortBy === sortCol.field && (sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}</button></th>
                     ) : (
-                      <th key={col.key}>{col.label}</th>
+                      <th scope="col" key={col.key}>{col.label}</th>
                     )
                   })}
                 </tr>

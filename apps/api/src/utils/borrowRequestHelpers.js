@@ -8,6 +8,10 @@ export const BORROW_REQUEST_RELATIONS = {
     employee: { select: EMPLOYEE_SUMMARY_SELECT },
     asset: { select: { id: true, assetTag: true, name: true, status: true, hostname: true } },
     approvedByUser: { select: { id: true, name: true, email: true } },
+    approvalHistory: {
+      orderBy: { createdAt: 'asc' },
+      include: { actorUser: { select: { id: true, name: true, email: true, role: true } } },
+    },
   },
 }
 

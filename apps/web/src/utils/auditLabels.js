@@ -21,6 +21,9 @@ export const ACTION_LABELS = {
   BORROW_REQUEST_APPROVED: 'อนุมัติคำขอยืม',
   BORROW_REQUEST_REJECTED: 'ปฏิเสธคำขอยืม',
   BORROW_REQUEST_CANCELLED: 'ยกเลิกคำขอยืม',
+  APPROVAL_STARTED: 'เริ่มกระบวนการอนุมัติ',
+  APPROVAL_APPROVED: 'ตัดสินใจอนุมัติ',
+  APPROVAL_REJECTED: 'ตัดสินใจปฏิเสธ',
 }
 
 export const ENTITY_TYPE_LABELS = {

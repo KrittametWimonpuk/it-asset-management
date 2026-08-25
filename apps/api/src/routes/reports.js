@@ -73,7 +73,7 @@ function fmtDate(v) {
   return v ? new Date(v).toISOString().slice(0, 10) : ''
 }
 
-// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 7 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
+// บันทึก audit log ตอน export ไฟล์สำเร็จ — ใช้ร่วมกันทั้ง 8 รายงาน กันไม่ต้องเขียนซ้ำทุก endpoint
 // (เรียกก่อน sendExport เสมอ ไม่ await เพราะเป็น fire-and-forget — ไม่หน่วงการดาวน์โหลดไฟล์)
 function logReportExport(req, reportLabel, format) {
   logAudit({
@@ -454,6 +454,106 @@ router.get('/borrow-requests', asyncHandler(async (req, res) => {
   const rows = await prisma.borrowRequest.findMany({ where, orderBy: { requestedAt: 'desc' }, ...BORROW_REQUEST_RELATIONS })
   logReportExport(req, 'คำขอยืมครุภัณฑ์', f.format)
   return sendExport(res, f.format, 'borrow-request-report', 'รายงานคำขอยืมครุภัณฑ์', BORROW_REQUEST_REPORT_COLUMNS, rows.map(shapeBorrowRequestRow))
+}))
+
+// ---------------------------------------------------------------------------
+// รายงานการอนุมัติ — เฉพาะ ADMIN/IT_STAFF พร้อมระยะเวลาตัดสินใจและ Top Approvers
+// ---------------------------------------------------------------------------
+const APPROVAL_REPORT_COLUMNS = [
+  { key: 'requestNumber', label: 'เลขที่คำขอ' },
+  { key: 'employeeName', label: 'พนักงาน' },
+  { key: 'department', label: 'แผนก' },
+  { key: 'asset', label: 'ครุภัณฑ์' },
+  { key: 'decision', label: 'ผลการตัดสินใจ' },
+  { key: 'reviewer', label: 'ผู้พิจารณา' },
+  { key: 'requestedAt', label: 'วันที่ส่งคำขอ' },
+  { key: 'decisionAt', label: 'วันที่ตัดสินใจ' },
+  { key: 'approvalDurationHours', label: 'ระยะเวลาพิจารณา (ชั่วโมง)' },
+  { key: 'comment', label: 'ความคิดเห็น' },
+  { key: 'rejectedReason', label: 'เหตุผลที่ปฏิเสธ' },
+]
+const APPROVAL_REPORT_SORTABLE = ['requestNumber', 'requestedAt', 'approvedAt', 'status', 'updatedAt']
+
+function approvalDecision(item) {
+  return item.approvalHistory?.findLast?.((entry) => entry.action === 'APPROVED' || entry.action === 'REJECTED')
+    || [...(item.approvalHistory || [])].reverse().find((entry) => entry.action === 'APPROVED' || entry.action === 'REJECTED')
+}
+
+function shapeApprovalRow(item) {
+  const decision = approvalDecision(item)
+  const decisionAt = item.approvedAt || decision?.createdAt || (item.status === 'REJECTED' ? item.updatedAt : null)
+  const duration = decisionAt ? (new Date(decisionAt).getTime() - new Date(item.requestedAt).getTime()) / 3600000 : null
+  return {
+    requestNumber: item.requestNumber,
+    employeeName: `${item.employee?.employeeCode || '-'} — ${item.employee?.fullName || 'Unknown Employee'}`,
+    department: item.employee?.department?.name || '-',
+    asset: `${item.asset?.assetTag ?? ''} — ${item.asset?.name ?? ''}`,
+    decision: decision?.action === 'REJECTED' || item.status === 'REJECTED' ? 'ปฏิเสธ' : 'อนุมัติ',
+    reviewer: decision?.actorUser ? (decision.actorUser.name || decision.actorUser.email) : (item.approvedByUser?.name || item.approvedByUser?.email || '-'),
+    requestedAt: fmtDate(item.requestedAt),
+    decisionAt: fmtDate(decisionAt),
+    approvalDurationHours: duration == null ? '' : Math.round(Math.max(0, duration) * 10) / 10,
+    comment: decision?.comment || '',
+    rejectedReason: item.rejectedReason || '',
+  }
+}
+
+router.get('/approvals', orgWideOnly, asyncHandler(async (req, res) => {
+  const f = parseReportQuery(req.query)
+  const constraints = [{ OR: [{ approvedAt: { not: null } }, { status: 'REJECTED' }] }]
+  if (f.search) constraints.push({ OR: [
+    { requestNumber: { contains: f.search, mode: 'insensitive' } },
+    { employee: { employeeCode: { contains: f.search, mode: 'insensitive' } } },
+    { employee: { fullName: { contains: f.search, mode: 'insensitive' } } },
+    { employee: { department: { name: { contains: f.search, mode: 'insensitive' } } } },
+    { asset: { assetTag: { contains: f.search, mode: 'insensitive' } } },
+    { asset: { name: { contains: f.search, mode: 'insensitive' } } },
+    { reason: { contains: f.search, mode: 'insensitive' } },
+    { remark: { contains: f.search, mode: 'insensitive' } },
+    { approvalHistory: { some: { comment: { contains: f.search, mode: 'insensitive' } } } },
+    { approvalHistory: { some: { actorUser: { name: { contains: f.search, mode: 'insensitive' } } } } },
+  ] })
+  const where = { deletedAt: null, ...dateRangeWhere('requestedAt', f.dateFrom, f.dateTo), AND: constraints }
+  if (BORROW_REQUEST_STATUSES.includes(f.borrowRequestStatus)) where.status = f.borrowRequestStatus
+
+  if (!f.format) {
+    const pagination = parsePagination(req.query)
+    const orderBy = parseSort(req.query, APPROVAL_REPORT_SORTABLE, 'updatedAt')
+    const [items, totalItems, durationRows, approverGroups] = await Promise.all([
+      prisma.borrowRequest.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, ...BORROW_REQUEST_RELATIONS }),
+      prisma.borrowRequest.count({ where }),
+      prisma.borrowRequest.findMany({ where, select: { requestedAt: true, approvedAt: true, updatedAt: true, status: true } }),
+      prisma.borrowRequestApproval.groupBy({
+        by: ['actorUserId'],
+        where: { action: { in: ['APPROVED', 'REJECTED'] }, actorUserId: { not: null }, borrowRequest: { is: where } },
+        _count: { actorUserId: true }, orderBy: { _count: { actorUserId: 'desc' } }, take: 5,
+      }),
+    ])
+    const userIds = approverGroups.map((row) => row.actorUserId).filter(Boolean)
+    const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
+    const userById = Object.fromEntries(users.map((user) => [user.id, user]))
+    const durations = durationRows.map((row) => {
+      const decisionAt = row.approvedAt || (row.status === 'REJECTED' ? row.updatedAt : null)
+      return decisionAt ? Math.max(0, (decisionAt.getTime() - row.requestedAt.getTime()) / 3600000) : null
+    }).filter((value) => value != null)
+    const averageApprovalTimeHours = durations.length
+      ? Math.round((durations.reduce((sum, value) => sum + value, 0) / durations.length) * 10) / 10
+      : 0
+    return ok(res, {
+      items: items.map(shapeApprovalRow), ...buildPageMeta(pagination, totalItems),
+      approvalSummary: {
+        averageApprovalTimeHours,
+        topApprovers: approverGroups.map((row) => ({
+          name: userById[row.actorUserId]?.name || userById[row.actorUserId]?.email || 'Unknown Reviewer',
+          decisions: row._count.actorUserId,
+        })),
+      },
+    })
+  }
+
+  const rows = await prisma.borrowRequest.findMany({ where, orderBy: { updatedAt: 'desc' }, ...BORROW_REQUEST_RELATIONS })
+  logReportExport(req, 'การอนุมัติคำขอยืม', f.format)
+  return sendExport(res, f.format, 'approval-report', 'รายงานการอนุมัติคำขอยืม', APPROVAL_REPORT_COLUMNS, rows.map(shapeApprovalRow))
 }))
 
 // ---------------------------------------------------------------------------

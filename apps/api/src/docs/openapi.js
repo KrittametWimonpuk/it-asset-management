@@ -519,6 +519,18 @@ const ticketSchemas = {
 
 const borrowRequestSchemas = {
   BorrowRequestStatus: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'] },
+  BorrowRequestApprovalAction: { type: 'string', enum: ['STARTED', 'APPROVED', 'REJECTED'] },
+  BorrowRequestApproval: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      action: { $ref: '#/components/schemas/BorrowRequestApprovalAction' },
+      actorUserId: { type: 'string', format: 'uuid', nullable: true },
+      actorUser: { allOf: [{ $ref: '#/components/schemas/User' }], nullable: true },
+      comment: { type: 'string', nullable: true },
+      createdAt: { type: 'string', format: 'date-time' },
+    },
+  },
   BorrowRequest: {
     type: 'object',
     properties: {
@@ -537,6 +549,7 @@ const borrowRequestSchemas = {
       employee: { $ref: '#/components/schemas/Employee' },
       asset: { type: 'object', properties: { id: { type: 'string', format: 'uuid' }, assetTag: { type: 'string' }, name: { type: 'string' }, status: { $ref: '#/components/schemas/AssetStatus' } } },
       approvedByUser: { allOf: [{ $ref: '#/components/schemas/User' }], nullable: true },
+      approvalHistory: { type: 'array', items: { $ref: '#/components/schemas/BorrowRequestApproval' } },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
     },
@@ -551,7 +564,11 @@ const borrowRequestSchemas = {
   },
   BorrowRequestRejectRequest: {
     type: 'object', required: ['rejectedReason'],
-    properties: { rejectedReason: { type: 'string', minLength: 3 }, remark: { type: 'string', nullable: true } },
+    properties: { rejectedReason: { type: 'string', minLength: 3 }, comment: { type: 'string', maxLength: 1000, nullable: true } },
+  },
+  BorrowRequestApproveRequest: {
+    type: 'object',
+    properties: { comment: { type: 'string', maxLength: 1000, nullable: true } },
   },
 }
 
@@ -641,7 +658,7 @@ const dashboardSchemas = {
       },
       borrowRequests: {
         type: 'object',
-        properties: { pending: { type: 'integer' }, approvedToday: { type: 'integer' }, rejectedToday: { type: 'integer' } },
+        properties: { pending: { type: 'integer' }, approvedToday: { type: 'integer' }, rejectedToday: { type: 'integer' }, averageApprovalTimeHours: { type: 'number' } },
       },
       charts: {
         type: 'object',
@@ -741,6 +758,15 @@ const reportSchemas = {
       reason: { type: 'string' }, rejectedReason: { type: 'string' }, remark: { type: 'string' },
     },
   },
+  ApprovalReportRow: {
+    type: 'object',
+    properties: {
+      requestNumber: { type: 'string' }, employeeName: { type: 'string' }, department: { type: 'string' },
+      asset: { type: 'string' }, decision: { type: 'string', enum: ['อนุมัติ', 'ปฏิเสธ'] }, reviewer: { type: 'string' },
+      requestedAt: { type: 'string' }, decisionAt: { type: 'string' }, approvalDurationHours: { type: 'number' },
+      comment: { type: 'string' }, rejectedReason: { type: 'string' },
+    },
+  },
   DepartmentSummaryRow: {
     type: 'object',
     properties: {
@@ -768,7 +794,7 @@ const reportSchemas = {
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED'],
   },
   AuditEntityType: {
     type: 'string',
@@ -801,7 +827,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-alpha.3',
+    version: '1.1.0-alpha.4',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
@@ -822,7 +848,7 @@ const definition = {
     { name: 'Employees', description: 'ข้อมูลพนักงานและ business identity สำหรับผู้ถือครองครุภัณฑ์; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
-    { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ และการสร้าง Assignment อัตโนมัติ' },
+    { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ ความคิดเห็น Timeline และการสร้าง Assignment อัตโนมัติ' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },

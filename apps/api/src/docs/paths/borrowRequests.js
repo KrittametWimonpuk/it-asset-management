@@ -55,6 +55,10 @@
  *     summary: อนุมัติและสร้าง Assignment อัตโนมัติ
  *     description: ADMIN/IT_STAFF เท่านั้น ทำงานใน Serializable transaction และจบคำขอเป็น COMPLETED
  *     parameters: [{ $ref: '#/components/parameters/BorrowRequestId' }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/BorrowRequestApproveRequest' }
  *     responses:
  *       '200': { description: อนุมัติและสร้าง Assignment สำเร็จ }
  *       '409': { description: พนักงานไม่ ACTIVE หรือครุภัณฑ์ถูกมอบหมายแล้ว }
@@ -103,4 +107,23 @@
  *         schema: { type: string, enum: [csv, xlsx, pdf] }
  *     responses:
  *       '200': { description: รายงาน JSON หรือไฟล์ส่งออก }
+ *
+ * /api/reports/approvals:
+ *   get:
+ *     tags: [Reports]
+ *     summary: รายงานการอนุมัติคำขอยืม
+ *     description: ADMIN/IT_STAFF เท่านั้น แสดงระยะเวลาพิจารณาและ Top Approvers พร้อมส่งออก CSV/XLSX/PDF
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/PageSizeParam'
+ *       - $ref: '#/components/parameters/SearchParam'
+ *       - in: query
+ *         name: borrowRequestStatus
+ *         schema: { $ref: '#/components/schemas/BorrowRequestStatus' }
+ *       - in: query
+ *         name: format
+ *         schema: { type: string, enum: [csv, xlsx, pdf] }
+ *     responses:
+ *       '200': { description: Approval report และ summary }
+ *       '403': { $ref: '#/components/responses/Forbidden' }
  */

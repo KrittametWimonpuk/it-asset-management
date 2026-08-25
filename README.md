@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.3`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-alpha.4`
 
 ---
 
@@ -31,11 +31,11 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
 | **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
 | **Asset Assignment & Lifecycle** | Employee เป็น business identity ของผู้ถือครอง, User เป็นผู้ทำรายการและบัญชี RBAC; รองรับค้นหา/เลือก Employee, มอบหมาย/รับคืน และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
-| **Borrow Request Workflow (v1.1 Alpha 3)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธ โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว พร้อม Audit และ Report |
+| **Borrow Request & Approval Workflow (v1.1 Alpha 4)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
-| **Reports & Export** | 7 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Borrow Request, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 65 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **Reports & Export** | 8 รายงาน (Asset Inventory, Assignment, Warranty, Helpdesk, Borrow Request, Approval, Department Summary, Vendor Summary) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 66 endpoint พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
@@ -404,7 +404,7 @@ Documentation/Operations/Release process — ดู
 
 ## 📊 Reports & Export
 
-หน้า "รายงาน" มีการ์ดให้เลือก 7 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
+หน้า "รายงาน" มีการ์ดให้เลือก 8 รายงาน — คลิกแล้วเข้าโหมด preview (ตัวกรอง + ตาราง) พร้อมปุ่มส่งออก
 CSV / Excel / PDF ที่มุมขวาบนของตาราง ทุกรายงานอ่านจากตารางที่มีอยู่แล้วเท่านั้น ไม่มีการคำนวณ/เก็บข้อมูลใหม่
 
 | รายงาน | คอลัมน์ | ตัวกรองที่รองรับ | ขอบเขต EMPLOYEE |
@@ -436,7 +436,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
-## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.3)
+## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.4)
 
 Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` และเป็น business identity ของผู้ถือครองครุภัณฑ์
 หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
@@ -458,7 +458,7 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 
 ---
 
-## 📋 Borrow Request Workflow (v1.1.0-alpha.3)
+## 📋 Borrow Request & Approval Workflow (v1.1.0-alpha.4)
 
 หน้า **คำขอยืม** เป็นขั้นตอนก่อน Assignment: Employee ที่เชื่อมกับทะเบียนพนักงานสถานะ ACTIVE เลือก
 ครุภัณฑ์ที่ไม่มีผู้ถือครอง ส่งเหตุผลและวันที่คาดว่าจะคืน จากนั้น ADMIN/IT_STAFF ตรวจคิวอนุมัติ
@@ -474,8 +474,12 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 โดย Employee เป็นผู้ถือครองและ User ปัจจุบันเป็น operator, จากนั้นตั้งคำขอเป็น `COMPLETED` หากมีการอนุมัติ
 พร้อมกันสำหรับครุภัณฑ์ชิ้นเดียว partial unique index เดิมจะทำให้มีเพียงรายการเดียวสำเร็จ ส่วนอีกคำขอตอบ 409
 
-Dashboard แสดง Pending/Approved Today/Rejected Today และ Reports มี Borrow Request Report พร้อม Preview กับ
-export CSV/Excel/PDF โดย EMPLOYEE ยังคงเห็นเฉพาะข้อมูลของตนเอง
+Phase 4 เพิ่ม `BorrowRequestApproval` แบบ append-only เพื่อเก็บ Timeline, ผู้ดำเนินการ, เวลา และความคิดเห็น
+โดยข้อมูลคำขอเดิมถูก backfill เท่าที่ระบุผู้ทำรายการได้ การตัดสินใจยังคงเป็น ADMIN/IT_STAFF เท่านั้นและไม่แก้
+Authentication, Assignment schema หรือ RBAC เดิม
+
+Dashboard แสดง Pending/Approved Today/Rejected Today/Average Approval Time และ Reports มีทั้ง Borrow Request
+Report กับ Approval Report ซึ่งแสดง Approval Duration และ Top Approvers พร้อม export CSV/Excel/PDF
 
 ---
 
@@ -488,7 +492,7 @@ export CSV/Excel/PDF โดย EMPLOYEE ยังคงเห็นเฉพา�
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (65 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+3. Endpoint ทั้งหมด (66 endpoint) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
    Assignments, Borrow Requests, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
@@ -534,7 +538,8 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 
 **Actions ที่รองรับ:** `CREATE`, `UPDATE`, `DELETE`, `ASSIGN`, `RETURN`, `OPEN`, `START_PROGRESS`, `ON_HOLD`,
 `RESOLVE`, `CLOSE`, `RESTORE`, `LOGIN`, `EXPORT_REPORT`, `BORROW_REQUEST_CREATED`,
-`BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`, `BORROW_REQUEST_CANCELLED`
+`BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`, `BORROW_REQUEST_CANCELLED`, `APPROVAL_STARTED`,
+`APPROVAL_APPROVED`, `APPROVAL_REJECTED`
 
 | เหตุการณ์ | Action ที่บันทึก | จุดที่เรียก |
 |-----------|------------------|-------------|
@@ -543,12 +548,14 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 | สร้าง/แก้ไข/ลบ master data (Category/Location/Department/Vendor) | `CREATE` / `UPDATE` / `DELETE` | `utils/masterDataRouter.js` (จุดเดียว ใช้ร่วมกันทั้ง 4 entity) |
 | มอบหมาย / แก้ไขรายละเอียด / รับคืนครุภัณฑ์ | `ASSIGN` / `UPDATE` / `RETURN` | `routes/assignments.js` |
 | สร้าง / อนุมัติ / ปฏิเสธ / ยกเลิกคำขอยืม | `BORROW_REQUEST_*` | `routes/borrowRequests.js` |
+| เริ่ม / อนุมัติ / ปฏิเสธกระบวนการอนุมัติ | `APPROVAL_STARTED` / `APPROVAL_APPROVED` / `APPROVAL_REJECTED` | `routes/borrowRequests.js` |
 | แจ้งปัญหาใหม่ / เริ่มดำเนินการ / พักงาน / แก้ไขสำเร็จ / ปิดงาน | `OPEN` / `START_PROGRESS` / `ON_HOLD` / `RESOLVE` / `CLOSE` | `routes/tickets.js` (action ตาม target status ของแต่ละ transition) |
 | สมัครสมาชิก / เข้าสู่ระบบ | `CREATE` (entityType `User`) / `LOGIN` | `routes/auth.js` |
 | ส่งออกรายงาน (CSV/Excel/PDF) | `EXPORT_REPORT` | `routes/reports.js` (ทุก endpoint ที่ `?format=` มา) |
 
 **กฎการบันทึก:** log เฉพาะการกระทำที่สำเร็จจริงเท่านั้น — validation ที่ล้มเหลว (400) หรือสิทธิ์ไม่พอ (403)
-ไม่ถูกบันทึก, และทุกการทำรายการสำเร็จหนึ่งครั้งสร้าง audit record ได้เพียงหนึ่งแถวเท่านั้น (ไม่มีการ log ซ้ำ)
+ไม่ถูกบันทึก การดำเนินการ Borrow Request อาจมีทั้ง lifecycle audit เดิมและ approval audit ใหม่ เพื่อรักษา
+ความเข้ากันได้ของผู้ใช้ Audit Log เดิมพร้อมแยกเหตุการณ์อนุมัติให้ค้นหาได้ชัดเจน
 ไม่มีการ log คำสั่ง GET ใด ๆ
 
 **Performance:** `logAudit()` เรียกแบบ fire-and-forget (**ไม่ `await`**) เสมอ — การเขียน audit log ไม่มีทาง
@@ -565,7 +572,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.3`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-alpha.4`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -775,6 +782,7 @@ cd deploy
 - [x] Employee Management Foundation — model/migration, REST API, RBAC, Audit Log และ responsive UI (`v1.1.0-alpha.1`)
 - [x] Assignment Integration Phase 2 — เชื่อม Employee กับ Assignment แบบ incremental โดยยังรักษาข้อมูล User เดิม (`v1.1.0-alpha.2`)
 - [x] Borrow Request Workflow — submit/approve/reject/cancel, auto Assignment, Dashboard, Report และ Audit (`v1.1.0-alpha.3`)
+- [x] Approval Workflow Enhancement — comments, reviewer, decision time, timeline, dashboard SLA metrics และ Approval Report (`v1.1.0-alpha.4`)
 - [ ] Return Workflow / Notifications / HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8

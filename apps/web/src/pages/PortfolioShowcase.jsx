@@ -16,7 +16,7 @@ const HIGHLIGHTS = [
   { title: 'Helpdesk', copy: 'Structured ticket workflow with priority and status tracking.', icon: Headphones },
   { title: 'Reports', copy: 'Filterable previews with CSV, Excel, and PDF export.', icon: Activity },
   { title: 'Audit Log', copy: 'Immutable activity history with before-and-after evidence.', icon: FileClock },
-  { title: 'Swagger', copy: 'Interactive OpenAPI 3.1 documentation for 65 endpoints.', icon: BookOpen },
+  { title: 'Swagger', copy: 'Interactive OpenAPI 3.1 documentation for 66 endpoints.', icon: BookOpen },
   { title: 'CI/CD', copy: 'Automated quality gates for every push and pull request.', icon: GitPullRequest },
   { title: 'Docker', copy: 'Production-ready containers with Nginx reverse proxy.', icon: Container },
 ]

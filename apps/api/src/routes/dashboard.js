@@ -186,6 +186,7 @@ async function buildOrgWideDashboard() {
     pendingBorrowRequests,
     approvedBorrowRequestsToday,
     rejectedBorrowRequestsToday,
+    approvalDurationRows,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -260,6 +261,11 @@ async function buildOrgWideDashboard() {
     prisma.borrowRequest.count({ where: { ...notDeleted, status: 'PENDING' } }),
     prisma.borrowRequest.count({ where: { ...notDeleted, approvedAt: todayRange(now) } }),
     prisma.borrowRequest.count({ where: { ...notDeleted, status: 'REJECTED', updatedAt: todayRange(now) } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("approvedAt" - "requestedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "BorrowRequest"
+      WHERE "deletedAt" IS NULL AND "approvedAt" IS NOT NULL
+    `,
   ])
 
   const recentAuditLogs = await attachPerformer(recentAuditLogRows)
@@ -342,6 +348,7 @@ async function buildOrgWideDashboard() {
       pending: pendingBorrowRequests,
       approvedToday: approvedBorrowRequestsToday,
       rejectedToday: rejectedBorrowRequestsToday,
+      averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
     },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
@@ -399,6 +406,7 @@ async function buildEmployeeDashboard(user) {
     pendingBorrowRequests,
     approvedBorrowRequestsToday,
     rejectedBorrowRequestsToday,
+    approvalDurationRows,
   ] = await Promise.all([
     prisma.employee.findFirst({
       where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
@@ -428,6 +436,14 @@ async function buildEmployeeDashboard(user) {
     prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'PENDING' } }),
     prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, approvedAt: todayRange(now) } }),
     prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'REJECTED', updatedAt: todayRange(now) } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (br."approvedAt" - br."requestedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "BorrowRequest" br
+      JOIN "Employee" employee ON employee."id" = br."employeeId"
+      WHERE br."deletedAt" IS NULL
+        AND br."approvedAt" IS NOT NULL
+        AND LOWER(employee."email") = LOWER(${user.email})
+    `,
   ])
 
   // จำนวน asset ที่ถือครองอยู่มักมีไม่กี่ชิ้นต่อคน — คำนวณ warranty bucket ในหน่วยความจำได้โดยไม่กระทบ performance
@@ -484,6 +500,7 @@ async function buildEmployeeDashboard(user) {
       pending: pendingBorrowRequests,
       approvedToday: approvedBorrowRequestsToday,
       rejectedToday: rejectedBorrowRequestsToday,
+      averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
     },
     charts: {
       assetsByCategory: [],
