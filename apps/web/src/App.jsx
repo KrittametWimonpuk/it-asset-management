@@ -21,6 +21,7 @@ const Tickets = lazy(() => import('./pages/Tickets.jsx'))
 const Reports = lazy(() => import('./pages/Reports.jsx'))
 const AuditLog = lazy(() => import('./pages/AuditLog.jsx'))
 const Employees = lazy(() => import('./pages/Employees.jsx'))
+const UserRoles = lazy(() => import('./pages/UserRoles.jsx'))
 const BorrowRequests = lazy(() => import('./pages/BorrowRequests.jsx'))
 const Notifications = lazy(() => import('./pages/Notifications.jsx'))
 const MasterDataPage = lazy(() => import('./pages/MasterDataPage.jsx'))
@@ -132,6 +133,7 @@ export default function App() {
 
   // EMPLOYEE จัดการ master data ไม่ได้ (Milestone 4) — ซ่อนแท็บทั้งหมดไปเลย ไม่ใช่แค่ปุ่มข้างใน
   const canManageMasterData = user.role !== 'EMPLOYEE'
+  const isAdmin = user.role === 'ADMIN'
   const activeMaster = canManageMasterData ? MASTER_TABS[tab] : null
 
   return (
@@ -160,6 +162,7 @@ export default function App() {
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}
           {tab === 'audit' && canManageMasterData && <AuditLog />}
+          {tab === 'users' && isAdmin && <UserRoles currentUser={user} />}
           {tab === 'employees' && canManageMasterData && <Employees role={user.role} />}
           {activeMaster && <MasterDataPage {...activeMaster.config} />}
         </Suspense>

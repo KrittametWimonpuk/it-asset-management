@@ -5,6 +5,15 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+- เพิ่มหน้า “สิทธิ์ผู้ใช้” สำหรับ ADMIN เพื่อกำหนดบทบาท `EMPLOYEE`, `IT_STAFF` และ `ADMIN`
+- เพิ่ม `PATCH /api/users/{id}/role` พร้อม validation, Audit Log, ป้องกันแก้สิทธิ์ตัวเอง และป้องกันลดสิทธิ์ ADMIN คนสุดท้าย
+
+### Security
+- `requireAuth` ตรวจ role ปัจจุบันจากฐานข้อมูลทุก request ทำให้การเลื่อนหรือลดสิทธิ์มีผลทันทีแม้ JWT เดิมยังไม่หมดอายุ
+
 ## [v1.1.0] — Stable Release
 
 v1.1.0 รวม Employee Management เข้ากับวงจรครุภัณฑ์ครบตั้งแต่คำขอยืม การอนุมัติ การมอบหมาย

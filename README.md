@@ -25,7 +25,7 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | หมวด | รายละเอียด |
 |------|-----------|
 | **Authentication** | สมัครสมาชิก / เข้าสู่ระบบด้วย JWT, รหัสผ่านเก็บเป็น bcrypt hash เท่านั้น |
-| **RBAC** | 3 สิทธิ์: `ADMIN` (เต็มระบบ), `IT_STAFF` (จัดการครุภัณฑ์/มอบหมายได้ จัดการผู้ใช้ไม่ได้), `EMPLOYEE` (เห็นเฉพาะของตัวเอง) — บังคับที่ backend เสมอ |
+| **RBAC** | 3 สิทธิ์: `ADMIN` (เต็มระบบและกำหนดสิทธิ์บัญชีอื่น), `IT_STAFF` (จัดการครุภัณฑ์/มอบหมายได้ แต่เปลี่ยนสิทธิ์ผู้ใช้ไม่ได้), `EMPLOYEE` (เห็นเฉพาะของตัวเอง) — บังคับที่ backend เสมอ และ role ที่ ADMIN เปลี่ยนมีผลทันที |
 | **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
@@ -220,11 +220,22 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `PORT` | พอร์ตที่ backend จะรัน | `4000` |
 | `NODE_ENV` | `development` (ค่าเริ่มต้น) หรือ `production` — กำหนดพฤติกรรม default ของ CORS เวลาไม่ได้ตั้ง `CORS_ORIGIN` (RC2) | `development` |
 | `CORS_ORIGIN` | origin ที่อนุญาตให้เรียก API ข้าม origin ได้ (คั่นด้วยจุลภาคถ้ามีหลายตัว) — ไม่บังคับ ดูรายละเอียดที่หัวข้อ [🌐 CORS](#-cors) ด้านล่าง (RC2) | `http://localhost:5173,https://asset.example.com` |
+| `CORS_ALLOW_PAGES_PREVIEWS` | อนุญาต HTTPS preview subdomain ของ Cloudflare Pages production origin ที่กำหนดไว้ | `false` |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | ความยาวหน้าต่างเวลานับจำนวนครั้ง login/register ต่อ IP (ms) — ไม่บังคับ ค่า default 900000 (15 นาที) (RC2) | `900000` |
 | `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
 
-Frontend ไม่ต้องตั้งค่า environment variable ใด ๆ ตอน dev (Vite proxy `/api` ให้อัตโนมัติ) ส่วนตอน build
-ขึ้น production ตัวแปร `API_UPSTREAM` ใน `docker-compose.yml` บอก nginx ว่าจะ proxy `/api` ไปที่ service ไหน
+Frontend อ่าน `VITE_API_URL` ผ่าน `import.meta.env` โดยกำหนดใน `apps/web/.env*` หรือ build environment
+ของผู้ให้บริการ ค่า `VITE_*` เป็นข้อมูลสาธารณะที่ถูกฝังลง JavaScript bundle ห้ามนำ secret มาใส่:
+
+| ไฟล์/Environment | ค่า |
+|------------------|-----|
+| Local dev (ค่า default) | `http://localhost:4000` |
+| Cloudflare Pages | `https://it-asset-management-api.onrender.com` |
+| Generic production | คัดลอก `apps/web/.env.production.example` แล้วแก้ URL |
+
+`npm run build` ใช้โหมด Cloudflare และโหลด `apps/web/.env.cloudflare`; ค่า `VITE_API_URL` ใน Cloudflare
+Dashboard มีลำดับความสำคัญสูงกว่าไฟล์นี้ ส่วน Docker ใช้ `npm run build:self-hosted` เพื่อคงการเชื่อมต่อ
+แบบ same-origin ผ่าน nginx ตามเดิม
 
 ---
 
@@ -291,6 +302,11 @@ inline script/style ที่ Swagger UI (`/docs`) ต้องใช้ — hea
 - ไม่ได้ตั้งค่า + `NODE_ENV=development` (ค่าเริ่มต้น) → reflect origin ที่ขอมา เหมือนพฤติกรรมเดิมก่อน RC2
   ทุกประการ (สะดวกตอน dev ที่ frontend/backend คนละพอร์ต)
 - ไม่ได้ตั้งค่า + `NODE_ENV=production` → ปิดรับ cross-origin request ทั้งหมด (fail closed เพื่อความปลอดภัย)
+- ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=true` → อนุญาตเฉพาะ HTTPS subdomain ของ Cloudflare Pages production
+  origin ที่อยู่ใน `CORS_ORIGIN` เช่น `https://<branch>.it-asset-management.pages.dev`
+
+Backend สะท้อนกลับเฉพาะ origin ที่ผ่าน allowlist จึงไม่ส่ง `Access-Control-Allow-Origin: *` เมื่อเปิด
+credentials และไม่ยอมรับ hostname ที่เพียงแค่ต่อท้ายด้วยโดเมนหลอก
 
 ในทางปฏิบัติ production จริงของโปรเจกต์นี้ (AWS ECS) ไม่ได้รับผลกระทบจากค่านี้เลย เพราะ ALB route ทั้ง
 `/` และ `/api/*` อยู่ใต้ origin เดียวกัน (path-based routing — ดู `deploy/02-infra.sh`) จึงไม่ถือเป็น
@@ -312,6 +328,56 @@ cross-origin request ตั้งแต่ต้น ตั้งค่านี�
 RC3 เพิ่มโครงสร้างและเอกสารสำหรับ deploy ระบบขึ้น production จริง — **ไม่มีการเพิ่ม business feature,
 เปลี่ยน API, หรือแก้ database schema ใด ๆ เลย** (ยกเว้นปรับ RDS backup retention 1→7 วัน) ดูรายละเอียด
 ทุกจุดที่แก้ไขได้ที่ [CHANGELOG](CHANGELOG.md)
+
+### ☁️ Cloudflare Pages + Render (Current Production)
+
+**Cloudflare Pages — Frontend**
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `apps/web` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Production branch | `master` |
+| `VITE_API_URL` | `https://it-asset-management-api.onrender.com` |
+
+`apps/web/.env.cloudflare` เก็บเฉพาะ API URL สาธารณะเพื่อให้ build ทำงานถูกต้องแม้ Dashboard ยังไม่ได้
+ตั้งค่า และ Cloudflare environment variable สามารถ override ได้ การเปลี่ยนค่า Vite env ต้อง **Redeploy**
+เพราะถูกฝังตอน build ไม่ได้อ่านตอน runtime
+
+**Render — Backend**
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `apps/api` |
+| Build command | `npm ci && npm run generate` |
+| Pre-deploy command | `npm run migrate` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+
+Environment ที่จำเป็น: `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET`,
+`CORS_ORIGIN=https://it-asset-management.pages.dev`, `CORS_ALLOW_PAGES_PREVIEWS=true` และ
+`TRUST_PROXY=1` ส่วน `PORT` ให้ใช้ค่าที่ Render inject มาโดยอัตโนมัติ (Express อ่าน `process.env.PORT` อยู่แล้ว)
+ห้ามเติม path ต่อท้าย `CORS_ORIGIN` และไม่ต้องใช้ wildcard
+
+Expected login flow:
+
+```text
+Cloudflare Pages
+  -> POST https://it-asset-management-api.onrender.com/api/auth/login
+  -> Express validates credentials and returns JWT
+  -> Frontend stores token and redirects to Dashboard
+```
+
+ตรวจหลัง deploy:
+
+```bash
+curl https://it-asset-management-api.onrender.com/api/health
+curl -i -X OPTIONS https://it-asset-management-api.onrender.com/api/auth/login \
+  -H "Origin: https://it-asset-management.pages.dev" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type,authorization"
+```
 
 ### 🐳 Production Docker Images
 
@@ -369,6 +435,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 | `NODE_ENV` | ต้องเป็น `production` เสมอสำหรับไฟล์นี้ |
 | `TRUST_PROXY` | จำนวน reverse proxy hop หน้า Express (topology มาตรฐานใช้ `1`) |
 | `CORS_ORIGIN` | ปกติปล่อยว่างได้ — topology มาตรฐานของ compose นี้เป็น same-origin ผ่าน nginx อยู่แล้ว |
+| `CORS_ALLOW_PAGES_PREVIEWS` | ปกติ `false`; เปิดเฉพาะ deployment ที่ใช้ Cloudflare Pages Preview |
 | `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` | ค่า default ใช้งานได้เลย ไม่บังคับตั้ง |
 | `PORT` | พอร์ตภายใน container ของ backend (default `4000`) |
 | `TLS_CERT_PATH`/`TLS_KEY_PATH` | certificate/private key สำหรับ nginx self-hosted |

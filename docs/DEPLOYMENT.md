@@ -6,6 +6,7 @@
 ## สารบัญ
 
 - [Deployment Paths ที่รองรับ](#deployment-paths-ที่รองรับ)
+- [Cloudflare Pages + Render](#cloudflare-pages--render)
 - [Server Requirements](#server-requirements)
 - [Build](#build)
 - [Startup](#startup)
@@ -19,14 +20,66 @@
 
 ## Deployment Paths ที่รองรับ
 
-โปรเจกต์นี้ deploy ได้ 2 ทาง เลือกทางใดทางหนึ่งตามความเหมาะสม:
+โปรเจกต์นี้รองรับ deployment ต่อไปนี้ เลือกตามความเหมาะสม:
 
 | ทาง | ใช้เมื่อไร | เครื่องมือ |
 |-----|-----------|-----------|
 | **A. AWS ECS Fargate** | ต้องการ managed infrastructure, auto-scaling, ALB, RDS แบบ managed | `deploy/*.sh` (มีอยู่ตั้งแต่ก่อน RC3) |
 | **B. Self-hosted Docker Compose** | มีเซิร์ฟเวอร์/VPS ของตัวเองอยู่แล้ว ต้องการควบคุมเต็มรูปแบบ ต้นทุนคงที่ | `docker-compose.prod.yml` (เพิ่มใน RC3) |
+| **C. Cloudflare Pages + Render** | Static frontend บน CDN และ managed Node API | Cloudflare/Render Dashboard + `apps/web/.env.cloudflare` |
 
-ทั้งสองทางรัน image เดียวกัน (`apps/api/Dockerfile`, `apps/web/Dockerfile`) แค่วิธี orchestrate ต่างกัน
+ทาง A/B รัน image เดียวกัน (`apps/api/Dockerfile`, `apps/web/Dockerfile`) ส่วนทาง C build frontend
+เป็น static assets และรัน backend เป็น Render Web Service
+
+---
+
+## Cloudflare Pages + Render
+
+### Cloudflare Pages
+
+- Root directory: `apps/web`
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Production branch: `master`
+- Environment variable: `VITE_API_URL=https://it-asset-management-api.onrender.com`
+
+Build script ใช้ Vite mode `cloudflare` และโหลด `apps/web/.env.cloudflare` เป็นค่า default สาธารณะ
+Dashboard env สามารถ override ได้ ทุกครั้งที่เปลี่ยนค่าให้สั่ง Redeploy เพราะ Vite ฝังค่านี้ลง bundle
+ระหว่าง build ตรวจ bundle หลัง deploy แล้วต้องพบ Render hostname และต้องไม่ใช้ relative `/api` URL
+
+### Render
+
+- Root directory: `apps/api`
+- Build command: `npm ci && npm run generate`
+- Pre-deploy command: `npm run migrate`
+- Start command: `npm start`
+- Health check path: `/api/health`
+
+Environment variables:
+
+```dotenv
+NODE_ENV=production
+DATABASE_URL=<Render PostgreSQL connection string>
+JWT_SECRET=<long random secret>
+CORS_ORIGIN=https://it-asset-management.pages.dev
+CORS_ALLOW_PAGES_PREVIEWS=true
+TRUST_PROXY=1
+```
+
+Render inject `PORT` ให้ Web Service อยู่แล้ว; Express อ่าน `process.env.PORT` ก่อน fallback ไป 4000
+หากไม่ต้องการ Preview ให้ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` โดย production origin หลักยังทำงานตามปกติ
+
+### CORS verification
+
+```bash
+curl -i -X OPTIONS https://it-asset-management-api.onrender.com/api/auth/login \
+  -H "Origin: https://it-asset-management.pages.dev" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type,authorization"
+```
+
+ผลที่ถูกต้องคือ `204`, `Access-Control-Allow-Origin` ตรงกับ Origin ที่ส่งมา และ
+`Access-Control-Allow-Credentials: true` โดยไม่มี wildcard
 
 ---
 
