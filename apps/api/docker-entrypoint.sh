@@ -9,5 +9,10 @@ set -e
 echo "==> กำลังอัปเดตฐานข้อมูล (prisma migrate deploy)..."
 npx prisma migrate deploy
 
+if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
+  echo "==> กำลังเตรียมข้อมูลตัวอย่างแบบ idempotent..."
+  npm run seed
+fi
+
 echo "==> เริ่มต้น API server"
 exec node src/index.js
