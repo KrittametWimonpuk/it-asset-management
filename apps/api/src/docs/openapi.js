@@ -223,7 +223,7 @@ const employeeSchemas = {
 }
 
 const assetSchemas = {
-  AssetStatus: { type: 'string', enum: ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED'] },
+  AssetStatus: { type: 'string', enum: ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED', 'LOST', 'MAINTENANCE'] },
   AssetCondition: { type: 'string', enum: ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'] },
   Asset: {
     type: 'object',
@@ -907,10 +907,10 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-beta.1',
+    version: '1.1.0-rc2',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
-      'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
+      'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, Notifications และ Audit Log แบบ durable outbox\n\n' +
       'เอกสารชุดนี้สร้างจาก JSDoc annotation ที่อ่าน route/validation/response จริงจากซอร์สโค้ด ' +
       '(ดู `src/docs/paths/*.js`) — ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง\n\n' +
       '**สิทธิ์การใช้งาน (RBAC)** บังคับที่ backend เสมอในทุก endpoint ที่ต้องล็อกอิน ' +

@@ -59,3 +59,15 @@ test('Workflow hooks and reminder sweep cover all required lifecycle outcomes', 
   assert.match(reminderSource, /3 \* DAY_MS/)
   assert.match(reminderSource, /expectedReturnDate < now/)
 })
+
+test('RC2 reminders are scheduler-driven and protected by a dedupe key', () => {
+  const schedulerSource = readFileSync(fileURLToPath(new URL('../jobs/runScheduler.js', import.meta.url)), 'utf8')
+  const dashboardSource = readFileSync(fileURLToPath(new URL('./dashboard.js', import.meta.url)), 'utf8')
+  const notificationRoutes = readFileSync(fileURLToPath(new URL('./notifications.js', import.meta.url)), 'utf8')
+  const rc2Migration = readFileSync(fileURLToPath(new URL('../../prisma/migrations/0015_rc2_production_hardening/migration.sql', import.meta.url)), 'utf8')
+  assert.match(schedulerSource, /generateDueReminders/)
+  assert.doesNotMatch(dashboardSource, /generateDueReminders/)
+  assert.doesNotMatch(notificationRoutes, /generateDueReminders/)
+  assert.match(rc2Migration, /Notification_dedupeKey_key/)
+  assert.match(rc2Migration, /CREATE UNIQUE INDEX/)
+})

@@ -29,7 +29,6 @@ import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
 import { attachPerformer } from '../utils/auditLog.js'
-import { generateDueRemindersForUser } from '../services/notificationService.js'
 
 // Milestone 9 — จำนวน audit event ล่าสุดที่แนบไปกับแดชบอร์ด (เฉพาะ ADMIN/IT_STAFF — ดู recentAuditLogs ด้านล่าง)
 const RECENT_AUDIT_LOGS_LIMIT = 10
@@ -45,6 +44,8 @@ const WARRANTY_WARNING_DAYS = 30
 // ASSIGNMENT_STATUS_OPTIONS) เพื่อให้ chart array ที่ส่งกลับไปพร้อมใช้แสดงผลได้ทันทีโดยไม่ต้อง map เพิ่ม
 const ASSET_STATUS_LABELS = {
   AVAILABLE: 'พร้อมใช้งาน',
+  LOST: 'สูญหาย',
+  MAINTENANCE: 'รอตรวจสอบ/ซ่อมบำรุง',
   IN_USE: 'กำลังใช้งาน',
   REPAIR: 'ซ่อมบำรุง',
   DISPOSED: 'เลิกใช้งาน',
@@ -423,7 +424,9 @@ async function buildEmployeeDashboard(user) {
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
   const userId = user.id
   const holderScope = assignmentHolderScopeForAccount(user)
-  const borrowRequestScope = { employee: { email: { equals: user.email, mode: 'insensitive' } } }
+  const borrowRequestScope = user.employeeId
+    ? { employeeId: user.employeeId }
+    : { id: '__unlinked_employee_account__' }
 
   const [
     currentEmployee,
@@ -447,7 +450,10 @@ async function buildEmployeeDashboard(user) {
     overdueAssets,
   ] = await Promise.all([
     prisma.employee.findFirst({
-      where: { email: { equals: user.email, mode: 'insensitive' }, deletedAt: null },
+      where: {
+        id: user.employeeId || '__unlinked_employee_account__',
+        deletedAt: null,
+      },
       select: EMPLOYEE_SUMMARY_SELECT,
     }),
     prisma.assignment.findMany({
@@ -593,7 +599,6 @@ async function buildEmployeeDashboard(user) {
 }
 
 router.get('/', asyncHandler(async (req, res) => {
-  await generateDueRemindersForUser(req.user)
   const data = req.user.role === 'EMPLOYEE'
     ? await buildEmployeeDashboard(req.user)
     : await buildOrgWideDashboard(req.user)

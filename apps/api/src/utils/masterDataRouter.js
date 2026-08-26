@@ -109,7 +109,7 @@ export function createMasterDataRouter({
 
     const item = await model.create({ data: parsed.data })
 
-    logAudit({
+    await logAudit({
       ...auditContext(req), action: 'CREATE', entityType, entityId: item.id,
       description: `สร้าง${entityLabel} ${item.name}`,
       newValues: parsed.data,
@@ -144,7 +144,7 @@ export function createMasterDataRouter({
 
     const item = await model.findUnique({ where: { id: req.params.id } })
 
-    logAudit({
+    await logAudit({
       ...auditContext(req), action: 'UPDATE', entityType, entityId: req.params.id,
       description: `แก้ไข${entityLabel} ${item.name}`,
       oldValues: existing, newValues: parsed.data,
@@ -163,7 +163,7 @@ export function createMasterDataRouter({
     })
     if (result.count === 0) return fail(res, 404, NOT_FOUND_MESSAGE)
 
-    logAudit({
+    await logAudit({
       ...auditContext(req), action: 'DELETE', entityType, entityId: req.params.id,
       description: `ลบ${entityLabel} (soft delete) ${existing?.name}`,
       oldValues: existing,

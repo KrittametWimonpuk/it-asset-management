@@ -144,12 +144,12 @@ router.post('/', employeeOnly, asyncHandler(async (req, res) => {
     })
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'BORROW_REQUEST_CREATED', entityType: 'BorrowRequest', entityId: item.id,
     description: `สร้างคำขอยืม ${item.requestNumber}: ${asset.assetTag} — ${asset.name}`,
     newValues: { requestNumber: item.requestNumber, employeeId: employee.id, assetId: asset.id, status: 'PENDING' },
   })
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'APPROVAL_STARTED', entityType: 'BorrowRequest', entityId: item.id,
     description: `เริ่มกระบวนการอนุมัติ ${item.requestNumber}`,
     newValues: { requestNumber: item.requestNumber, status: 'PENDING' },
@@ -185,9 +185,20 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
       })
       if (activeAssignment) return { error: [409, 'ครุภัณฑ์นี้ถูกมอบหมายไปแล้ว ไม่สามารถอนุมัติคำขอนี้ได้'] }
 
-      const legacyUser = employee.email
-        ? await tx.user.findFirst({ where: { email: { equals: employee.email, mode: 'insensitive' } }, select: { id: true } })
-        : null
+      let legacyUser = await tx.user.findUnique({ where: { employeeId: employee.id }, select: { id: true } })
+      if (!legacyUser && employee.email) {
+        const accounts = await tx.user.findMany({
+          where: { email: { equals: employee.email, mode: 'insensitive' } },
+          select: { id: true },
+          take: 2,
+        })
+        legacyUser = accounts.length === 1 ? accounts[0] : null
+      }
+      const assetChanged = await tx.asset.updateMany({
+        where: { id: request.assetId, deletedAt: null, status: 'AVAILABLE' },
+        data: { status: 'IN_USE' },
+      })
+      if (assetChanged.count !== 1) return { error: [409, 'ครุภัณฑ์ไม่อยู่ในสถานะพร้อมใช้งานแล้ว'] }
       const assignment = await tx.assignment.create({
         data: {
           assetId: request.assetId, employeeId: request.employeeId, userId: legacyUser?.id,
@@ -220,18 +231,18 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
   }
 
   if (result.error) return fail(res, ...result.error)
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'BORROW_REQUEST_APPROVED', entityType: 'BorrowRequest', entityId: result.item.id,
     description: `อนุมัติ ${result.item.requestNumber} และสร้างการมอบหมายอัตโนมัติ`,
     newValues: { status: 'COMPLETED', assignmentId: result.assignment.id, employeeId: result.item.employeeId, assetId: result.item.assetId },
   })
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'APPROVAL_APPROVED', entityType: 'BorrowRequest', entityId: result.item.id,
     description: `ตัดสินใจอนุมัติ ${result.item.requestNumber}`,
     oldValues: { status: 'PENDING' },
     newValues: { status: 'COMPLETED', comment: parsed.data.comment, approvedAt: result.item.approvedAt },
   })
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'ASSIGN', entityType: 'Assignment', entityId: result.assignment.id,
     description: `สร้างการมอบหมายอัตโนมัติจาก ${result.item.requestNumber}`,
     newValues: { borrowRequestId: result.item.id, employeeId: result.item.employeeId, assetId: result.item.assetId },
@@ -267,12 +278,12 @@ router.post('/:id/reject', approveOrReject, asyncHandler(async (req, res) => {
     return tx.borrowRequest.findUnique({ where: { id: req.params.id }, ...BORROW_REQUEST_RELATIONS })
   })
   if (!item) return fail(res, 404, 'ไม่พบคำขอที่รออนุมัติ หรือคำขอนี้ถูกดำเนินการแล้ว')
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'BORROW_REQUEST_REJECTED', entityType: 'BorrowRequest', entityId: item.id,
     description: `ปฏิเสธคำขอยืม ${item.requestNumber}: ${item.rejectedReason}`,
     oldValues: { status: 'PENDING' }, newValues: { status: 'REJECTED', rejectedReason: item.rejectedReason },
   })
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'APPROVAL_REJECTED', entityType: 'BorrowRequest', entityId: item.id,
     description: `ตัดสินใจปฏิเสธ ${item.requestNumber}`,
     oldValues: { status: 'PENDING' },
@@ -293,7 +304,7 @@ router.post('/:id/cancel', employeeOnly, asyncHandler(async (req, res) => {
   })
   if (changed.count !== 1) return fail(res, 404, 'ไม่พบคำขอที่ยกเลิกได้ หรือคำขอนี้ถูกดำเนินการแล้ว')
   const item = await prisma.borrowRequest.findUnique({ where: { id: req.params.id }, ...BORROW_REQUEST_RELATIONS })
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'BORROW_REQUEST_CANCELLED', entityType: 'BorrowRequest', entityId: item.id,
     description: `ยกเลิกคำขอยืม ${item.requestNumber}`,
     oldValues: { status: 'PENDING' }, newValues: { status: 'CANCELLED' },

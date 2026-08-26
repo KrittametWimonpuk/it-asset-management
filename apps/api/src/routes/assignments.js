@@ -134,6 +134,12 @@ function inspectionResultFor(status) {
   return status === 'RETURNED' ? 'PASSED' : 'FAILED'
 }
 
+export function assetStatusAfterReturn(status) {
+  if (status === 'LOST') return 'LOST'
+  if (status === 'DAMAGED') return 'MAINTENANCE'
+  return 'AVAILABLE'
+}
+
 function finalAuditActionFor(status) {
   if (status === 'DAMAGED') return 'RETURN_DAMAGED'
   if (status === 'LOST') return 'RETURN_LOST'
@@ -191,14 +197,14 @@ async function finalizeReturn({ assignmentId, existing, req, status, conditionAf
     })
     if (changed.count !== 1) throw Object.assign(new Error('RETURN_ALREADY_CLOSED'), { code: 'RETURN_ALREADY_CLOSED' })
 
-    if (conditionAfter) {
-      await tx.asset.update({
-        where: { id: existing.assetId },
-        data: { assetCondition: status === 'DAMAGED' ? 'DAMAGED' : conditionAfter },
-      })
-    } else if (status === 'DAMAGED') {
-      await tx.asset.update({ where: { id: existing.assetId }, data: { assetCondition: 'DAMAGED' } })
-    }
+    await tx.asset.update({
+      where: { id: existing.assetId },
+      data: {
+        status: assetStatusAfterReturn(status),
+        ...(conditionAfter ? { assetCondition: status === 'DAMAGED' ? 'DAMAGED' : conditionAfter } : {}),
+        ...(!conditionAfter && status === 'DAMAGED' ? { assetCondition: 'DAMAGED' } : {}),
+      },
+    })
 
     const events = []
     if (needsStartedEvent) events.push({
@@ -219,15 +225,15 @@ async function finalizeReturn({ assignmentId, existing, req, status, conditionAf
   })
 }
 
-function logInspectionAudit(req, assignment, status, inspectionResult, conditionAfter, inspectionNotes, inspectedAt, returnedAt) {
+async function logInspectionAudit(req, assignment, status, inspectionResult, conditionAfter, inspectionNotes, inspectedAt, returnedAt) {
   const base = { ...auditContext(req), entityType: 'Assignment', entityId: assignment.id }
-  logAudit({
+  await logAudit({
     ...base,
     action: 'RETURN_INSPECTED',
     description: `ตรวจรับคืน ${assignment.asset.assetTag} — ${assignment.asset.name}: ${inspectionResult}`,
     newValues: { inspectionResult, conditionAfter: conditionAfter || null, inspectionNotes, inspectedAt, inspectorId: req.user.id },
   })
-  logAudit({
+  await logAudit({
     ...base,
     action: finalAuditActionFor(status),
     description: `${status === 'RETURNED' ? 'รับคืนสำเร็จ' : status === 'DAMAGED' ? 'รับคืนแบบชำรุด' : 'บันทึกสูญหาย'} ${assignment.asset.assetTag} — ${assignment.asset.name}`,
@@ -305,13 +311,19 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
     }
   }
 
-  const employeeWhere = requestedEmployeeId
-    ? { id: requestedEmployeeId }
-    : { email: { equals: legacyUser.email, mode: 'insensitive' } }
-  const targetEmployee = await prisma.employee.findFirst({
-    where: { ...employeeWhere, deletedAt: null, isActive: true, status: 'ACTIVE' },
+  const employeeCandidates = await prisma.employee.findMany({
+    where: {
+      ...(requestedEmployeeId
+        ? { id: requestedEmployeeId }
+        : legacyUser.employeeId
+          ? { id: legacyUser.employeeId }
+          : { email: { equals: legacyUser.email, mode: 'insensitive' } }),
+      deletedAt: null, isActive: true, status: 'ACTIVE',
+    },
     select: { ...EMPLOYEE_SUMMARY_SELECT, email: true },
+    take: 2,
   })
+  const targetEmployee = employeeCandidates.length === 1 ? employeeCandidates[0] : null
   if (!targetEmployee) {
     const message = requestedEmployeeId
       ? 'ไม่พบพนักงานที่พร้อมรับมอบหมาย'
@@ -320,10 +332,15 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
   }
 
   // Preserve userId where a matching account exists, but do not require Employee to have a login.
+  if (!legacyUser) {
+    legacyUser = await prisma.user.findUnique({ where: { employeeId: targetEmployee.id } })
+  }
   if (!legacyUser && targetEmployee.email) {
-    legacyUser = await prisma.user.findFirst({
-      where: { email: { equals: targetEmployee.email, mode: 'insensitive' } },
+    // Backward compatibility for an account that could not yet be linked explicitly.
+    const accounts = await prisma.user.findMany({
+      where: { email: { equals: targetEmployee.email, mode: 'insensitive' } }, take: 2,
     })
+    legacyUser = accounts.length === 1 ? accounts[0] : null
   }
 
   const activeAssignment = await prisma.assignment.findFirst({ where: { assetId, ...ACTIVE_ASSIGNMENT_WHERE } })
@@ -331,18 +348,33 @@ router.post('/', manageAssignments, asyncHandler(async (req, res) => {
     return fail(res, 409, 'ครุภัณฑ์นี้ถูกมอบหมายให้ผู้อื่นอยู่แล้ว กรุณารับคืนก่อนมอบหมายใหม่')
   }
 
-  const assignment = await prisma.assignment.create({
-    data: {
-      assetId,
-      employeeId: targetEmployee.id,
-      userId: legacyUser?.id,
-      assignedById: req.user.id,
-      ...rest,
-    },
-    ...WITH_RELATIONS,
-  })
+  let assignment
+  try {
+    assignment = await prisma.$transaction(async (tx) => {
+      const changed = await tx.asset.updateMany({
+        where: { id: assetId, deletedAt: null, status: 'AVAILABLE' },
+        data: { status: 'IN_USE' },
+      })
+      if (changed.count !== 1) throw Object.assign(new Error('ASSET_NOT_AVAILABLE'), { code: 'ASSET_NOT_AVAILABLE' })
+      return tx.assignment.create({
+        data: {
+          assetId,
+          employeeId: targetEmployee.id,
+          userId: legacyUser?.id,
+          assignedById: req.user.id,
+          ...rest,
+        },
+        ...WITH_RELATIONS,
+      })
+    })
+  } catch (error) {
+    if (error?.code === 'ASSET_NOT_AVAILABLE' || error?.code === 'P2002') {
+      return fail(res, 409, 'ครุภัณฑ์นี้ไม่อยู่ในสถานะพร้อมใช้งาน หรือเพิ่งถูกมอบหมายโดยรายการอื่น')
+    }
+    throw error
+  }
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'ASSIGN', entityType: 'Assignment', entityId: assignment.id,
     description: `มอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name} ให้ ${assignmentHolderName(assignment)} (${assignment.employee.employeeCode})`,
     newValues: { assetId, employeeId: targetEmployee.id, userId: legacyUser?.id || null, ...rest },
@@ -379,7 +411,7 @@ router.put('/:id', manageAssignments, asyncHandler(async (req, res) => {
     ...WITH_RELATIONS,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'UPDATE', entityType: 'Assignment', entityId: assignment.id,
     description: `แก้ไขรายละเอียดการมอบหมาย ${assignment.asset.assetTag} — ${assignment.asset.name}`,
     oldValues: Object.fromEntries(Object.keys(parsed.data).map((k) => [k, existing[k]])),
@@ -424,7 +456,7 @@ router.post('/:id/return/start', manageAssignments, asyncHandler(async (req, res
   })
   if (!assignment) return fail(res, 409, 'รายการนี้เริ่มกระบวนการรับคืนไปแล้ว')
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'RETURN_STARTED', entityType: 'Assignment', entityId: assignment.id,
     description: `เริ่มตรวจรับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignmentHolderName(assignment)}`,
     newValues: { returnStatus: 'PENDING_INSPECTION', returnStartedAt: startedAt, employeeId: assignment.employeeId },
@@ -453,6 +485,9 @@ router.post('/:id/return/inspect', manageAssignments, asyncHandler(async (req, r
   const returnedAt = parsed.data.returnedAt || inspectedAt
   if (!ensureReturnDateIsValid(res, inspectedAt, existing.assignedAt, 'inspectedAt')) return
   if (!ensureReturnDateIsValid(res, returnedAt, existing.assignedAt)) return
+  if (returnedAt < inspectedAt) {
+    return fail(res, 400, 'วันที่คืนต้องไม่ก่อนวันที่ตรวจรับ', [{ field: 'returnedAt', message: 'วันที่คืนต้องไม่ก่อนวันที่ตรวจรับ' }])
+  }
 
   const assignment = await finalizeReturn({
     assignmentId: existing.id,
@@ -469,7 +504,7 @@ router.post('/:id/return/inspect', manageAssignments, asyncHandler(async (req, r
   })
   if (!assignment) return fail(res, 409, 'รายการนี้ถูกรับคืนไปแล้ว')
 
-  logInspectionAudit(
+  await logInspectionAudit(
     req, assignment, parsed.data.status, inspectionResultFor(parsed.data.status),
     parsed.data.conditionAfter, parsed.data.inspectionNotes, inspectedAt, returnedAt,
   )
@@ -504,13 +539,13 @@ router.post('/:id/return', manageAssignments, asyncHandler(async (req, res) => {
   })
   if (!assignment) return fail(res, 409, 'รายการนี้ถูกรับคืนไปแล้ว')
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'RETURN', entityType: 'Assignment', entityId: assignment.id,
     description: `รับคืน ${assignment.asset.assetTag} — ${assignment.asset.name} จาก ${assignmentHolderName(assignment)}`,
     oldValues: { returnedAt: existing.returnedAt, status: existing.status, conditionAfter: existing.conditionAfter, remark: existing.remark },
     newValues: { returnedAt, status, conditionAfter, remark: parsed.data.remark, employeeId: assignment.employeeId, employeeCode: assignment.employee?.employeeCode || null },
   })
-  logInspectionAudit(req, assignment, status, inspectionResultFor(status), conditionAfter, inspectionNotes, returnedAt, returnedAt)
+  await logInspectionAudit(req, assignment, status, inspectionResultFor(status), conditionAfter, inspectionNotes, returnedAt, returnedAt)
 
   await notifyEmployee(assignment.employeeId, returnNotificationPayload(assignment, status, req))
 

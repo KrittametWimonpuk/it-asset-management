@@ -19,15 +19,13 @@ export const EMPLOYEE_SUMMARY_SELECT = {
 
 export const LEGACY_HOLDER_SELECT = { id: true, name: true, email: true }
 
-// EMPLOYEE login accounts are linked incrementally by email. Keep the legacy userId branch so
-// old assignments continue to respect the exact same RBAC scope during the transition.
+// RC2 uses the explicit User.employeeId relation. Legacy Assignment.userId remains readable when
+// an account could not be backfilled; ambiguous email matching is deliberately not used for scope.
 export function assignmentHolderScopeForAccount(user) {
-  return {
-    OR: [
-      { userId: user.id },
-      { employee: { email: { equals: user.email, mode: 'insensitive' } } },
-    ],
-  }
+  return { OR: [
+    { userId: user.id },
+    ...(user.employeeId ? [{ employeeId: user.employeeId }] : []),
+  ] }
 }
 
 export function assignmentHolderName(assignment, fallback = 'Unknown Employee') {

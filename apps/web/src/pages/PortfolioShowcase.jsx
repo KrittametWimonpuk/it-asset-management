@@ -90,7 +90,7 @@ export default function PortfolioShowcase({ onViewDemo }) {
             <div className="showcase-hero-actions">
               <button type="button" className="showcase-primary-action" onClick={onViewDemo}>View Demo <ArrowRight size={17} /></button>
               <a className="showcase-secondary-action" href={GITHUB_URL} target="_blank" rel="noreferrer"><GitPullRequest size={17} /> GitHub</a>
-              <a className="showcase-tertiary-action" href="/api/docs/" target="_blank" rel="noreferrer"><BookOpen size={17} /> API Docs</a>
+              <a className="showcase-tertiary-action" href="/docs" target="_blank" rel="noreferrer"><BookOpen size={17} /> API Docs</a>
             </div>
             <div className="showcase-proof"><span><CheckCircle2 size={15} /> Stable v1.0.1</span><span><CheckCircle2 size={15} /> 57 documented endpoints</span><span><CheckCircle2 size={15} /> 3-role RBAC</span></div>
           </div>

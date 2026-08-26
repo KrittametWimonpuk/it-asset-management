@@ -248,6 +248,14 @@ async function main() {
     employeesByEmail[data.email] = row
   }
 
+  // RC2 explicit identity link — seed ต้องสะท้อน production model ไม่พึ่ง runtime email fallback
+  for (const account of [admin, itStaff, employee]) {
+    await prisma.user.update({
+      where: { id: account.id },
+      data: { employeeId: employeesByEmail[account.email].id },
+    })
+  }
+
   // ---- Milestone 7: ครุภัณฑ์เพิ่มเติมสำหรับตัวอย่างใบแจ้งซ่อม (เครื่องพิมพ์/เครือข่าย ไม่มีผู้ถือครองรายบุคคล) ----
   // แยก upsert ต่างหากจาก assets ที่ผูกกับ admin ตอนสร้างผู้ใช้ด้านบน เพราะ upsert ของ admin ใช้
   // update: {} เมื่อมีอยู่แล้ว (รันซ้ำจะไม่สร้าง asset ใหม่ในนั้นอีก) — ฟังก์ชันนี้เช็คซ้ำเองจาก assetTag แทน

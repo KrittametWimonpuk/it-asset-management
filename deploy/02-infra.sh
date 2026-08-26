@@ -11,6 +11,7 @@
 # ---------------------------------------------------------------------------
 source "$(dirname "$0")/lib.sh"
 : "${ACCOUNT_ID:?รัน 00-check.sh ก่อน}"
+: "${CERTIFICATE_ARN:?ต้องกำหนด ACM CERTIFICATE_ARN สำหรับ production HTTPS}"
 
 # ===== 1) หา VPC + subnet =====
 log "ค้นหา default VPC..."
@@ -42,7 +43,7 @@ ensure_sg() {
 }
 
 log "สร้าง Security Groups..."
-ALB_SG=$(ensure_sg "${APP_NAME}-alb-sg"  "ALB inbound 80")
+ALB_SG=$(ensure_sg "${APP_NAME}-alb-sg"  "ALB inbound HTTPS")
 TASK_SG=$(ensure_sg "${APP_NAME}-task-sg" "ECS tasks")
 RDS_SG=$(ensure_sg "${APP_NAME}-rds-sg"  "RDS postgres")
 save_state ALB_SG "$ALB_SG"; save_state TASK_SG "$TASK_SG"; save_state RDS_SG "$RDS_SG"
@@ -50,6 +51,8 @@ save_state ALB_SG "$ALB_SG"; save_state TASK_SG "$TASK_SG"; save_state RDS_SG "$
 # เปิดพอร์ต (authorize ซ้ำจะ error เฉย ๆ จึง || true)
 aws_ ec2 authorize-security-group-ingress --group-id "$ALB_SG" \
   --protocol tcp --port 80 --cidr 0.0.0.0/0 >/dev/null 2>&1 || true
+aws_ ec2 authorize-security-group-ingress --group-id "$ALB_SG" \
+  --protocol tcp --port 443 --cidr 0.0.0.0/0 >/dev/null 2>&1 || true
 # task รับจาก ALB ทั้งพอร์ต web(80) และ api(4000)
 aws_ ec2 authorize-security-group-ingress --group-id "$TASK_SG" \
   --protocol tcp --port 80 --source-group "$ALB_SG" >/dev/null 2>&1 || true
@@ -82,6 +85,8 @@ if [ -z "${DATABASE_URL:-}" ]; then
       --db-subnet-group-name "${APP_NAME}-subnets" \
       --vpc-security-group-ids "$RDS_SG" \
       --no-publicly-accessible \
+      --storage-encrypted \
+      --deletion-protection \
       --backup-retention-period 7 >/dev/null
   fi
 
@@ -95,7 +100,6 @@ else
   DB_URL_FINAL="$DATABASE_URL"
   ok "ใช้ DATABASE_URL ที่กำหนดใน config"
 fi
-save_state DB_URL_FINAL "$DB_URL_FINAL"
 
 # ===== 4) ECS Cluster + Logs + IAM role =====
 log "สร้าง ECS cluster..."
@@ -119,6 +123,26 @@ fi
 EXEC_ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query 'Role.Arn' --output text)
 save_state EXEC_ROLE_ARN "$EXEC_ROLE_ARN"
 
+ensure_secret() {
+  local name="$1" value="$2" arn
+  arn=$(aws_ secretsmanager describe-secret --secret-id "$name" --query ARN --output text 2>/dev/null || echo None)
+  if [ "$arn" = "None" ] || [ -z "$arn" ]; then
+    arn=$(aws_ secretsmanager create-secret --name "$name" --secret-string "$value" --query ARN --output text)
+  else
+    aws_ secretsmanager put-secret-value --secret-id "$arn" --secret-string "$value" >/dev/null
+  fi
+  echo "$arn"
+}
+
+log "จัดเก็บ application secrets ใน AWS Secrets Manager..."
+DATABASE_URL_SECRET_ARN=$(ensure_secret "${APP_NAME}/database-url" "$DB_URL_FINAL")
+JWT_SECRET_ARN=$(ensure_secret "${APP_NAME}/jwt-secret" "$JWT_SECRET")
+save_state DATABASE_URL_SECRET_ARN "$DATABASE_URL_SECRET_ARN"
+save_state JWT_SECRET_ARN "$JWT_SECRET_ARN"
+remove_state DB_URL_FINAL
+aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name "${APP_NAME}-read-secrets" \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"secretsmanager:GetSecretValue\"],\"Resource\":[\"$DATABASE_URL_SECRET_ARN\",\"$JWT_SECRET_ARN\"]}]}" >/dev/null
+
 # ===== 5) ALB + Target Groups + Listener =====
 log "สร้าง Application Load Balancer..."
 ALB_ARN=$(aws_ elbv2 describe-load-balancers --names "${APP_NAME}-alb" \
@@ -141,30 +165,54 @@ ensure_tg() {
       --health-check-path "$hpath" \
       --query 'TargetGroups[0].TargetGroupArn' --output text)
   fi
+  aws_ elbv2 modify-target-group --target-group-arn "$arn" --health-check-path "$hpath" >/dev/null
   echo "$arn"
 }
 
 log "สร้าง Target Groups..."
-TG_WEB=$(ensure_tg "${APP_NAME}-web-tg" 80 "/")
+TG_WEB=$(ensure_tg "${APP_NAME}-web-tg" 80 "/healthz")
 TG_API=$(ensure_tg "${APP_NAME}-api-tg" 4000 "/health")
 save_state TG_WEB "$TG_WEB"; save_state TG_API "$TG_API"
 
-log "สร้าง Listener (:80) + กติกาแยก /api ..."
+log "สร้าง HTTPS Listener (:443) และ redirect HTTP -> HTTPS ..."
 LISTENER=$(aws_ elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" \
-           --query 'Listeners[?Port==`80`].ListenerArn | [0]' --output text 2>/dev/null || echo None)
+           --query 'Listeners[?Port==`443`].ListenerArn | [0]' --output text 2>/dev/null || echo None)
 if [ "$LISTENER" = "None" ] || [ -z "$LISTENER" ]; then
   LISTENER=$(aws_ elbv2 create-listener --load-balancer-arn "$ALB_ARN" \
-    --protocol HTTP --port 80 \
+    --protocol HTTPS --port 443 --certificates "CertificateArn=$CERTIFICATE_ARN" \
+    --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
     --default-actions "Type=forward,TargetGroupArn=$TG_WEB" \
     --query 'Listeners[0].ListenerArn' --output text)
+else
+  aws_ elbv2 modify-listener --listener-arn "$LISTENER" \
+    --certificates "CertificateArn=$CERTIFICATE_ARN" \
+    --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
+    --default-actions "Type=forward,TargetGroupArn=$TG_WEB" >/dev/null
 fi
 save_state LISTENER "$LISTENER"
 
-# กติกา: path /api/* -> api target group (สร้างถ้ายังไม่มี priority 10)
-if ! aws_ elbv2 describe-rules --listener-arn "$LISTENER" \
-      --query 'Rules[?Priority==`10`]' --output text | grep -q .; then
+HTTP_LISTENER=$(aws_ elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" \
+  --query 'Listeners[?Port==`80`].ListenerArn | [0]' --output text 2>/dev/null || echo None)
+if [ "$HTTP_LISTENER" = "None" ] || [ -z "$HTTP_LISTENER" ]; then
+  HTTP_LISTENER=$(aws_ elbv2 create-listener --load-balancer-arn "$ALB_ARN" \
+    --protocol HTTP --port 80 \
+    --default-actions 'Type=redirect,RedirectConfig={Protocol=HTTPS,Port=443,StatusCode=HTTP_301}' \
+    --query 'Listeners[0].ListenerArn' --output text)
+else
+  aws_ elbv2 modify-listener --listener-arn "$HTTP_LISTENER" \
+    --default-actions 'Type=redirect,RedirectConfig={Protocol=HTTPS,Port=443,StatusCode=HTTP_301}' >/dev/null
+fi
+
+# กติกา: path /api/* และ Swagger /docs -> api target group
+API_RULE=$(aws_ elbv2 describe-rules --listener-arn "$LISTENER" \
+  --query 'Rules[?Priority==`10`].RuleArn | [0]' --output text 2>/dev/null || echo None)
+if [ "$API_RULE" = "None" ] || [ -z "$API_RULE" ]; then
   aws_ elbv2 create-rule --listener-arn "$LISTENER" --priority 10 \
-    --conditions Field=path-pattern,Values='/api/*' \
+    --conditions Field=path-pattern,Values='/api/*','/docs','/docs/*' \
+    --actions "Type=forward,TargetGroupArn=$TG_API" >/dev/null
+else
+  aws_ elbv2 modify-rule --rule-arn "$API_RULE" \
+    --conditions Field=path-pattern,Values='/api/*','/docs','/docs/*' \
     --actions "Type=forward,TargetGroupArn=$TG_API" >/dev/null
 fi
 
@@ -173,4 +221,4 @@ ALB_DNS=$(aws_ elbv2 describe-load-balancers --load-balancer-arns "$ALB_ARN" \
 save_state ALB_DNS "$ALB_DNS"
 
 ok "โครงสร้างพื้นฐานพร้อม"
-echo "   URL (จะใช้ได้หลังรัน 03-deploy.sh):  http://${ALB_DNS}"
+echo "   URL (จะใช้ได้หลังรัน 03-deploy.sh):  https://${ALB_DNS}"

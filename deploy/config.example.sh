@@ -29,6 +29,9 @@ export DB_PASSWORD="CHANGE-ME-Strong-Passw0rd"   # <-- แก้ให้เด�
 # สร้างค่าสุ่มยาว ๆ ด้วย:  openssl rand -hex 32
 export JWT_SECRET="CHANGE-ME-to-a-long-random-secret"
 
+# ARN ของ ACM certificate ใน region เดียวกับ ALB (บังคับสำหรับ production HTTPS)
+export CERTIFICATE_ARN="arn:aws:acm:ap-southeast-1:123456789012:certificate/CHANGE-ME"
+
 # ---- ขนาดเครื่อง (Fargate) ----
 # 256 = 0.25 vCPU, 512 = 0.5 GB RAM  (ค่าต่ำสุด ประหยัดสุด)
 export TASK_CPU="256"

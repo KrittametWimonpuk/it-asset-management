@@ -44,6 +44,7 @@ services:
     environment:
       # ให้ nginx รู้ว่าจะ proxy /api ไปที่ service ไหน (ดู apps/web/nginx.conf)
       API_UPSTREAM: "api:4000"
+      API_UPSTREAM_SCHEME: "http"
     ports:
       - "8080:80"
     depends_on:

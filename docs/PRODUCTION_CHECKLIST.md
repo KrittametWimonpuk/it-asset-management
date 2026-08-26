@@ -1,6 +1,6 @@
 # Production Readiness Checklist
 
-> RC3 — Production Deployment & Operations. ใช้ checklist นี้ก่อนปล่อย v1.0.0 จริงขึ้น production
+> v1.1.0 RC2 — Production Deployment & Operations. ใช้ checklist นี้ก่อนปล่อยจริงขึ้น production
 > ครั้งแรก และก่อน deploy เวอร์ชันสำคัญทุกครั้งถัดไป — ทำเครื่องหมายทีละข้อ ไม่ข้าม
 
 ## Infrastructure
@@ -10,8 +10,7 @@
 - [ ] เซิร์ฟเวอร์/instance ตรงตาม [Server Requirements](DEPLOYMENT.md#server-requirements) ขั้นต่ำ
 - [ ] Docker Engine + Compose v2 ติดตั้งแล้ว (ทาง B) หรือ AWS CLI v2 configure แล้ว (ทาง A)
 - [ ] DNS ชี้มาที่เซิร์ฟเวอร์/ALB ถูกต้องแล้ว (ถ้ามีโดเมนจริง)
-- [ ] TLS/HTTPS ติดตั้งแล้วถ้าเปิดใช้งานจริงต่อ internet สาธารณะ (ดู
-      [Known Limitations ใน README](../README.md#️-known-limitations) — compose ที่ให้มายังไม่มี TLS termination ในตัว)
+- [ ] TLS/HTTPS ใช้ certificate ที่ valid: ACM ARN สำหรับ AWS หรือ TLS paths สำหรับ self-hosted
 
 ## Deployment
 
@@ -21,6 +20,7 @@
 - [ ] `DB_PASSWORD`/RDS master password เป็นรหัสผ่านที่แข็งแรงจริง
 - [ ] Migration ทั้งหมด apply สำเร็จ (`prisma migrate deploy` ผ่านไม่มี error)
 - [ ] Container/Service ทุกตัวขึ้นสถานะ "healthy" (ไม่ใช่แค่ "running")
+- [ ] cron/EventBridge เรียก `npm run scheduler` เป็นระยะและตรวจ log แล้ว
 
 ## Security
 
@@ -29,13 +29,13 @@
 - [ ] `NODE_ENV=production` ตั้งไว้จริงในระบบจริง (ไม่ใช่ค่า default/ว่าง)
 - [ ] `CORS_ORIGIN` ตั้งค่าเหมาะสม หรือปล่อยว่างถ้าใช้ topology same-origin ผ่าน nginx ตามปกติ — **ห้าม**
       ปล่อยให้ CORS เปิดกว้างแบบ wildcard ใน production
-- [ ] Security headers (Helmet + nginx) ทำงานจริง — เช็คด้วย `curl -I http://<host>` ว่ามี
+- [ ] Security headers (Helmet + nginx) ทำงานจริง — เช็คด้วย `curl -I https://<host>` ว่ามี
       `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security` เป็นต้น
 - [ ] Rate limiting บน login/register ทำงานจริง (ทดสอบยิงเกิน limit แล้วได้ `429`)
 - [ ] Password policy (ขั้นต่ำ 8 ตัวอักษร) บังคับใช้จริงตอนสมัคร/เปลี่ยนรหัสผ่าน
 - [ ] Backend container รันด้วย non-root user (`USER node` ใน Dockerfile — ตรวจด้วย `docker exec ... whoami`)
-- [ ] db/api ไม่ publish port ออก host โดยไม่จำเป็น (ทาง B — เฉพาะ `web:80` เท่านั้นที่ควรเปิด)
-- [ ] Swagger UI (`/api/docs/`) เข้าถึงได้ตามที่ตั้งใจ (ถ้าต้องการปิดใน production จริง ต้องตัดสินใจและ
+- [ ] db/api ไม่ publish port ออก host โดยไม่จำเป็น (ทาง B — เปิดเฉพาะ `web:80/443`)
+- [ ] Swagger UI (`/docs`) เข้าถึงได้ตามที่ตั้งใจ (ถ้าต้องการปิดใน production จริง ต้องตัดสินใจและ
       บันทึกเป็น known trade-off — ปัจจุบันเปิดไว้โดยตั้งใจเพื่อความสะดวกของทีม)
 - [ ] ไม่มี debug flag/verbose error stack trace รั่วไหลออกไปหา client จริง
 
@@ -60,7 +60,7 @@
 - [ ] README.md มีลิงก์ไปทุกเอกสาร production (deployment/backup/rollback/checklist)
 - [ ] CHANGELOG.md มี entry ของเวอร์ชันที่กำลังจะปล่อยจริง
 - [ ] ตัวแปร environment ทุกตัวมีคำอธิบายใน `.env.example`/`.env.production.example`
-- [ ] Known Limitations (เช่น ไม่มี TLS termination ในตัว, ไม่มี Brotli) บันทึกไว้ชัดเจน ไม่ปิดบัง
+- [ ] Known Limitations (เช่น certificate renewal, ไม่มี Brotli) บันทึกไว้ชัดเจน ไม่ปิดบัง
 
 ## Operations
 

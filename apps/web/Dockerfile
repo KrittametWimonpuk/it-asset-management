@@ -18,6 +18,11 @@ RUN npm run build          # ได้ผลลัพธ์อยู่ในโ
 # ---- ขั้นที่ 2: serve ----
 FROM nginx:alpine
 
+# ให้ official entrypoint อ่าน nameserver จริงจาก /etc/resolv.conf แล้ว export
+# NGINX_LOCAL_RESOLVERS ก่อน envsubst; รองรับ Docker Desktop, Linux และ ECS ที่ resolver ต่างกัน
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    API_UPSTREAM_SCHEME=http
+
 # ---- RC3: Image labels (OCI standard) — metadata สำหรับ registry/scanner ไม่กระทบการทำงานของ image ----
 LABEL org.opencontainers.image.title="it-asset-management-web" \
       org.opencontainers.image.description="Frontend — React (build แล้ว) เสิร์ฟด้วย nginx" \
@@ -31,6 +36,6 @@ COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # ---- RC3: Healthcheck — ใช้ wget ที่มากับ busybox ใน image alpine อยู่แล้ว ไม่ต้องติดตั้งเพิ่ม ----
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/healthz || exit 1
 
 EXPOSE 80

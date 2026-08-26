@@ -5,6 +5,43 @@
 
 ---
 
+## [v1.1.0-rc2] — Production Hardening
+
+RC2 แก้เฉพาะ Critical/High findings จาก RC1 โดยคง API, authentication flow และข้อมูลเดิมทั้งหมด
+
+### Fixed
+- เพิ่มความสัมพันธ์ one-to-one แบบ explicit `User.employeeId → Employee.id` พร้อม unique/FK และ backfill
+  เฉพาะอีเมลที่จับคู่ได้แบบไม่กำกวม; แถว legacy ที่จับคู่ไม่ได้ยังใช้ fallback เดิมได้
+- ทำให้การสร้าง Assignment/อนุมัติ Borrow Request และการปิด Return อัปเดต `Asset.status` ใน transaction
+  เดียวกัน (`IN_USE`, `AVAILABLE`, `LOST`, `MAINTENANCE`) พร้อม conditional update กัน race
+- ย้าย due/overdue reminder ออกจาก Dashboard/Notification read path ไปเป็น scheduler entry point
+  `npm run scheduler`; เพิ่ม database dedupe key แบบ unique และทำซ้ำ/concurrent ได้อย่าง idempotent
+- เปลี่ยน Audit จาก fire-and-forget เป็น durable `AuditOutbox` พร้อม idempotent dispatch, exponential retry
+  และ scheduler flush; Notification กับ audit event ถูกบันทึกแบบ atomic
+- ตั้ง Express `trust proxy` ให้ production topology, ทำให้ `req.ip`, audit IP และ rate limit อิง client IP จริง
+- แก้ nginx/API upstream และ runtime DNS resolver, `/healthz`, Swagger routing, HTTPS/TLS, AWS ACM listener,
+  Secrets Manager และ RDS encryption
+- เพิ่ม index สำหรับ due-date Assignment, Employee lookup และ Notification dedupe; Notification Summary ใช้
+  database `groupBy` และ export จำกัด 25,000 แถวเพื่อคุม memory
+- รวม modal focus trap, Escape, initial focus และ focus restoration ไว้ใน hook เดียว
+- อัปเดต Vite เป็น 6.4.3 และ dependency ทางอ้อมจน frontend `npm audit` เหลือ 0 ช่องโหว่
+
+### Testing
+- CI ใช้ PostgreSQL 16 จริง รัน migration ทั้งชุดและ RC2 integration checks สำหรับ FK/unique/dedupe/
+  Assignment state transaction ก่อน lint/test/build
+- เพิ่ม contract tests สำหรับ expand-only migration, scheduler separation, audit outbox, proxy และ healthcheck
+
+### Compatibility
+- ไม่ลบ `Assignment.userId`, email fallback หรือ endpoint เดิม; JWT รุ่นก่อน RC2 ถูก enrich `employeeId`
+  จากฐานข้อมูลระหว่างตรวจ token โดยไม่บังคับ logout
+- Migration `0015_rc2_production_hardening` เป็น expand-only และไม่ hard-delete ข้อมูลใด
+
+### Known Limitations
+- ต้องให้ orchestrator/cron เรียก `npm run scheduler`; repository เตรียม worker interface แต่ไม่ผูกกับผู้ให้บริการรายใด
+- Rate-limit store ยังอยู่ใน memory ต่อ instance; deployment ที่ scale หลาย API replicas ควรใช้ shared store
+- Backend audit พบเฉพาะ advisory ระดับ Moderate ใน dependency ภายใน ExcelJS; ไม่มี High/Critical และโค้ดไม่ได้
+  เรียก UUID custom buffer API ที่ได้รับผลกระทบ
+
 ## [v1.1.0-beta.1] — Notifications & Reminder System
 
 Beta 1 เพิ่มชั้นการสื่อสารบน lifecycle เดิม โดย Notification เป็น best-effort หลังธุรกรรมสำเร็จ จึงไม่ทำให้

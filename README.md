@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-beta.1`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-rc2`
 
 ---
 
@@ -29,15 +29,15 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
-| **Employee Management (v1.1 Alpha)** | ทะเบียนพนักงานแยกจากบัญชี User: ค้นหา/กรอง/แบ่งหน้า, สถานะการทำงาน, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log ครบถ้วน |
+| **Employee Management (v1.1 RC2)** | ทะเบียนพนักงานและความสัมพันธ์ one-to-one กับ User แบบ explicit FK/unique: ค้นหา/กรอง/แบ่งหน้า, สถานะ, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log |
 | **Asset Assignment & Return Inspection** | Employee เป็น business identity ของผู้ถือครอง, User เป็น operator/RBAC; รองรับมอบหมาย, เริ่มตรวจรับ, สภาพ/ผลตรวจ/ผู้ตรวจ/เวลา, Return Timeline และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
 | **Borrow Request & Approval Workflow (v1.1 Alpha 4)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
-| **Notifications & Reminders (v1.1 Beta 1)** | การแจ้งเตือน in-app สำหรับคำขอ/อนุมัติ/มอบหมาย/รับคืน พร้อม unread badge, reminder ก่อนกำหนด 3 วัน, overdue, search/filter/pagination, soft delete และ recipient-scoped RBAC |
+| **Notifications & Reminders (v1.1 RC2)** | การแจ้งเตือน in-app พร้อม unread badge, reminder ก่อนกำหนด 3 วัน/overdue แบบ scheduler-ready และ database dedupe, search/filter/pagination, soft delete และ recipient-scoped RBAC |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 10 รายงาน (เพิ่ม Notification Summary จาก 9 รายงานเดิม) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
 | **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 75 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
-| **Audit Log** | บันทึกทุกการกระทำสำคัญทางธุรกิจ (สร้าง/แก้ไข/ลบ/มอบหมาย/รับคืน/สถานะตั๋วเปลี่ยน/เข้าสู่ระบบ/ส่งออกรายงาน) พร้อมค่าก่อน-หลังแก้ไข ผู้ทำรายการ เวลา และ IP — เป็นประวัติที่แก้ไข/ลบไม่ได้ (immutable), เฉพาะ ADMIN/IT_STAFF ดูได้ |
+| **Audit Log** | บันทึกการกระทำสำคัญผ่าน durable outbox + retry พร้อมค่าก่อน-หลัง ผู้ทำรายการ เวลา และ real client IP — ประวัติแก้ไข/ลบไม่ได้, เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
 | **Deploy** | สอง production path: (1) Docker Compose self-hosted (`docker-compose.prod.yml` — nginx reverse proxy + security headers + gzip) หรือ (2) สคริปต์ deploy ขึ้น AWS ECS Fargate + RDS + ALB — ดู [🚀 Production Deployment & Operations](#-production-deployment--operations-release-candidate-3) |
@@ -46,9 +46,15 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 
 ## 🏗️ Architecture Overview
 
+```text
+Browser ─HTTPS─▶ nginx / AWS ALB ─┬─▶ React + Vite static UI
+                                  └─/api,/docs─▶ Express ─▶ Prisma ─▶ PostgreSQL
+Scheduler / EventBridge ───────────────────────────┬──────▶ Reminder dedupe
+                                                   └──────▶ Audit outbox retry
+User (authentication/RBAC) ── 0..1 : 1 ── Employee (business identity)
 ```
-apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  PostgreSQL (Prisma)
-```
+
+ดูแผนภาพและขอบเขต component/transaction โดยละเอียดที่ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 - **Frontend**: React 18 + Vite, ไม่มี router library / state management library ใด ๆ (ตั้งใจให้เรียบง่าย
   — สลับหน้าด้วย state ธรรมดาใน [App.jsx](apps/web/src/App.jsx)) หน้าจอหลักคุยกับ backend ผ่านตัวช่วยกลางที่
@@ -56,11 +62,11 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
 - **Backend**: Express — แต่ละ resource เป็น router แยกไฟล์ใน `src/routes/`, master data ทั้ง 4 ตัว
   (Category/Location/Department/Vendor) ใช้ router factory ตัวเดียวกัน ([masterDataRouter.js](apps/api/src/utils/masterDataRouter.js))
   กันเขียนโค้ดซ้ำ
-- **Auth**: JWT ที่ฝัง `{ id, email, role }` ไว้ในตัว, ตรวจสอบผ่าน middleware กลาง
+- **Auth**: JWT ที่ฝัง `{ id, email, role, employeeId }` ไว้ในตัว, ตรวจสอบผ่าน middlewareกลาง
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0013_return_workflow_enhancement`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0015_rc2_production_hardening`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -68,10 +74,9 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
 - **RBAC ที่ backend เสมอ**: ทุก query ที่ scope ตาม role (เช่น EMPLOYEE เห็นเฉพาะของตัวเอง) กรองใน
   Prisma `where` โดยตรง ไม่ใช่กรองที่ frontend แล้วซ่อน UI — frontend ซ่อนปุ่ม/แท็บเป็นแค่ UX เสริม
   ไม่ใช่ชั้นความปลอดภัยจริง
-- **Employee ≠ User (v1.1 Phase 2)**: `Employee` เป็น business identity ของผู้ถือครอง ส่วน `User` ยังคงเป็น
-  บัญชี Authentication/RBAC และ operator (`assignedById`) โดย `Assignment.employeeId` ใช้กับรายการใหม่
-  ขณะที่ `userId` ยังเก็บแบบ nullable เพื่ออ่านข้อมูลเก่า การ scope บัญชี EMPLOYEE ตรวจทั้งสอง relation และ
-  fallback เป็น User เดิมหรือ `Unknown Employee` หากแถวเก่ายัง map ไม่ได้
+- **Employee ≠ User (v1.1 RC2)**: `Employee` เป็น business identity ส่วน `User.employeeId` เป็น explicit
+  one-to-one FK สำหรับ Authentication/RBAC; `Assignment.userId` และ email fallback ยังคงไว้เฉพาะข้อมูล legacy
+  ที่ migration จับคู่ไม่ได้อย่างปลอดภัย
 - **Ticket lifecycle (Milestone 7)**: วงจรสถานะบังคับจริงที่ backend ([ticketHelpers.js](apps/api/src/utils/ticketHelpers.js):
   `TICKET_TRANSITIONS`) ไม่ใช่แค่ UI ซ่อนตัวเลือก — transition ที่ไม่อยู่ในตารางนี้ถูกปฏิเสธด้วย `400` เสมอ:
 
@@ -94,13 +99,12 @@ apps/web (React + Vite)  ──/api/*──▶  apps/api (Express)  ──▶  P
   import `scopeForRead` ตัวเดียวกับที่ `routes/assets.js`/`assignments.js`/`tickets.js` ใช้จริงมาโดยตรง (ตั้งใจ
   `export` ฟังก์ชันเดิมออกมาแทนเขียนเงื่อนไข RBAC ซ้ำ — ถ้าเขียนแยกแล้วพลาดไม่ตรงกันจะกลายเป็นช่องโหว่รั่ว
   ข้อมูลข้ามขอบเขตได้) endpoint เดียวกันตอบได้ 2 แบบ: ไม่ส่ง `?format=` มา = JSON แบ่งหน้าปกติ (ใช้กับหน้า
-  Preview), ส่ง `?format=csv|xlsx|pdf` มา = ไฟล์ดาวน์โหลดตรง ๆ (ดึงข้อมูล "ทั้งหมด" ที่ตรงตัวกรอง ไม่ใช่แค่หน้า
-  ที่กำลังดู — ไม่ export รายการที่ถูกกรอง/ซ่อนออกไปแล้ว) Department Summary/Vendor Summary เป็นภาพรวมองค์กร
+  Preview), ส่ง `?format=csv|xlsx|pdf` มา = ไฟล์ดาวน์โหลดตรง ๆ (สูงสุด 25,000 แถวตามตัวกรอง) Department Summary/Vendor Summary เป็นภาพรวมองค์กร
   ล้วน ๆ จึงกัน EMPLOYEE ด้วย `requireRole('ADMIN','IT_STAFF')` ตั้งแต่ต้นทาง (403 ไม่ใช่แค่ซ่อนปุ่ม)
   ดูรายละเอียดรายงานทั้งหมดที่หัวข้อ [📊 Reports & Export](#-reports--export) ด้านล่าง
-- **Audit Log (Milestone 9)**: `utils/auditLog.js` มีฟังก์ชันเดียว `logAudit()` ที่ทุก route เรียกใช้หลัง
-  ทำรายการสำเร็จ (**ไม่ `await`** — fire-and-forget เพื่อไม่ให้การเขียน audit log หน่วง response หลัก
-  ถ้าเขียนไม่สำเร็จจะ log error ที่ server console เฉย ๆ ไม่กระทบ response ที่ตอบผู้ใช้ไปแล้ว) `AuditLog.performedById`
+- **Audit Log (RC2)**: `utils/auditLog.js` persist เหตุการณ์ลง `AuditOutbox` ก่อนทุกครั้งและทุก caller `await`
+  การบันทึก จากนั้น dispatcher สร้าง `AuditLog` แบบ idempotent; transient failure ถูกเก็บ attempts/error/
+  next retry ไว้ให้ scheduler ไม่สูญหายแบบเงียบ ๆ `AuditLog.performedById`
   ตั้งใจไม่ผูก Prisma relation กับ `User` (เป็นแค่ string ธรรมดา) เพื่อไม่ต้องแก้ model `User` เลย และกันปัญหา
   onDelete policy ที่ยังไม่มีคำตอบชัดเจนในอนาคต — `routes/audit.js` จึง join กับ `User` เองตอนอ่าน (ดึง id ที่ไม่ซ้ำ
   ในหน้าที่กำลังแสดงมา query ครั้งเดียว ไม่ query ทีละแถว) ฟังก์ชัน join นี้ (`attachPerformer`) ใช้ร่วมกันทั้ง
@@ -314,7 +318,7 @@ RC3 เพิ่มโครงสร้างและเอกสารสำ�
 Dockerfile ทั้งสองตัว (`apps/api/Dockerfile`, `apps/web/Dockerfile`) เดิมของ RC2 ยังใช้เหมือนเดิมทุก
 ประการ (ไม่ได้แยกไฟล์ใหม่) เพิ่มเข้ามาเฉพาะ:
 - **HEALTHCHECK**: backend เช็ก `/health` ด้วย Node's built-in `http` module (ไม่ติดตั้ง curl เพิ่ม —
-  minimal attack surface), frontend เช็กด้วย `wget` ที่มีอยู่แล้วใน `nginx:alpine` base image
+  minimal attack surface), frontend เช็ก `/healthz` ด้วย `wget` ที่มีอยู่แล้วใน `nginx:alpine` base image
 - **OCI image labels** (`org.opencontainers.image.title/description/licenses`) — metadata มาตรฐานสำหรับ
   registry/scanning tools ไม่มีผลต่อพฤติกรรมรันไทม์
 
@@ -348,8 +352,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
   (`nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ต้องใช้ custom image — เว้นไว้เพื่อลดความเสี่ยง ดู
   Known Limitations)
 - **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
-  `X-XSS-Protection`, `Strict-Transport-Security` (HSTS — **มีผลจริงเฉพาะตอนใช้ผ่าน HTTPS เท่านั้น** — compose
-  ไฟล์นี้ไม่มี TLS termination ในตัว ดู Known Limitations)
+  `X-XSS-Protection`, `Strict-Transport-Security`; compose terminate TLS ที่ nginx และ AWS terminate ที่ ALB/ACM
 - **Static asset caching**: ไฟล์ที่ผ่าน content-hash แล้ว (`/assets/*-[hash].js`) cache 1 ปีแบบ
   `immutable`, ส่วน `index.html` ใช้ `no-cache` เสมอ (กันเสิร์ฟ entry point เก่าที่ชี้ asset ที่ถูกลบไปแล้ว)
 - **Proxy timeout**: `proxy_read_timeout 120s` (นานกว่า default) รองรับ export PDF/Excel รายงานใหญ่ที่ใช้เวลานาน
@@ -364,9 +367,11 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 | `DATABASE_URL` | connection string ที่ backend ใช้จริง — host เป็นชื่อ service `db` (ไม่ใช่ `localhost`) |
 | `JWT_SECRET` | สร้างด้วย `openssl rand -hex 32` — **ห้ามใช้ค่าตัวอย่าง** |
 | `NODE_ENV` | ต้องเป็น `production` เสมอสำหรับไฟล์นี้ |
+| `TRUST_PROXY` | จำนวน reverse proxy hop หน้า Express (topology มาตรฐานใช้ `1`) |
 | `CORS_ORIGIN` | ปกติปล่อยว่างได้ — topology มาตรฐานของ compose นี้เป็น same-origin ผ่าน nginx อยู่แล้ว |
 | `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` | ค่า default ใช้งานได้เลย ไม่บังคับตั้ง |
 | `PORT` | พอร์ตภายใน container ของ backend (default `4000`) |
+| `TLS_CERT_PATH`/`TLS_KEY_PATH` | certificate/private key สำหรับ nginx self-hosted |
 
 ทาง A (AWS ECS) ยังใช้ `deploy/config.sh` เหมือนเดิม (ดู `deploy/config.example.sh`) — ไม่เกี่ยวกับ
 `.env.production` ไฟล์นี้เลย
@@ -510,7 +515,7 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 
 ---
 
-## 🔔 Notifications & Reminder System (v1.1.0-beta.1)
+## 🔔 Notifications & Reminder System (v1.1.0-rc2)
 
 ระบบสร้าง Notification หลัง workflow สำเร็จสำหรับคำขอยืม, ผลอนุมัติ, การมอบหมาย, รอตรวจรับ และผลการคืน
 โดยความล้มเหลวของชั้นการสื่อสารไม่ rollback ธุรกรรม lifecycle เดิม ผู้ใช้ทุก role เห็นเฉพาะรายการที่ส่งถึง
@@ -524,9 +529,15 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 | POST | `/api/notifications/read-all` | อ่านทั้งหมด |
 | DELETE | `/api/notifications/:id` | เก็บเข้าคลังแบบ soft delete |
 
-Reminder ก่อนกำหนด 3 วันและ overdue ใช้ on-access sweep แบบ idempotent เมื่อเปิด Dashboard หรือ Notification
-ใน Beta 1 เพื่อไม่เพิ่ม scheduler/service ใหม่ให้สถาปัตยกรรมเดิม เมื่อเข้าสู่ production ที่ต้องส่งตรงเวลาขณะไม่มี
-ผู้ใช้งาน ควรเรียก reminder generator ผ่าน scheduled worker/cron เพิ่มภายหลัง
+Reminder ก่อนกำหนด 3 วันและ overdue ไม่ขึ้นกับการเปิด Dashboard แล้ว ใช้ database `dedupeKey` แบบ unique
+และรันผ่าน scheduler interface เดียวกับ audit retry:
+
+```bash
+cd apps/api
+npm run scheduler
+```
+
+ตั้ง cron/EventBridge ให้เรียกคำสั่งนี้เป็นระยะ (แนะนำทุก 5 นาที) การเรียกซ้ำหรือทำงานพร้อมกันไม่สร้างรายการซ้ำ
 
 ---
 
@@ -606,9 +617,8 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 ความเข้ากันได้ของผู้ใช้ Audit Log เดิมพร้อมแยกเหตุการณ์อนุมัติให้ค้นหาได้ชัดเจน
 ไม่มีการ log คำสั่ง GET ใด ๆ
 
-**Performance:** `logAudit()` เรียกแบบ fire-and-forget (**ไม่ `await`**) เสมอ — การเขียน audit log ไม่มีทาง
-หน่วง response ของ business action หลัก แม้เขียนล้มเหลว (เช่น DB มีปัญหาชั่วคราว) ก็แค่ log error ไว้ที่
-server console โดยไม่กระทบผู้ใช้
+**Reliability:** `logAudit()` ถูก `await` และ persist ลง `AuditOutbox` ก่อน จากนั้น dispatcher เขียน AuditLog
+แบบ idempotent; ถ้า transient failure จะเก็บ error/backoff ไว้ให้ `npm run scheduler` retry
 
 **RBAC:** ADMIN/IT_STAFF อ่านได้ทั้งหมด (`GET /api/audit`, `GET /api/audit/:id`), EMPLOYEE เข้าไม่ได้เลย (403)
 
@@ -620,7 +630,7 @@ server console โดยไม่กระทบผู้ใช้
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-beta.1`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-rc2`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 
@@ -732,7 +742,7 @@ cd deploy
 3. **02** สร้างโครงสร้างพื้นฐาน (VPC, Security Group, **RDS Postgres**, ECS Cluster, **Load Balancer**)
 4. **03** สั่งรัน container บน ECS Fargate + ผูกกับ Load Balancer
 
-พอเสร็จจะได้ URL หน้าตาแบบ `http://webapp-starter-alb-xxxx.ap-southeast-7.elb.amazonaws.com`
+พอเสร็จจะได้ URL หน้าตาแบบ `https://webapp-starter-alb-xxxx.ap-southeast-7.elb.amazonaws.com`
 
 ### Deploy เวอร์ชันใหม่ (หลังแก้โค้ด)
 ```bash
@@ -767,9 +777,8 @@ cd deploy
 - **ไม่มี endpoint ลบประวัติการมอบหมาย** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติต้องอยู่ครบเสมอ) ไม่ใช่ข้อจำกัดทางเทคนิค
 - **Master data ที่ถูกลบยังผูกกับ asset เก่าได้** — ตั้งใจให้ asset เก่าที่อ้างอิง category/location ที่ถูกลบไปแล้ว
   ยังแสดงชื่อได้ถูกต้อง แต่หมายความว่าการลบ master data ไม่ cascade ไปเช็ก asset ที่ใช้อยู่
-- **Automated tests ยังไม่ครอบคลุมทุก module เดิม** — มี unit/policy tests สำหรับ Employee, Assignment และ Borrow Request
-  (validation, legacy compatibility, RBAC scope, audit policy และ migration contract) แล้ว แต่ browser E2E
-  และโมดูลเดิมทั้งหมดยังไม่มี coverage อัตโนมัติเต็มระบบ
+- **Automated tests ยังไม่ครอบคลุม browser E2E ทุก module** — CI รัน PostgreSQL migration/integration gate,
+  unit/policy tests, lint และ production buildแล้ว แต่ visual regression/screen reader ยังต้องทำ manual ก่อน Stable
 - **Frontend ไม่มี router library** — สลับหน้าด้วย state ธรรมดา เหมาะกับแอปขนาดนี้ แต่ไม่รองรับ URL ที่ deep-link ได้
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
@@ -778,7 +787,7 @@ cd deploy
   scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
 - **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
   (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
-- **Export ดึงข้อมูลทั้งหมดในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ
+- **Export ดึงข้อมูลสูงสุด 25,000 แถวในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ
   streaming (ไม่รวมไฟล์ทั้งก้อนไว้ในหน่วยความจำก่อนส่ง) แต่ query ฐานข้อมูลยังดึงแถวที่ตรงเงื่อนไขมาในคำสั่ง
   เดียว เพราะ Prisma ไม่มี API สำหรับ stream ผลลัพธ์ทีละแถวแบบตรงไปตรงมา ปลอดภัยสำหรับขนาดรายงานของระบบนี้
   (หลักพันแถว) แต่ถ้าข้อมูลโตถึงหลักแสน/ล้านแถว ควรทำ background export job แทนการ export แบบ synchronous
@@ -796,14 +805,8 @@ cd deploy
   constraint ระดับฐานข้อมูล (ตั้งใจ ดูเหตุผลที่ schema.prisma และหัวข้อ Architecture Overview) หมายความว่าถ้า
   ในอนาคตมี endpoint ลบผู้ใช้จริง ๆ audit log เก่าจะยังอ้างอิง id ที่ไม่มีตัวตนอยู่ในระบบแล้วได้ (แสดงผลเป็น
   "ระบบ/ไม่ทราบ" ที่หน้า Audit Log แทน ไม่ error)
-- **การเขียน audit log เป็นแบบ fire-and-forget** — เรียก `logAudit()` โดยไม่ `await` เสมอ (ตั้งใจ กันไม่ให้
-  หน่วง response ของ business action หลัก) หมายความว่าในกรณีที่หายากมาก ๆ (เช่น DB connection หลุดพอดีตอนนั้น)
-  business action อาจสำเร็จแต่ audit record เขียนไม่สำเร็จ (log error ไว้ที่ server console เท่านั้น) — ไม่มี
-  retry queue หรือ dead-letter mechanism ในตอนนี้
-- **CI test ยังไม่เชื่อมฐานข้อมูลจริง** — step `npm test` เป็น unit/policy test ที่ deterministic; migration และ
-  CRUD integration ต้องตรวจผ่าน Docker Compose แยกต่างหากเพื่อไม่ให้ pipeline เบื้องต้นซับซ้อนเกินจำเป็น
-- **CI ไม่รวม end-to-end/integration test กับฐานข้อมูลจริง** — `prisma validate`/`prisma generate` และ unit tests
-  ไม่เชื่อมฐานข้อมูลจริง จึงยังต้องตรวจ migration/CRUD runtime ผ่าน Docker Compose ก่อน release
+- **Audit outbox ไม่มี dead-letter UI** — retry metadata อยู่ใน `AuditOutbox` และ scheduler retry อัตโนมัติ
+  แต่การตรวจ/แก้ event ที่ล้มเหลวถาวรยังต้องทำผ่าน database/operations tooling
 - **Rate limit เก็บสถานะไว้ในหน่วยความจำของแต่ละ instance (ไม่ใช่ distributed)** — ถ้า deploy หลาย instance
   พร้อมกัน (`desired-count` > 1) โควตาจะนับแยกอิสระต่อ instance ไม่รวมกัน (เช่น ตั้ง max 10 ครั้ง แต่มี
   2 instance = ผู้โจมตีมีโอกาสยิงได้จริงสูงสุด ~20 ครั้งถ้ากระจาย request ไปสองฝั่งพอดี) ปัจจุบัน deploy
@@ -814,9 +817,8 @@ cd deploy
 - **Health check ตรวจแค่ "ต่อฐานข้อมูลได้ไหม" ไม่ได้ตรวจว่า schema ตรงกับ migration ล่าสุดหรือไม่** — ถ้า
   migration ค้าง (เช่น deploy image ใหม่ก่อนรัน migration) endpoint นี้จะยังตอบ "ok" อยู่ แม้ query บางอย่าง
   จะพังเพราะ column/table ไม่ตรงกับโค้ดจริงก็ตาม
-- **`docker-compose.prod.yml` ไม่มี TLS termination ในตัว** (RC3) — เปิดแค่ port 80 (HTTP) เท่านั้น
-  `Strict-Transport-Security` header ที่ตั้งไว้ใน `nginx.prod.conf` จะไม่มีผลจริงจนกว่าจะมี HTTPS จริง —
-  ผู้ดูแลระบบต้องเพิ่มเอง (เช่น วาง reverse proxy อีกชั้นที่มี TLS อยู่หน้าสุด หรือใช้ certbot/Let's Encrypt)
+- **Self-hosted TLS ต้องจัดหา certificate เอง** — compose เปิด HTTPS แล้วและ mount path จาก
+  `TLS_CERT_PATH`/`TLS_KEY_PATH` แต่ repository ไม่ออก/renew Let's Encrypt certificate แทนผู้ดูแลระบบ
 - **Brotli compression ยังไม่เปิดใช้งาน** (RC3) — `nginx:alpine` ไม่มี `ngx_brotli` module ในตัว ปัจจุบันใช้
   gzip เท่านั้น เปิด Brotli ได้ในอนาคตด้วยการ build custom nginx image
 - **ไม่มี scheduled backup อัตโนมัติสำหรับทาง B (self-hosted)** (RC3) — เอกสารมีขั้นตอน backup/restore ให้
@@ -833,6 +835,7 @@ cd deploy
 - [x] Approval Workflow Enhancement — comments, reviewer, decision time, timeline, dashboard SLA metrics และ Approval Report (`v1.1.0-alpha.4`)
 - [x] Return Workflow Enhancement — inspection, inspector, timeline, dashboard metrics, report และ audit (`v1.1.0-alpha.5`)
 - [x] Notifications & Reminder System — workflow events, unread/read, due/overdue, Dashboard, Report และ Audit (`v1.1.0-beta.1`)
+- [x] RC2 Production Hardening — identity FK, state transaction, scheduler/dedupe, audit outbox, TLS/proxy/indexes/a11y (`v1.1.0-rc2`)
 - [ ] HR Integration บน Employee foundation
 - [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8

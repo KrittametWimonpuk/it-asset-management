@@ -6,7 +6,7 @@ import { ok, fail } from '../utils/response.js'
 import { buildPageMeta, parsePagination, parseSort } from '../utils/queryParams.js'
 import { auditContext, logAudit } from '../utils/auditLog.js'
 import {
-  generateDueRemindersForUser, NOTIFICATION_PRIORITIES, NOTIFICATION_TYPES,
+  NOTIFICATION_PRIORITIES, NOTIFICATION_TYPES,
 } from '../services/notificationService.js'
 
 const router = Router()
@@ -29,7 +29,6 @@ export function buildNotificationWhere(query, userId) {
 }
 
 router.get('/', asyncHandler(async (req, res) => {
-  await generateDueRemindersForUser(req.user)
   const pagination = parsePagination(req.query)
   const where = buildNotificationWhere(req.query, req.user.id)
   const orderBy = parseSort(req.query, SORTABLE_FIELDS, 'createdAt')
@@ -41,7 +40,6 @@ router.get('/', asyncHandler(async (req, res) => {
 }))
 
 router.get('/unread-count', asyncHandler(async (req, res) => {
-  await generateDueRemindersForUser(req.user)
   const count = await prisma.notification.count({
     where: { userId: req.user.id, isRead: false, deletedAt: null },
   })
@@ -55,7 +53,7 @@ router.post('/read-all', asyncHandler(async (req, res) => {
     data: { isRead: true, readAt },
   })
   if (changed.count > 0) {
-    logAudit({
+    await logAudit({
       ...auditContext(req), action: 'NOTIFICATION_READ', entityType: 'Notification',
       description: `อ่านการแจ้งเตือนทั้งหมด ${changed.count} รายการ`,
       newValues: { count: changed.count, readAt },
@@ -74,7 +72,7 @@ router.post('/:id/read', asyncHandler(async (req, res) => {
     where: { id: item.id }, data: { isRead: true, readAt },
   })
   if (!item.isRead) {
-    logAudit({
+    await logAudit({
       ...auditContext(req), action: 'NOTIFICATION_READ', entityType: 'Notification', entityId: item.id,
       description: `อ่านการแจ้งเตือน: ${item.title}`,
       oldValues: { isRead: false }, newValues: { isRead: true, readAt },

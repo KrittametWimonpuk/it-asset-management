@@ -88,6 +88,25 @@ async function employeeCodeExists(code, excludeId) {
   return Boolean(duplicate)
 }
 
+async function linkMatchingAccount(client, employee) {
+  if (!employee.email) return
+  const [accounts, employees] = await Promise.all([
+    client.user.findMany({
+      where: { email: { equals: employee.email, mode: 'insensitive' } },
+      select: { id: true, employeeId: true },
+      take: 2,
+    }),
+    client.employee.findMany({
+      where: { email: { equals: employee.email, mode: 'insensitive' }, deletedAt: null },
+      select: { id: true },
+      take: 2,
+    }),
+  ])
+  if (accounts.length === 1 && employees.length === 1 && !accounts[0].employeeId) {
+    await client.user.update({ where: { id: accounts[0].id }, data: { employeeId: employee.id } })
+  }
+}
+
 async function invalidDepartment(departmentId) {
   if (!departmentId) return false
   const department = await prisma.department.findFirst({
@@ -148,9 +167,13 @@ router.post('/', asyncHandler(async (req, res) => {
     ...parsed.data,
     fullName: employeeFullName(parsed.data.firstName, parsed.data.lastName),
   }
-  const employee = await prisma.employee.create({ data, ...WITH_DEPARTMENT })
+  const employee = await prisma.$transaction(async (tx) => {
+    const created = await tx.employee.create({ data, ...WITH_DEPARTMENT })
+    await linkMatchingAccount(tx, created)
+    return created
+  })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'CREATE', entityType: 'Employee', entityId: employee.id,
     description: `สร้างพนักงาน ${employee.employeeCode} — ${employee.fullName}`,
     newValues: data,
@@ -176,9 +199,13 @@ router.put('/:id', asyncHandler(async (req, res) => {
     data.fullName = employeeFullName(parsed.data.firstName ?? existing.firstName, parsed.data.lastName ?? existing.lastName)
   }
 
-  const employee = await prisma.employee.update({ where: { id: existing.id }, data, ...WITH_DEPARTMENT })
+  const employee = await prisma.$transaction(async (tx) => {
+    const updated = await tx.employee.update({ where: { id: existing.id }, data, ...WITH_DEPARTMENT })
+    await linkMatchingAccount(tx, updated)
+    return updated
+  })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'UPDATE', entityType: 'Employee', entityId: employee.id,
     description: `แก้ไขพนักงาน ${employee.employeeCode} — ${employee.fullName}`,
     oldValues: Object.fromEntries(Object.keys(data).map((key) => [key, existing[key]])),
@@ -196,7 +223,7 @@ router.delete('/:id', adminOnly, asyncHandler(async (req, res) => {
   const archivedAt = new Date()
   await prisma.employee.update({ where: { id: existing.id }, data: { deletedAt: archivedAt } })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'DELETE', entityType: 'Employee', entityId: existing.id,
     description: `เก็บพนักงานเข้าคลัง ${existing.employeeCode} — ${existing.fullName}`,
     oldValues: { deletedAt: null }, newValues: { deletedAt: archivedAt },
@@ -214,7 +241,7 @@ router.post('/:id/restore', adminOnly, asyncHandler(async (req, res) => {
     where: { id: existing.id }, data: { deletedAt: null }, ...WITH_DEPARTMENT,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'RESTORE', entityType: 'Employee', entityId: employee.id,
     description: `กู้คืนพนักงาน ${employee.employeeCode} — ${employee.fullName}`,
     oldValues: { deletedAt: existing.deletedAt }, newValues: { deletedAt: null },

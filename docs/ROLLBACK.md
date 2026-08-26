@@ -119,7 +119,7 @@ checklist เดียวกับหลัง deploy ปกติทุกป�
 
 1. Container/Service ขึ้น "healthy"
 2. `GET /api/health` ตอบ `200` พร้อม `database: "connected"`
-3. Swagger UI (`/api/docs/`) เข้าถึงได้
+3. Swagger UI (`/docs`) เข้าถึงได้
 4. Frontend โหลดได้ + login ทดสอบผ่าน
 5. ตรวจ log ว่าไม่มี error ที่เคยพบก่อน rollback หลงเหลืออยู่
 6. ถ้า rollback เกี่ยวข้องกับฐานข้อมูล: สุ่มตรวจข้อมูลสำคัญ (asset/assignment ล่าสุด) ว่าตรงกับที่คาดไว้

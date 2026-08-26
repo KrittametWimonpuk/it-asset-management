@@ -25,11 +25,10 @@ test('reject requires a reason and all workflow statuses are available', () => {
   assert.deepEqual(BORROW_REQUEST_STATUSES, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'])
 })
 
-test('EMPLOYEE scope uses business identity email while staff can read all', () => {
-  const employee = { role: 'EMPLOYEE', email: 'employee@example.com' }
-  assert.deepEqual(borrowRequestScopeForAccount(employee), {
-    employee: { email: { equals: employee.email, mode: 'insensitive' } },
-  })
+test('EMPLOYEE scope uses explicit business identity while staff can read all', () => {
+  const employee = { role: 'EMPLOYEE', email: 'employee@example.com', employeeId: 'employee-id' }
+  assert.deepEqual(borrowRequestScopeForAccount(employee), { employeeId: 'employee-id' })
+  assert.deepEqual(borrowRequestScopeForAccount({ role: 'EMPLOYEE' }), { id: '__unlinked_employee_account__' })
   assert.deepEqual(borrowRequestScopeForAccount({ role: 'ADMIN' }), {})
 })
 

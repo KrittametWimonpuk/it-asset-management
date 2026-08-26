@@ -35,6 +35,8 @@ model User {
   assignmentsInspected Assignment[] @relation("AssignmentInspector")
   assignmentReturnEvents AssignmentReturnEvent[] @relation("AssignmentReturnActor")
   notifications Notification[]
+  employeeId    String?   @unique
+  employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -50,6 +52,8 @@ enum AssetStatus {
   IN_USE // กำลังถูกใช้งานอยู่
   REPAIR // อยู่ระหว่างซ่อม
   DISPOSED // เลิกใช้งาน / ตัดจำหน่ายแล้ว
+  LOST // สูญหายระหว่างการถือครอง
+  MAINTENANCE // รอตรวจสอบ/ซ่อมบำรุงหลังรับคืนแบบชำรุด
 }
 
 // สภาพครุภัณฑ์ทางกายภาพ — เพิ่มใน Milestone 3 (Asset Details)
@@ -140,6 +144,7 @@ model Notification {
   createdAt DateTime             @default(now())
   readAt    DateTime?
   deletedAt DateTime?
+  dedupeKey String?              @unique
 
   @@index([userId, isRead, deletedAt, createdAt])
   @@index([type, priority, createdAt])
@@ -149,8 +154,8 @@ model Notification {
 // ---------------------------------------------------------------------------
 // v1.1.0 Phase 1 — Employee Management Foundation
 //
-// Employee แยกจาก User โดยเจตนา: User เป็นบัญชีสำหรับ authentication/RBAC ส่วน Employee
-// เป็น business identity ของผู้ถือครองครุภัณฑ์ โดย Assignment.user ยังเก็บไว้รองรับข้อมูลเดิม
+// User เป็นบัญชี authentication/RBAC และเชื่อม Employee แบบ one-to-one ผ่าน User.employeeId;
+// Assignment.user ยังเก็บไว้รองรับข้อมูลเดิมที่ยัง map business identity ไม่ได้
 // ---------------------------------------------------------------------------
 enum EmployeeStatus {
   ACTIVE
@@ -179,10 +184,12 @@ model Employee {
   deletedAt    DateTime?
   assignments  Assignment[]
   borrowRequests BorrowRequest[]
+  user           User?
 
   @@index([departmentId])
   @@index([status])
   @@index([fullName])
+  @@index([email])
   @@index([deletedAt])
 }
 
@@ -361,6 +368,8 @@ model Assignment {
   @@index([status])
   @@index([returnStatus])
   @@index([inspectedById])
+  @@index([expectedReturnDate])
+  @@index([returnedAt, expectedReturnDate, deletedAt])
 }
 
 model AssignmentReturnEvent {
@@ -551,10 +560,27 @@ model AuditLog {
 
   ipAddress String? // req.ip ตอนทำรายการ (ไม่บังคับ)
   userAgent String? // req.get('user-agent') ตอนทำรายการ (ไม่บังคับ)
+  outboxId  String? @unique
 
   // query หลักของหน้า Audit Log กรอง/เรียงด้วยฟิลด์เหล่านี้เสมอ — index ช่วยให้ query เร็วขึ้น
   @@index([entityType, entityId])
   @@index([performedById])
   @@index([performedAt])
   @@index([action])
+}
+
+// RC2 durable audit delivery. Business code first persists an event here, then a retryable
+// dispatcher copies it to AuditLog. A transient AuditLog failure therefore never drops evidence.
+model AuditOutbox {
+  id            String    @id @default(uuid())
+  payload       Json
+  attempts      Int       @default(0)
+  lastError     String?
+  nextAttemptAt DateTime  @default(now())
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([processedAt, nextAttemptAt])
+  @@index([createdAt])
 }

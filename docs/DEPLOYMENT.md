@@ -1,6 +1,6 @@
 # Deployment Guide
 
-> RC3 — Production Deployment & Operations. เอกสารนี้ครอบคลุมการ deploy ระบบขึ้น production จริง
+> v1.1.0 RC2 — Production Deployment & Operations. เอกสารนี้ครอบคลุมการ deploy ระบบขึ้น production จริง
 > ทั้งสองเส้นทางที่โปรเจกต์นี้รองรับ ดูภาพรวมสถาปัตยกรรมที่ [README.md](../README.md) ก่อนอ่านต่อ
 
 ## สารบัญ
@@ -46,7 +46,7 @@
 | Disk | 20 GB | 40 GB+ (ขึ้นกับขนาดข้อมูล + จำนวน backup ที่เก็บ) |
 | OS | Linux ที่รัน Docker Engine ได้ (Ubuntu 22.04+ แนะนำ) | เดียวกัน |
 | Docker | Docker Engine 24+ พร้อม Docker Compose v2 (`docker compose`, ไม่ใช่ `docker-compose` แยก) | เดียวกัน |
-| Network | เปิด port 80 (และ 443 ถ้าจะทำ HTTPS — ดู [Known Limitations](../README.md#️-known-limitations)) | เดียวกัน |
+| Network | เปิด port 80 (redirect) และ 443 (HTTPS) | เดียวกัน |
 
 ---
 
@@ -59,11 +59,15 @@ cp config.example.sh config.sh   # ครั้งแรกเท่านั้
 ./01-build-push.sh                # build ทั้งสอง image แล้ว push ขึ้น ECR
 ```
 
+ตั้ง `CERTIFICATE_ARN` เป็น ACM certificate ที่ valid ใน region เดียวกับ ALB สคริปต์จะสร้าง HTTPS listener
+และ redirect HTTP → HTTPS; `DATABASE_URL`/`JWT_SECRET` ถูกเก็บใน Secrets Manager ไม่อยู่ plaintext ใน task definition
+
 ### ทาง B: Docker Compose
 ```bash
 cp .env.production.example .env.production   # ครั้งแรกเท่านั้น แล้วแก้ค่าทุกตัวที่มี CHANGE-ME
 docker compose -f docker-compose.prod.yml --env-file .env.production build
 ```
+กำหนด `TLS_CERT_PATH` และ `TLS_KEY_PATH` ให้ชี้ fullchain/private key ที่อ่านได้จาก Docker daemon
 Image ทั้งสองตัวถูก build จาก Dockerfile เดียวกับที่ CI ใช้ตรวจสอบ (`npm ci`, non-root, healthcheck)
 ดูรายละเอียดที่หัวข้อ "🐳 Production Docker Images" ใน README
 
@@ -86,7 +90,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 `-d` = รันเบื้องหลัง (detached) — `docker-entrypoint.sh` ของ `api` service รัน `prisma migrate deploy`
 ให้อัตโนมัติก่อน server จะเริ่มฟัง request จริง (เหมือนพฤติกรรมเดิมของ `docker-compose.yml` ตอน dev ทุกประการ)
 
-เปิดเบราว์เซอร์ไปที่ `http://<server-ip>` (หรือ `http://localhost` ถ้าทดสอบบนเครื่องตัวเอง)
+เปิดเบราว์เซอร์ไปที่ `https://<server-host>`; port 80 มีไว้ redirect ไป HTTPS เท่านั้น
 
 ---
 
@@ -138,20 +142,34 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec api np
 
 2. **Health endpoint**
    ```bash
-   curl -s http://<host>/api/health
+   curl -s https://<host>/api/health
    # ต้องได้ {"status":"ok","time":"...","database":"connected"}
    # ถ้าได้ status:"error"/database:"disconnected" แปลว่า backend ต่อฐานข้อมูลไม่ได้ — เช็ก DATABASE_URL
    ```
 
 3. **Swagger UI ยังเข้าถึงได้** (ยืนยันว่า backend serve request จริงได้ ไม่ใช่แค่ health endpoint เฉย ๆ)
    ```bash
-   curl -s -o /dev/null -w "%{http_code}" http://<host>/api/docs/
+   curl -s -o /dev/null -w "%{http_code}" https://<host>/docs
    # ควรได้ 200
    ```
 
-4. **Frontend โหลดได้ + route ทำงาน** — เปิดเบราว์เซอร์ที่ `http://<host>` ล็อกอินทดสอบ 1 ครั้ง
+4. **Frontend โหลดได้ + route ทำงาน** — เปิดเบราว์เซอร์ที่ `https://<host>` ล็อกอินทดสอบ 1 ครั้ง
 
 5. **ตรวจ log ว่าไม่มี error ผิดปกติ** — ดูหัวข้อ [Log Locations](#log-locations) ด้านล่าง
+
+---
+
+## Scheduler
+
+Reminder และ audit outbox retry ใช้ one-shot command เดียว ซึ่งต้องให้ platform เรียกเป็นระยะ (แนะนำทุก 5 นาที):
+
+```bash
+# Self-hosted cron/systemd timer
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T api npm run scheduler
+```
+
+บน AWS ให้ใช้ EventBridge Scheduler เรียก ECS task จาก API task definition โดย override command เป็น
+`["npm","run","scheduler"]` คำสั่ง idempotent และปลอดภัยเมื่อ trigger ซ้ำหรือทำงานเหลื่อมกัน
 
 ---
 
@@ -177,7 +195,8 @@ Backend log เป็น structured JSON (RC2: request logging) หนึ่ง�
 | Login ไม่ผ่านทั้งที่ credential ถูก | `JWT_SECRET` เปลี่ยนไปจากตอนที่ token เดิมถูกออก (เช่น restart แล้วสุ่มค่าใหม่โดยไม่ตั้งใจ) | ตรวจว่า `.env.production`/`config.sh` มี `JWT_SECRET` ค่าเดิมคงที่เสมอ ไม่สุ่มใหม่ทุกครั้งที่ deploy |
 | CORS error ใน browser console | `NODE_ENV=production` แต่ frontend เรียก API จากคนละ origin โดยไม่ได้ตั้ง `CORS_ORIGIN` | ตั้ง `CORS_ORIGIN` ให้ตรงกับ origin จริงของหน้าเว็บ (ปกติไม่เกิดกับ topology มาตรฐานของโปรเจกต์นี้ที่ web/api อยู่ origin เดียวกันผ่าน nginx — ดู README: CORS) |
 | Rate limit (`429`) ตอนทดสอบ login ซ้ำ ๆ | ตั้งใจ (RC2 — ป้องกัน brute-force) | รอตามเวลาที่ `AUTH_RATE_LIMIT_WINDOW_MS` กำหนด (default 15 นาที) หรือปรับค่าถ้าจำเป็นสำหรับ QA |
-| Export PDF/Excel timeout | รายงานมีข้อมูลเยอะเกินไป เกิน `proxy_read_timeout` ที่ nginx ตั้งไว้ (production: 120s) | ใช้ตัวกรองลดจำนวนแถวก่อน export หรือปรับ `proxy_read_timeout` ใน `nginx.prod.conf` |
+| Export PDF/Excel timeout | รายงานใหญ่หรือ format ใช้ CPU สูง แม้ RC2 จำกัด query ไว้ 25,000 แถว | ใช้ตัวกรองลดจำนวนแถวก่อน export หรือปรับ `proxy_read_timeout` ใน `nginx.prod.conf` |
+| ไม่มี due reminder/audit retry | ยังไม่ได้ตั้ง cron/EventBridge ให้เรียก scheduler | เรียก `npm run scheduler` และตรวจ log/ตาราง `AuditOutbox` |
 | `npm ci` fail ตอน build image | `package-lock.json` ไม่ตรงกับ `package.json` (ลืม commit lockfile หลังแก้ dependency) | รัน `npm install` ในเครื่อง dev เพื่ออัปเดต lockfile แล้ว commit ทั้งคู่ |
 
 ดูเพิ่มเติม: [docs/BACKUP_RECOVERY.md](BACKUP_RECOVERY.md), [docs/ROLLBACK.md](ROLLBACK.md),

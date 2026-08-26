@@ -30,13 +30,18 @@ test('Assignment validation rejects a create without any holder identity', () =>
   assert.ok(result.error.issues.some((issue) => issue.path[0] === 'employeeId'))
 })
 
-test('EMPLOYEE Assignment scope covers Employee email and legacy userId', () => {
+test('unlinked EMPLOYEE Assignment scope remains limited to legacy userId', () => {
   const account = { id: USER_ID, email: 'employee@example.com', role: 'EMPLOYEE' }
   const expected = assignmentHolderScopeForAccount(account)
   assert.deepEqual(scopeForRead(account), expected)
   assert.deepEqual(expected.OR[0], { userId: USER_ID })
-  assert.deepEqual(expected.OR[1].employee.email, { equals: account.email, mode: 'insensitive' })
+  assert.equal(expected.OR.length, 1)
   assert.deepEqual(scopeForRead({ ...account, role: 'ADMIN' }), {})
+})
+
+test('EMPLOYEE Assignment scope prefers the explicit Employee relation', () => {
+  const account = { id: USER_ID, email: 'employee@example.com', employeeId: EMPLOYEE_ID, role: 'EMPLOYEE' }
+  assert.deepEqual(scopeForRead(account), { OR: [{ userId: USER_ID }, { employeeId: EMPLOYEE_ID }] })
 })
 
 test('holder display prefers Employee and never crashes on unmapped legacy rows', () => {

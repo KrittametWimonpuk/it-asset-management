@@ -186,7 +186,7 @@ router.post('/', asyncHandler(async (req, res) => {
     ...TICKET_WITH_RELATIONS,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'OPEN', entityType: 'Ticket', entityId: ticket.id,
     description: `แจ้งปัญหาใหม่ ${ticket.ticketNumber} — ${ticket.title} (${ticket.asset.assetTag})`,
     newValues: { assetId, ...rest },
@@ -237,7 +237,7 @@ router.put('/:id', manageTickets, asyncHandler(async (req, res) => {
   const statusChanged = data.status !== undefined && data.status !== existing.status
   const action = statusChanged ? (STATUS_TO_AUDIT_ACTION[data.status] || 'UPDATE') : 'UPDATE'
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action, entityType: 'Ticket', entityId: ticket.id,
     description: `แก้ไข/มอบหมายตั๋ว ${ticket.ticketNumber} — ${ticket.title}`,
     oldValues: Object.fromEntries(Object.keys(data).map((k) => [k, existing[k]])),
@@ -269,7 +269,7 @@ router.post('/:id/resolve', manageTickets, asyncHandler(async (req, res) => {
     ...TICKET_WITH_RELATIONS,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'RESOLVE', entityType: 'Ticket', entityId: ticket.id,
     description: `แก้ไขปัญหาสำเร็จ ${ticket.ticketNumber} — ${ticket.title}`,
     oldValues: { status: existing.status, resolution: existing.resolution, resolvedAt: existing.resolvedAt },
@@ -301,7 +301,7 @@ router.post('/:id/close', manageTickets, asyncHandler(async (req, res) => {
     ...TICKET_WITH_RELATIONS,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'CLOSE', entityType: 'Ticket', entityId: ticket.id,
     description: `ปิดงาน ${ticket.ticketNumber} — ${ticket.title}`,
     oldValues: { status: existing.status, closedAt: existing.closedAt },

@@ -31,23 +31,9 @@ export default function EmployeeForm({ employee, departments, onSubmit, onCancel
   const titleId = 'employee-form-title'
   const isEdit = Boolean(employee)
 
-  useDialogDismiss(onCancel, busy)
+  useDialogDismiss(onCancel, busy, dialogRef)
 
   useEffect(() => { firstInputRef.current?.focus() }, [])
-
-  useEffect(() => {
-    function trapFocus(event) {
-      if (event.key !== 'Tab' || !dialogRef.current) return
-      const focusable = [...dialogRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')]
-      if (!focusable.length) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-    }
-    document.addEventListener('keydown', trapFocus)
-    return () => document.removeEventListener('keydown', trapFocus)
-  }, [])
 
   function update(name, value) {
     setForm((current) => ({ ...current, [name]: value }))

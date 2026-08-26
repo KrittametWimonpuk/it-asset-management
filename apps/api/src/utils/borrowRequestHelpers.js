@@ -22,13 +22,15 @@ export async function nextBorrowRequestNumber(client = prisma) {
 
 export function borrowRequestScopeForAccount(user) {
   if (user.role !== 'EMPLOYEE') return {}
-  return { employee: { email: { equals: user.email, mode: 'insensitive' } } }
+  return user.employeeId
+    ? { employeeId: user.employeeId }
+    : { id: '__unlinked_employee_account__' }
 }
 
 export async function activeEmployeeForAccount(user, client = prisma) {
   return client.employee.findFirst({
     where: {
-      email: { equals: user.email, mode: 'insensitive' },
+      id: user.employeeId || '__unlinked_employee_account__',
       status: 'ACTIVE', isActive: true, deletedAt: null,
     },
     select: { id: true, employeeCode: true, fullName: true },

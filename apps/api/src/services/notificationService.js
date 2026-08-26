@@ -8,8 +8,8 @@ export const NOTIFICATION_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL']
 const STAFF_ROLES = ['ADMIN', 'IT_STAFF']
 const DAY_MS = 24 * 60 * 60 * 1000
 
-function auditSent(notification, context = {}) {
-  logAudit({
+async function auditSent(notification, context = {}, client = prisma) {
+  await logAudit({
     ...context,
     action: 'NOTIFICATION_SENT',
     entityType: 'Notification',
@@ -20,21 +20,25 @@ function auditSent(notification, context = {}) {
       type: notification.type,
       priority: notification.priority,
     },
-  })
+  }, client)
 }
 
 // Notification is deliberately best-effort. A communication failure must never roll back a
 // completed lifecycle transaction. Callers may await this helper for deterministic tests, but it
 // always resolves with null instead of throwing.
-export async function createNotificationSafe({ userId, title, message, type, priority = 'NORMAL', auditContext = {} }) {
+export async function createNotificationSafe({ userId, title, message, type, priority = 'NORMAL', dedupeKey = null, auditContext = {} }) {
   if (!userId) return null
   try {
-    const notification = await prisma.notification.create({
-      data: { userId, title, message, type, priority },
+    const notification = await prisma.$transaction(async (tx) => {
+      const created = await tx.notification.create({
+        data: { userId, title, message, type, priority, dedupeKey },
+      })
+      await auditSent(created, auditContext, tx)
+      return created
     })
-    auditSent(notification, auditContext)
     return notification
   } catch (error) {
+    if (error?.code === 'P2002' && dedupeKey) return null
     console.error('สร้างการแจ้งเตือนไม่สำเร็จ:', error)
     return null
   }
@@ -50,16 +54,20 @@ export async function staffRecipientIds() {
 
 export async function userIdForEmployee(employeeId) {
   if (!employeeId) return null
+  const linked = await prisma.user.findUnique({ where: { employeeId }, select: { id: true } })
+  if (linked) return linked.id
+  // Legacy fallback for Employee rows that could not be linked safely during migration.
   const employee = await prisma.employee.findFirst({
     where: { id: employeeId, deletedAt: null, email: { not: null } },
     select: { email: true },
   })
   if (!employee?.email) return null
-  const user = await prisma.user.findFirst({
+  const users = await prisma.user.findMany({
     where: { email: { equals: employee.email, mode: 'insensitive' } },
     select: { id: true },
+    take: 2,
   })
-  return user?.id || null
+  return users.length === 1 ? users[0].id : null
 }
 
 export async function notifyStaff(payload) {
@@ -94,24 +102,19 @@ async function createReminderOnce(userId, assignment, overdue) {
     ? `${assignment.asset.name} เกินกำหนดคืนวันที่ ${dueDateLabel(assignment.expectedReturnDate)} กรุณาดำเนินการโดยเร็ว`
     : `${assignment.asset.name} มีกำหนดคืนวันที่ ${dueDateLabel(assignment.expectedReturnDate)} ภายใน 3 วัน`
 
-  // The requested schema intentionally has no source/dedupe column. Matching the stable title and
-  // message keeps reminder generation idempotent while preserving the exact data contract.
-  const existing = await prisma.notification.findFirst({
-    where: { userId, type: 'REMINDER', title, message },
-    select: { id: true },
-  })
-  if (existing) return null
+  const dueKey = assignment.expectedReturnDate.toISOString().slice(0, 10)
   return createNotificationSafe({
     userId,
     title,
     message,
     type: 'REMINDER',
     priority: overdue ? 'CRITICAL' : 'HIGH',
+    dedupeKey: `assignment:${assignment.id}:${overdue ? 'overdue' : 'upcoming'}:${dueKey}:user:${userId}`,
   })
 }
 
-// Beta 1 uses an on-access sweep instead of adding a scheduler process to the existing
-// architecture. It runs before notification and dashboard reads and is idempotent per due date.
+// Legacy compatibility entry point retained for callers outside this repository. Application
+// reads no longer invoke it; production reminder generation runs through runSchedulerTick().
 export async function generateDueRemindersForUser(user, now = new Date()) {
   try {
     const isEmployee = user.role === 'EMPLOYEE'
@@ -137,4 +140,44 @@ export async function generateDueRemindersForUser(user, now = new Date()) {
     console.error('สร้างการแจ้งเตือนกำหนดคืนไม่สำเร็จ:', error)
     return []
   }
+}
+
+// Scheduler-ready organization sweep. It does not depend on dashboard traffic and is safe to run
+// repeatedly or concurrently because Notification.dedupeKey is protected by a unique constraint.
+export async function generateDueReminders(now = new Date()) {
+  const dueLimit = new Date(now.getTime() + (3 * DAY_MS))
+  const [assignments, staff] = await Promise.all([
+    prisma.assignment.findMany({
+      where: {
+        returnedAt: null,
+        deletedAt: null,
+        expectedReturnDate: { not: null, lte: dueLimit },
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        userId: true,
+        expectedReturnDate: true,
+        asset: { select: { assetTag: true, name: true } },
+      },
+    }),
+    prisma.user.findMany({ where: { role: { in: STAFF_ROLES } }, select: { id: true } }),
+  ])
+
+  const employeeIds = [...new Set(assignments.map((item) => item.employeeId).filter(Boolean))]
+  const linkedUsers = employeeIds.length
+    ? await prisma.user.findMany({ where: { employeeId: { in: employeeIds } }, select: { id: true, employeeId: true } })
+    : []
+  const userByEmployee = new Map(linkedUsers.map((item) => [item.employeeId, item.id]))
+  const jobs = []
+  for (const assignment of assignments) {
+    const overdue = assignment.expectedReturnDate < now
+    const employeeUserId = userByEmployee.get(assignment.employeeId) || assignment.userId
+    if (employeeUserId) jobs.push(createReminderOnce(employeeUserId, assignment, overdue))
+    if (overdue) {
+      for (const account of staff) jobs.push(createReminderOnce(account.id, assignment, true))
+    }
+  }
+  const results = await Promise.all(jobs)
+  return { checked: assignments.length, created: results.filter(Boolean).length }
 }
