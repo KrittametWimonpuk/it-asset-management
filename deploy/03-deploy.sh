@@ -60,4 +60,4 @@ aws_ ecs wait services-stable --cluster "$CLUSTER" \
 rm -rf "$TMP"
 echo ""
 ok "Deploy สำเร็จ! เปิดเว็บได้ที่:"
-echo "   👉  http://${ALB_DNS}"
+echo "   👉  https://${ALB_DNS}"

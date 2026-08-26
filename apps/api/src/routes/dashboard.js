@@ -18,7 +18,13 @@ import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ok } from '../utils/response.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { ACTIVE_ASSIGNMENT_WHERE } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  EMPLOYEE_SUMMARY_SELECT,
+  LEGACY_HOLDER_SELECT,
+  assignmentHolderName,
+  assignmentHolderScopeForAccount,
+} from '../utils/assignmentHelpers.js'
 import { ASSET_STATUSES } from './assets.js'
 import { ASSIGNMENT_STATUSES } from './assignments.js'
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './tickets.js'
@@ -38,6 +44,8 @@ const WARRANTY_WARNING_DAYS = 30
 // ASSIGNMENT_STATUS_OPTIONS) เพื่อให้ chart array ที่ส่งกลับไปพร้อมใช้แสดงผลได้ทันทีโดยไม่ต้อง map เพิ่ม
 const ASSET_STATUS_LABELS = {
   AVAILABLE: 'พร้อมใช้งาน',
+  LOST: 'สูญหาย',
+  MAINTENANCE: 'รอตรวจสอบ/ซ่อมบำรุง',
   IN_USE: 'กำลังใช้งาน',
   REPAIR: 'ซ่อมบำรุง',
   DISPOSED: 'เลิกใช้งาน',
@@ -126,12 +134,12 @@ function mergeRecentActivities(assignments, returns, newAssets, limit) {
   const items = [
     ...assignments.map((a) => ({
       type: 'ASSIGNMENT',
-      message: `มอบหมาย ${a.asset.assetTag} — ${a.asset.name} ให้ ${a.user.name || a.user.email}`,
+      message: `มอบหมาย ${a.asset.assetTag} — ${a.asset.name} ให้ ${assignmentHolderName(a)}`,
       at: a.assignedAt,
     })),
     ...returns.map((a) => ({
       type: 'RETURN',
-      message: `รับคืน ${a.asset.assetTag} — ${a.asset.name} จาก ${a.user.name || a.user.email}`,
+      message: `รับคืน ${a.asset.assetTag} — ${a.asset.name} จาก ${assignmentHolderName(a)}`,
       at: a.returnedAt,
     })),
     ...newAssets.map((a) => ({
@@ -145,7 +153,7 @@ function mergeRecentActivities(assignments, returns, newAssets, limit) {
 }
 
 // ---- ภาพรวมทั้งองค์กร (ADMIN / IT_STAFF) ----
-async function buildOrgWideDashboard() {
+async function buildOrgWideDashboard(user) {
   const now = new Date()
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
   const notDeleted = { deletedAt: null }
@@ -177,6 +185,17 @@ async function buildOrgWideDashboard() {
     closedToday,
     recentTickets,
     recentAuditLogRows,
+    pendingBorrowRequests,
+    approvedBorrowRequestsToday,
+    rejectedBorrowRequestsToday,
+    approvalDurationRows,
+    pendingInspections,
+    completedReturnsToday,
+    damagedReturns,
+    lostAssets,
+    returnDurationRows,
+    unreadNotifications,
+    overdueAssets,
   ] = await Promise.all([
     // นับ asset แยกตามสถานะในคำสั่งเดียว (ใช้ทั้งการ์ดสรุปและกราฟ "Assets by Status")
     prisma.asset.groupBy({ by: ['status'], where: notDeleted, _count: true }),
@@ -211,13 +230,21 @@ async function buildOrgWideDashboard() {
       where: notDeleted,
       orderBy: { assignedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
-      include: { asset: { select: { assetTag: true, name: true } }, user: { select: { name: true, email: true } } },
+      include: {
+        asset: { select: { assetTag: true, name: true } },
+        employee: { select: EMPLOYEE_SUMMARY_SELECT },
+        user: { select: LEGACY_HOLDER_SELECT },
+      },
     }),
     prisma.assignment.findMany({
       where: { ...notDeleted, returnedAt: { not: null } },
       orderBy: { returnedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
-      include: { asset: { select: { assetTag: true, name: true } }, user: { select: { name: true, email: true } } },
+      include: {
+        asset: { select: { assetTag: true, name: true } },
+        employee: { select: EMPLOYEE_SUMMARY_SELECT },
+        user: { select: LEGACY_HOLDER_SELECT },
+      },
     }),
     prisma.asset.findMany({
       where: notDeleted,
@@ -240,6 +267,25 @@ async function buildOrgWideDashboard() {
     // Milestone 9 — เหตุการณ์ audit log ล่าสุด (ยังไม่รู้ชื่อผู้ทำรายการตรงนี้ — attachPerformer join ทีหลัง
     // นอก Promise.all เพราะต้องรู้ก่อนว่ามี performedById อะไรบ้างในหน้านี้)
     prisma.auditLog.findMany({ orderBy: { performedAt: 'desc' }, take: RECENT_AUDIT_LOGS_LIMIT }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, status: 'PENDING' } }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, approvedAt: todayRange(now) } }),
+    prisma.borrowRequest.count({ where: { ...notDeleted, status: 'REJECTED', updatedAt: todayRange(now) } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("approvedAt" - "requestedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "BorrowRequest"
+      WHERE "deletedAt" IS NULL AND "approvedAt" IS NOT NULL
+    `,
+    prisma.assignment.count({ where: { ...notDeleted, returnStatus: 'PENDING_INSPECTION', returnedAt: null } }),
+    prisma.assignment.count({ where: { ...notDeleted, returnedAt: todayRange(now) } }),
+    prisma.assignment.count({ where: { ...notDeleted, status: 'DAMAGED' } }),
+    prisma.assignment.count({ where: { ...notDeleted, status: 'LOST' } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("returnedAt" - "returnStartedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "Assignment"
+      WHERE "deletedAt" IS NULL AND "returnedAt" IS NOT NULL AND "returnStartedAt" IS NOT NULL
+    `,
+    prisma.notification.count({ where: { userId: user.id, isRead: false, deletedAt: null } }),
+    prisma.assignment.count({ where: { ...notDeleted, returnedAt: null, expectedReturnDate: { lt: now } } }),
   ])
 
   const recentAuditLogs = await attachPerformer(recentAuditLogRows)
@@ -318,6 +364,24 @@ async function buildOrgWideDashboard() {
       resolvedToday,
       closedToday,
     },
+    borrowRequests: {
+      pending: pendingBorrowRequests,
+      approvedToday: approvedBorrowRequestsToday,
+      rejectedToday: rejectedBorrowRequestsToday,
+      averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
+    },
+    returns: {
+      pendingInspections,
+      completedToday: completedReturnsToday,
+      damaged: damagedReturns,
+      lost: lostAssets,
+      averageProcessingTimeHours: Math.round(Number(returnDurationRows[0]?.averageHours || 0) * 10) / 10,
+    },
+    notifications: {
+      unread: unreadNotifications,
+      overdueAssets,
+      pendingActions: pendingBorrowRequests + pendingInspections,
+    },
     charts: {
       assetsByCategory: assetsByCategoryGroups.map((g) => ({
         label: categoryNameById[g.categoryId] || NOT_SET_LABEL,
@@ -355,11 +419,17 @@ async function buildOrgWideDashboard() {
 }
 
 // ---- เฉพาะของตัวเอง (EMPLOYEE) — ไม่มีสถิติภาพรวมองค์กรเลย ----
-async function buildEmployeeDashboard(userId) {
+async function buildEmployeeDashboard(user) {
   const now = new Date()
   const in30Days = new Date(now.getTime() + WARRANTY_WARNING_DAYS * 24 * 60 * 60 * 1000)
+  const userId = user.id
+  const holderScope = assignmentHolderScopeForAccount(user)
+  const borrowRequestScope = user.employeeId
+    ? { employeeId: user.employeeId }
+    : { id: '__unlinked_employee_account__' }
 
   const [
+    currentEmployee,
     activeAssignments,
     assignmentStatusGroups,
     recentOwn,
@@ -367,14 +437,32 @@ async function buildEmployeeDashboard(userId) {
     resolvedToday,
     closedToday,
     recentTickets,
+    pendingBorrowRequests,
+    approvedBorrowRequestsToday,
+    rejectedBorrowRequestsToday,
+    approvalDurationRows,
+    pendingInspections,
+    completedReturnsToday,
+    damagedReturns,
+    lostAssets,
+    returnDurations,
+    unreadNotifications,
+    overdueAssets,
   ] = await Promise.all([
+    prisma.employee.findFirst({
+      where: {
+        id: user.employeeId || '__unlinked_employee_account__',
+        deletedAt: null,
+      },
+      select: EMPLOYEE_SUMMARY_SELECT,
+    }),
     prisma.assignment.findMany({
-      where: { userId, ...ACTIVE_ASSIGNMENT_WHERE },
+      where: { ...holderScope, ...ACTIVE_ASSIGNMENT_WHERE },
       include: { asset: { select: { warrantyExpiry: true } } },
     }),
-    prisma.assignment.groupBy({ by: ['status'], where: { userId, deletedAt: null }, _count: true }),
+    prisma.assignment.groupBy({ by: ['status'], where: { ...holderScope, deletedAt: null }, _count: true }),
     prisma.assignment.findMany({
-      where: { userId, deletedAt: null },
+      where: { ...holderScope, deletedAt: null },
       orderBy: { assignedAt: 'desc' },
       take: RECENT_ACTIVITIES_LIMIT,
       include: { asset: { select: { assetTag: true, name: true } } },
@@ -389,6 +477,27 @@ async function buildEmployeeDashboard(userId) {
       take: RECENT_ACTIVITIES_LIMIT,
       select: RECENT_TICKET_SELECT,
     }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'PENDING' } }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, approvedAt: todayRange(now) } }),
+    prisma.borrowRequest.count({ where: { ...borrowRequestScope, deletedAt: null, status: 'REJECTED', updatedAt: todayRange(now) } }),
+    prisma.$queryRaw`
+      SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (br."approvedAt" - br."requestedAt")) / 3600), 0)::double precision AS "averageHours"
+      FROM "BorrowRequest" br
+      JOIN "Employee" employee ON employee."id" = br."employeeId"
+      WHERE br."deletedAt" IS NULL
+        AND br."approvedAt" IS NOT NULL
+        AND LOWER(employee."email") = LOWER(${user.email})
+    `,
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnStatus: 'PENDING_INSPECTION', returnedAt: null } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnedAt: todayRange(now) } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, status: 'DAMAGED' } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, status: 'LOST' } }),
+    prisma.assignment.findMany({
+      where: { ...holderScope, deletedAt: null, returnedAt: { not: null }, returnStartedAt: { not: null } },
+      select: { returnedAt: true, returnStartedAt: true },
+    }),
+    prisma.notification.count({ where: { userId, isRead: false, deletedAt: null } }),
+    prisma.assignment.count({ where: { ...holderScope, deletedAt: null, returnedAt: null, expectedReturnDate: { lt: now } } }),
   ])
 
   // จำนวน asset ที่ถือครองอยู่มักมีไม่กี่ชิ้นต่อคน — คำนวณ warranty bucket ในหน่วยความจำได้โดยไม่กระทบ performance
@@ -409,6 +518,7 @@ async function buildEmployeeDashboard(userId) {
   const ticketStatusCounts = countByGroupField(ticketStatusGroups, TICKET_STATUSES, 'status')
 
   return {
+    currentEmployee,
     summary: {
       totalAssets: totalAssignedAssets,
       assignedAssets: totalAssignedAssets,
@@ -440,6 +550,26 @@ async function buildEmployeeDashboard(userId) {
       resolvedToday,
       closedToday,
     },
+    borrowRequests: {
+      pending: pendingBorrowRequests,
+      approvedToday: approvedBorrowRequestsToday,
+      rejectedToday: rejectedBorrowRequestsToday,
+      averageApprovalTimeHours: Math.round(Number(approvalDurationRows[0]?.averageHours || 0) * 10) / 10,
+    },
+    returns: {
+      pendingInspections,
+      completedToday: completedReturnsToday,
+      damaged: damagedReturns,
+      lost: lostAssets,
+      averageProcessingTimeHours: returnDurations.length
+        ? Math.round((returnDurations.reduce((sum, item) => sum + ((item.returnedAt - item.returnStartedAt) / 3600000), 0) / returnDurations.length) * 10) / 10
+        : 0,
+    },
+    notifications: {
+      unread: unreadNotifications,
+      overdueAssets,
+      pendingActions: pendingBorrowRequests + pendingInspections,
+    },
     charts: {
       assetsByCategory: [],
       assetsByDepartment: [],
@@ -470,8 +600,8 @@ async function buildEmployeeDashboard(userId) {
 
 router.get('/', asyncHandler(async (req, res) => {
   const data = req.user.role === 'EMPLOYEE'
-    ? await buildEmployeeDashboard(req.user.id)
-    : await buildOrgWideDashboard()
+    ? await buildEmployeeDashboard(req.user)
+    : await buildOrgWideDashboard(req.user)
   ok(res, data)
 }))
 

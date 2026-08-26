@@ -43,6 +43,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: ${NODE_ENV}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       CORS_ORIGIN: ${CORS_ORIGIN}
       AUTH_RATE_LIMIT_WINDOW_MS: ${AUTH_RATE_LIMIT_WINDOW_MS}
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX}
@@ -62,12 +63,16 @@ services:
     environment:
       # ให้ nginx รู้ว่าจะ proxy /api ไปที่ service ไหน (ดู apps/web/nginx.prod.conf)
       API_UPSTREAM: "api:4000"
+      API_UPSTREAM_SCHEME: "http"
     volumes:
       # ทับ config เดิมที่ build เข้า image ด้วย production config (gzip/cache/security header/HSTS) —
       # read-only กันไม่ให้ container แก้ไฟล์นี้เองได้
       - ./apps/web/nginx.prod.conf:/etc/nginx/templates/default.conf.template:ro
+      - ${TLS_CERT_PATH}:/etc/nginx/tls/fullchain.pem:ro
+      - ${TLS_KEY_PATH}:/etc/nginx/tls/privkey.pem:ro
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       - api
     networks:

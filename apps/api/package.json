@@ -1,16 +1,18 @@
 {
   "name": "starter-api",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Backend API — Express + Prisma + PostgreSQL",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "scheduler": "node src/jobs/runScheduler.js",
     "generate": "prisma generate",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "seed": "node prisma/seed.js",
     "lint": "eslint .",
+    "test": "node --test",
     "validate": "prisma validate",
     "build": "prisma generate"
   },

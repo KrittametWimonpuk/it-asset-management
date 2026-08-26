@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Clock3,
   Edit3,
+  Eye,
   History,
   Inbox,
   PackageCheck,
@@ -26,10 +27,11 @@ import { api } from '../api.js'
 import AssignmentForm from '../components/AssignmentForm.jsx'
 import ReturnAssignmentForm, { ASSIGNMENT_STATUS_OPTIONS } from '../components/ReturnAssignmentForm.jsx'
 import { formatDate } from '../utils/format.js'
+import { assignmentHolderCode, assignmentHolderDepartment, assignmentHolderName, assignmentHolderPosition } from '../utils/assignmentHolder.js'
 import './Assignments.css'
 
 const PAGE_SIZE = 20
-const EMPTY_FILTERS = { status: '', assetId: '', userId: '' }
+const EMPTY_FILTERS = { status: '', assetId: '', employeeId: '' }
 
 const SORT_COLUMNS = [
   { field: 'assignedAt', label: 'วันที่มอบหมาย' },
@@ -44,8 +46,24 @@ const STATUS_META = {
   DAMAGED: { label: 'เสียหาย', icon: Wrench, tone: 'amber' },
 }
 
+const RETURN_WORKFLOW_META = {
+  PENDING_INSPECTION: { label: 'รอตรวจรับ', tone: 'amber', icon: Clock3 },
+  PASSED: { label: 'ผ่านการตรวจ', tone: 'green', icon: CheckCircle2 },
+  FAILED: { label: 'ไม่ผ่านการตรวจ', tone: 'red', icon: AlertTriangle },
+  RETURNED: { label: 'คืนเสร็จสมบูรณ์', tone: 'green', icon: CheckCircle2 },
+  DAMAGED: { label: 'รับคืนแบบชำรุด', tone: 'amber', icon: Wrench },
+  LOST: { label: 'สูญหาย', tone: 'red', icon: AlertTriangle },
+}
+
 function statusLabel(status) {
   return ASSIGNMENT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status
+}
+
+function ReturnWorkflowBadge({ status }) {
+  const config = RETURN_WORKFLOW_META[status]
+  if (!config) return null
+  const Icon = config.icon
+  return <span className={`assignment-return-badge tone-${config.tone}`}><Icon size={12} aria-hidden="true" />{config.label}</span>
 }
 
 function pagesFor(current, total) {
@@ -82,7 +100,7 @@ function SortHeader({ field, label, sortBy, sortOrder, refreshing, onSort }) {
   )
 }
 
-export default function Assignments({ role, initialAssetId }) {
+export default function Assignments({ role, user, initialAssetId }) {
   const canManage = role === 'ADMIN' || role === 'IT_STAFF'
   const [assignments, setAssignments] = useState([])
   const [meta, setMeta] = useState({ page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 })
@@ -99,17 +117,17 @@ export default function Assignments({ role, initialAssetId }) {
   const [editingAssignment, setEditingAssignment] = useState(null)
   const [returnTarget, setReturnTarget] = useState(null)
   const [assetOptions, setAssetOptions] = useState(null)
-  const [userOptions, setUserOptions] = useState(null)
+  const [employeeOptions, setEmployeeOptions] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     const requests = [api.listAssets({ pageSize: 100, sortBy: 'assetTag', sortOrder: 'asc' })]
-    if (canManage) requests.push(api.users.list({ pageSize: 100, sortBy: 'name', sortOrder: 'asc' }))
+    if (canManage) requests.push(api.employees.list({ pageSize: 100, sortBy: 'employeeCode', sortOrder: 'asc', status: 'ACTIVE', isActive: true }))
     Promise.all(requests)
-      .then(([assetsResponse, usersResponse]) => {
+      .then(([assetsResponse, employeesResponse]) => {
         if (cancelled) return
         setAssetOptions(assetsResponse.items)
-        if (usersResponse) setUserOptions(usersResponse.items)
+        if (employeesResponse) setEmployeeOptions(employeesResponse.items)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -195,10 +213,18 @@ export default function Assignments({ role, initialAssetId }) {
     load()
   }
 
-  async function handleReturn(payload) {
-    await api.assignments.return(returnTarget.id, payload)
-    setReturnTarget(null)
-    load()
+  async function handleReturnStart(payload) {
+    const updated = await api.assignments.startReturn(returnTarget.id, payload)
+    setReturnTarget(updated)
+    await load()
+    return updated
+  }
+
+  async function handleReturnInspection(payload) {
+    const updated = await api.assignments.inspectReturn(returnTarget.id, payload)
+    setReturnTarget(updated)
+    await load()
+    return updated
   }
 
   return (
@@ -241,9 +267,9 @@ export default function Assignments({ role, initialAssetId }) {
         {canManage && (
           <div className="assignment-filter-field">
             <label htmlFor="assignment-filter-holder">ผู้ถือครอง</label>
-            <select id="assignment-filter-holder" value={filters.userId} onChange={(event) => updateFilter('userId', event.target.value)} disabled={!userOptions}>
+            <select id="assignment-filter-holder" value={filters.employeeId} onChange={(event) => updateFilter('employeeId', event.target.value)} disabled={!employeeOptions}>
               <option value="">ทุกคน</option>
-              {userOptions?.map((user) => <option key={user.id} value={user.id}>{user.name || user.email}</option>)}
+              {employeeOptions?.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeCode} — {employee.fullName}</option>)}
             </select>
           </div>
         )}
@@ -289,8 +315,8 @@ export default function Assignments({ role, initialAssetId }) {
                 <div className="current-holder-list">
                   {currentHolders.map((assignment) => (
                     <article className="current-holder-item" key={assignment.id}>
-                      <span className="holder-avatar">{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span>
-                      <div className="holder-copy"><strong>{assignment.user?.name || assignment.user?.email}</strong><span>{assignment.asset?.assetTag} · {assignment.asset?.name}</span></div>
+                      <span className="holder-avatar">{assignmentHolderName(assignment).charAt(0).toUpperCase()}</span>
+                      <div className="holder-copy"><strong>{assignmentHolderName(assignment)}</strong><span>{assignmentHolderCode(assignment)} · {assignmentHolderDepartment(assignment)} · {assignmentHolderPosition(assignment)}</span></div>
                       <time><Clock3 size={13} /> {formatDate(assignment.assignedAt)}</time>
                     </article>
                   ))}
@@ -309,7 +335,7 @@ export default function Assignments({ role, initialAssetId }) {
                   return (
                     <li className={`tone-${config.tone}`} key={assignment.id}>
                       <span className="timeline-marker"><TimelineIcon size={14} /></span>
-                      <div><strong>{assignment.asset?.assetTag} · {statusLabel(assignment.status)}</strong><p>{assignment.user?.name || assignment.user?.email} · {assignment.asset?.name}</p></div>
+                      <div><strong>{assignment.asset?.assetTag} · {statusLabel(assignment.status)}</strong><p>{assignmentHolderName(assignment)} · {assignmentHolderCode(assignment)} · {assignment.asset?.name}</p></div>
                       <time>{formatDate(assignment.returnedAt || assignment.assignedAt)}</time>
                     </li>
                   )
@@ -340,13 +366,13 @@ export default function Assignments({ role, initialAssetId }) {
                     return (
                       <tr key={assignment.id}>
                         <td><div className="assignment-asset-cell"><span><Boxes size={17} /></span><div><strong>{assignment.asset?.assetTag}</strong><small>{assignment.asset?.name}</small></div></div></td>
-                        <td><div className="assignment-holder-cell"><span>{(assignment.user?.name || assignment.user?.email || '?').charAt(0).toUpperCase()}</span><div><strong>{assignment.user?.name || assignment.user?.email}</strong><small>{assignment.status === 'ASSIGNED' ? 'ผู้ถือครองปัจจุบัน' : 'ผู้ถือครองในอดีต'}</small></div></div></td>
+                        <td><div className="assignment-holder-cell"><span>{assignmentHolderName(assignment).charAt(0).toUpperCase()}</span><div><strong>{assignmentHolderName(assignment)}</strong><small>{assignmentHolderCode(assignment)} · {assignmentHolderDepartment(assignment)} · {assignmentHolderPosition(assignment)} · {assignment.status === 'ASSIGNED' ? 'ผู้ถือครองปัจจุบัน' : 'ผู้ถือครองในอดีต'}</small></div></div></td>
                         <td>{assignment.assignedBy?.name || assignment.assignedBy?.email}</td>
                         <td>{formatDate(assignment.assignedAt)}</td>
                         <td>{assignment.returnedAt ? formatDate(assignment.returnedAt) : <span className="assignment-muted">—</span>}</td>
-                        <td><span className={`assignment-status-badge tone-${config.tone}`}><StatusIcon size={13} />{statusLabel(assignment.status)}</span></td>
+                        <td><span className="assignment-status-stack"><span className={`assignment-status-badge tone-${config.tone}`}><StatusIcon size={13} />{statusLabel(assignment.status)}</span><ReturnWorkflowBadge status={assignment.returnStatus} /></span></td>
                         <td>{assignment.expectedReturnDate ? formatDate(assignment.expectedReturnDate) : <span className="assignment-muted">ไม่ระบุ</span>}</td>
-                        {canManage && <td className="assignment-row-actions">{assignment.status === 'ASSIGNED' ? <><button type="button" onClick={() => openEdit(assignment)} title="แก้ไข" aria-label={`แก้ไข ${assignment.asset?.assetTag}`}><Edit3 size={16} /></button><button type="button" className="return-action" onClick={() => setReturnTarget(assignment)} title="รับคืน" aria-label={`รับคืน ${assignment.asset?.assetTag}`}><Undo2 size={16} /></button></> : <span>—</span>}</td>}
+                        {canManage && <td className="assignment-row-actions">{assignment.status === 'ASSIGNED' ? <><button type="button" onClick={() => openEdit(assignment)} title="แก้ไข" aria-label={`แก้ไข ${assignment.asset?.assetTag}`}><Edit3 size={16} /></button><button type="button" className="return-action" onClick={() => setReturnTarget(assignment)} title={assignment.returnStatus === 'PENDING_INSPECTION' ? 'ตรวจรับคืน' : 'เริ่มรับคืน'} aria-label={`${assignment.returnStatus === 'PENDING_INSPECTION' ? 'ตรวจรับคืน' : 'เริ่มรับคืน'} ${assignment.asset?.assetTag}`}><Undo2 size={16} /></button></> : assignment.returnEvents?.length ? <button type="button" onClick={() => setReturnTarget(assignment)} title="ดูประวัติรับคืน" aria-label={`ดูประวัติรับคืน ${assignment.asset?.assetTag}`}><Eye size={16} /></button> : <span>—</span>}</td>}
                       </tr>
                     )
                   })}
@@ -366,7 +392,7 @@ export default function Assignments({ role, initialAssetId }) {
       )}
 
       {formOpen && <AssignmentForm assignment={editingAssignment} onSubmit={handleSubmit} onCancel={() => { setFormOpen(false); setEditingAssignment(null) }} />}
-      {returnTarget && <ReturnAssignmentForm assignment={returnTarget} onSubmit={handleReturn} onCancel={() => setReturnTarget(null)} />}
+      {returnTarget && <ReturnAssignmentForm assignment={returnTarget} operator={user} onStart={handleReturnStart} onInspect={handleReturnInspection} onCancel={() => setReturnTarget(null)} />}
     </div>
   )
 }

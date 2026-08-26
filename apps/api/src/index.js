@@ -22,9 +22,20 @@ import dashboardRoutes from './routes/dashboard.js'
 import ticketRoutes from './routes/tickets.js'
 import reportRoutes from './routes/reports.js'
 import auditRoutes from './routes/audit.js'
+import employeeRoutes from './routes/employees.js'
+import borrowRequestRoutes from './routes/borrowRequests.js'
+import notificationRoutes from './routes/notifications.js'
 import { fail } from './utils/response.js'
 
 const app = express()
+
+// RC2: honor exactly one reverse-proxy hop in production (ALB/Nginx) so req.ip and the auth rate
+// limiter use the real client address. Development remains direct unless explicitly configured.
+const trustProxySetting = process.env.TRUST_PROXY
+const trustProxy = trustProxySetting === undefined
+  ? (process.env.NODE_ENV === 'production' ? 1 : false)
+  : (/^\d+$/.test(trustProxySetting) ? Number(trustProxySetting) : trustProxySetting === 'true')
+app.set('trust proxy', trustProxy)
 
 // ---- RC2: Production Hardening ----
 // helmet ใส่ security header มาตรฐาน (X-Content-Type-Options, X-Frame-Options, HSTS ฯลฯ) ให้อัตโนมัติ
@@ -73,6 +84,9 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/tickets', ticketRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/employees', employeeRoutes)
+app.use('/api/borrow-requests', borrowRequestRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 // ---- ดักกรณีเรียก path ที่ไม่มี ----
 app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))
@@ -82,6 +96,10 @@ app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))
 // แปลง error ที่รู้จัก (เช่น unique constraint ชนกันตอน request พร้อมกันหลาย ๆ อัน) ให้เป็นข้อความที่เป็นมิตรแทน
 app.use((err, _req, res, _next) => {
   console.error(err)
+
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return fail(res, 400, 'JSON ใน request body ไม่ถูกต้อง')
+  }
 
   // P2002 = unique constraint ชนกัน (กรณี race condition ที่หลุดผ่านการเช็กล่วงหน้าไปได้)
   if (err?.code === 'P2002') {

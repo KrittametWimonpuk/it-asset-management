@@ -545,3 +545,4 @@
 @media (prefers-reduced-motion: reduce) {
   .assets-advanced-filters, .assets-refreshing svg, .assets-shimmer::after { animation: none; }
 }
+.assets-holder-summary strong,.assets-holder-summary small{display:block}.assets-holder-summary small{max-width:260px;overflow:hidden;color:var(--color-text-secondary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}

@@ -33,7 +33,12 @@ import {
   optionalText, optionalDate, optionalIPv4, optionalMac,
   optionalCurrency, optionalNonNegativeNumber, optionalEnum,
 } from '../utils/zodHelpers.js'
-import { ACTIVE_ASSIGNMENT_WHERE, CURRENT_ASSIGNMENT_INCLUDE, shapeAssetWithAssignment } from '../utils/assignmentHelpers.js'
+import {
+  ACTIVE_ASSIGNMENT_WHERE,
+  CURRENT_ASSIGNMENT_INCLUDE,
+  assignmentHolderScopeForAccount,
+  shapeAssetWithAssignment,
+} from '../utils/assignmentHelpers.js'
 import { ASSET_TICKETS_INCLUDE, summarizeAssetTickets } from '../utils/ticketHelpers.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
 
@@ -47,7 +52,7 @@ const manageAssets = requireRole('ADMIN', 'IT_STAFF')
 
 // สถานะที่อนุญาต — ต้องตรงกับ enum AssetStatus ใน schema.prisma
 // export ไว้ให้ routes/dashboard.js ใช้ร่วมกัน (สร้าง breakdown ให้ครบทุกสถานะแม้บางสถานะจะนับได้ 0)
-export const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED']
+export const ASSET_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED', 'LOST', 'MAINTENANCE']
 
 // สภาพครุภัณฑ์ที่อนุญาต — ต้องตรงกับ enum AssetCondition ใน schema.prisma
 // export ไว้ให้ routes/assignments.js ใช้ร่วมกัน (conditionBefore/conditionAfter ใช้ enum เดียวกัน)
@@ -133,7 +138,7 @@ function shapeAsset(asset) {
 export function scopeForRead(user) {
   const where = { deletedAt: null }
   if (user.role === 'EMPLOYEE') {
-    where.assignments = { some: { userId: user.id, ...ACTIVE_ASSIGNMENT_WHERE } }
+    where.assignments = { some: { ...ACTIVE_ASSIGNMENT_WHERE, ...assignmentHolderScopeForAccount(user) } }
   }
   return where
 }
@@ -273,7 +278,7 @@ router.post('/', manageAssets, asyncHandler(async (req, res) => {
     ...WITH_RELATIONS,
   })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'CREATE', entityType: 'Asset', entityId: asset.id,
     description: `สร้างครุภัณฑ์ ${asset.assetTag} — ${asset.name}`,
     newValues: parsed.data,
@@ -330,7 +335,7 @@ router.put('/:id', manageAssets, asyncHandler(async (req, res) => {
 
   const asset = await prisma.asset.findUnique({ where: { id: req.params.id }, ...WITH_RELATIONS })
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'UPDATE', entityType: 'Asset', entityId: req.params.id,
     description: `แก้ไขครุภัณฑ์ ${asset.assetTag} — ${asset.name}`,
     oldValues: existing, newValues: parsed.data,
@@ -363,7 +368,7 @@ router.delete('/:id', manageAssets, asyncHandler(async (req, res) => {
     return fail(res, 404, NOT_FOUND_MESSAGE)
   }
 
-  logAudit({
+  await logAudit({
     ...auditContext(req), action: 'DELETE', entityType: 'Asset', entityId: req.params.id,
     description: `ลบครุภัณฑ์ (soft delete) ${existing?.assetTag} — ${existing?.name}`,
     oldValues: existing,

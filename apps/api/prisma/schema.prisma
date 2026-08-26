@@ -30,6 +30,13 @@ model User {
   // Milestone 7: ใบแจ้งซ่อม/ปัญหา — แยก 2 ความสัมพันธ์เพราะ Ticket ชี้มาที่ User สองทางเช่นกัน
   ticketsReported Ticket[] @relation("TicketReportedBy") // ตั๋วที่ตัวเองเป็นผู้แจ้ง
   ticketsAssigned Ticket[] @relation("TicketAssignedTo") // ตั๋วที่ตัวเองถูกมอบหมายให้ดูแล (เฉพาะ ADMIN/IT_STAFF)
+  approvedBorrowRequests BorrowRequest[] @relation("BorrowRequestApprovedBy")
+  borrowRequestApprovalActions BorrowRequestApproval[] @relation("BorrowRequestApprovalActor")
+  assignmentsInspected Assignment[] @relation("AssignmentInspector")
+  assignmentReturnEvents AssignmentReturnEvent[] @relation("AssignmentReturnActor")
+  notifications Notification[]
+  employeeId    String?   @unique
+  employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 }
 
 // สิทธิ์การใช้งานของผู้ใช้ — Milestone 4 (RBAC)
@@ -45,6 +52,8 @@ enum AssetStatus {
   IN_USE // กำลังถูกใช้งานอยู่
   REPAIR // อยู่ระหว่างซ่อม
   DISPOSED // เลิกใช้งาน / ตัดจำหน่ายแล้ว
+  LOST // สูญหายระหว่างการถือครอง
+  MAINTENANCE // รอตรวจสอบ/ซ่อมบำรุงหลังรับคืนแบบชำรุด
 }
 
 // สภาพครุภัณฑ์ทางกายภาพ — เพิ่มใน Milestone 3 (Asset Details)
@@ -100,7 +109,87 @@ model Department {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   assets      Asset[]
+  employees   Employee[]
 
+  @@index([deletedAt])
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  BORROW_REQUEST
+  APPROVAL
+  ASSIGNMENT
+  RETURN
+  REMINDER
+  SYSTEM
+}
+
+// v1.1.0 Beta 1 — operational communication scoped to the recipient account.
+// Notifications are never hard-deleted; DELETE only sets deletedAt.
+model Notification {
+  id        String               @id @default(uuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String
+  message   String
+  type      NotificationType
+  priority  NotificationPriority @default(NORMAL)
+  isRead    Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  readAt    DateTime?
+  deletedAt DateTime?
+  dedupeKey String?              @unique
+
+  @@index([userId, isRead, deletedAt, createdAt])
+  @@index([type, priority, createdAt])
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// v1.1.0 Phase 1 — Employee Management Foundation
+//
+// User เป็นบัญชี authentication/RBAC และเชื่อม Employee แบบ one-to-one ผ่าน User.employeeId;
+// Assignment.user ยังเก็บไว้รองรับข้อมูลเดิมที่ยัง map business identity ไม่ได้
+// ---------------------------------------------------------------------------
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  RESIGNED
+}
+
+model Employee {
+  id           String         @id @default(uuid())
+  employeeCode String         @unique
+  firstName    String
+  lastName     String
+  fullName     String
+  email        String?
+  phone        String?
+  departmentId String?
+  department   Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position     String?
+  status       EmployeeStatus @default(ACTIVE)
+  hireDate     DateTime?
+  remark       String?
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+  assignments  Assignment[]
+  borrowRequests BorrowRequest[]
+  user           User?
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([fullName])
+  @@index([email])
   @@index([deletedAt])
 }
 
@@ -139,6 +228,7 @@ model Asset {
   owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   assignments Assignment[] // Milestone 5: ประวัติการมอบหมายทั้งหมด (ปัจจุบัน + อดีต) ของ asset นี้
   tickets     Ticket[] // Milestone 7: ใบแจ้งซ่อม/ปัญหาทั้งหมด (ปัจจุบัน + ประวัติ) ของ asset นี้
+  borrowRequests BorrowRequest[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt // อัปเดตอัตโนมัติทุกครั้งที่แก้ไข
   deletedAt   DateTime? // soft delete: ไม่เป็น null แปลว่าถูก "ลบ" แล้ว (ยังอยู่ในฐานข้อมูลจริง)
@@ -214,14 +304,34 @@ enum AssignmentStatus {
   DAMAGED // เสียหายระหว่างถือครอง
 }
 
+enum ReturnWorkflowStatus {
+  PENDING_INSPECTION
+  PASSED
+  FAILED
+  RETURNED
+  DAMAGED
+  LOST
+}
+
+enum ReturnInspectionResult {
+  PASSED
+  FAILED
+}
+
 model Assignment {
   id String @id @default(uuid())
 
   assetId String
   asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
-  userId String // ผู้ถือครอง (พนักงานที่ได้รับมอบหมาย)
-  user   User   @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+  // legacy holder relation — nullable ตั้งแต่ v1.1.0 Phase 2 และยังคงไว้เพื่ออ่านข้อมูลเก่า
+  userId String?
+  user   User?  @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+
+  // business holder relation — รายการใหม่ทุกแถวต้องมีค่า (บังคับใน API ระหว่างช่วงเปลี่ยนผ่าน)
+  // nullable ในฐานข้อมูลเพื่อรักษา assignment เก่าที่ไม่สามารถ backfill ได้อย่างแน่นอน
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   assignedById String // ผู้ทำรายการมอบหมาย (ADMIN/IT_STAFF) — ตั้งจาก req.user.id เสมอ ไม่รับจาก client
   assignedBy   User   @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
@@ -235,6 +345,15 @@ model Assignment {
   conditionBefore AssetCondition? // สภาพตอนมอบหมาย (ใช้ enum เดียวกับ Asset.assetCondition)
   conditionAfter  AssetCondition? // สภาพตอนคืน — มีค่าก็ต่อเมื่อคืนแล้วเท่านั้น
 
+  returnStatus      ReturnWorkflowStatus?
+  returnStartedAt   DateTime?
+  inspectionResult  ReturnInspectionResult?
+  inspectedById     String?
+  inspectedBy       User?                   @relation("AssignmentInspector", fields: [inspectedById], references: [id], onDelete: SetNull)
+  inspectionNotes   String?
+  inspectedAt       DateTime?
+  returnEvents      AssignmentReturnEvent[]
+
   remark String?
 
   createdAt DateTime  @default(now())
@@ -244,8 +363,97 @@ model Assignment {
   // query หลักของ list/get กรองด้วย assetId/userId/deletedAt เสมอ — index ช่วยให้ query เร็วขึ้น
   @@index([assetId, deletedAt])
   @@index([userId])
+  @@index([employeeId])
   @@index([assignedById])
   @@index([status])
+  @@index([returnStatus])
+  @@index([inspectedById])
+  @@index([expectedReturnDate])
+  @@index([returnedAt, expectedReturnDate, deletedAt])
+}
+
+model AssignmentReturnEvent {
+  id           String               @id @default(uuid())
+  assignmentId String
+  assignment   Assignment           @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  status       ReturnWorkflowStatus
+  actorUserId  String?
+  actorUser    User?                @relation("AssignmentReturnActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  condition    AssetCondition?
+  notes        String?
+  createdAt    DateTime             @default(now())
+
+  @@index([assignmentId, createdAt])
+  @@index([actorUserId])
+  @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// v1.1.0 Phase 3 — Borrow Request Workflow
+// คำขอยืมเป็นขั้นตอนก่อน Assignment; เมื่ออนุมัติ API จะสร้าง Assignment และปิดคำขอเป็น COMPLETED
+// ---------------------------------------------------------------------------
+enum BorrowRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum BorrowRequestApprovalAction {
+  STARTED
+  APPROVED
+  REJECTED
+}
+
+model BorrowRequest {
+  id            String              @id @default(uuid())
+  requestNumber String              @unique
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  assetId String
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  requestedAt       DateTime @default(now())
+  expectedReturnDate DateTime?
+  reason             String
+  status             BorrowRequestStatus @default(PENDING)
+
+  approvedByUserId String?
+  approvedByUser   User? @relation("BorrowRequestApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  rejectedReason   String?
+  remark           String?
+  approvalHistory  BorrowRequestApproval[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([employeeId])
+  @@index([assetId])
+  @@index([approvedByUserId])
+  @@index([status, requestedAt])
+  @@index([deletedAt])
+}
+
+// ประวัติการอนุมัติแบบ append-only — แยกจาก BorrowRequest เพียงตารางเดียวเพื่อเก็บ Timeline
+// และผู้ตัดสินใจย้อนหลัง โดยไม่เปลี่ยน Assignment หรือสถานะ workflow เดิม
+model BorrowRequestApproval {
+  id              String                      @id @default(uuid())
+  borrowRequestId String
+  borrowRequest   BorrowRequest               @relation(fields: [borrowRequestId], references: [id], onDelete: Restrict)
+  action          BorrowRequestApprovalAction
+  actorUserId     String?
+  actorUser       User?                       @relation("BorrowRequestApprovalActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  comment         String?
+  createdAt       DateTime                    @default(now())
+
+  @@index([borrowRequestId, createdAt])
+  @@index([actorUserId])
+  @@index([action, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -352,10 +560,27 @@ model AuditLog {
 
   ipAddress String? // req.ip ตอนทำรายการ (ไม่บังคับ)
   userAgent String? // req.get('user-agent') ตอนทำรายการ (ไม่บังคับ)
+  outboxId  String? @unique
 
   // query หลักของหน้า Audit Log กรอง/เรียงด้วยฟิลด์เหล่านี้เสมอ — index ช่วยให้ query เร็วขึ้น
   @@index([entityType, entityId])
   @@index([performedById])
   @@index([performedAt])
   @@index([action])
+}
+
+// RC2 durable audit delivery. Business code first persists an event here, then a retryable
+// dispatcher copies it to AuditLog. A transient AuditLog failure therefore never drops evidence.
+model AuditOutbox {
+  id            String    @id @default(uuid())
+  payload       Json
+  attempts      Int       @default(0)
+  lastError     String?
+  nextAttemptAt DateTime  @default(now())
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([processedAt, nextAttemptAt])
+  @@index([createdAt])
 }

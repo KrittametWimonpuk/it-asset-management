@@ -34,7 +34,7 @@ const loginSchema = z.object({
 // หมายเหตุ: ถ้า role ถูกเปลี่ยนภายหลัง ผู้ใช้ต้องล็อกอินใหม่ token เก่าจะยังพก role เดิมไปจนกว่าจะหมดอายุ (เหมือน email/name)
 function signToken(user) {
   return jwt.sign(
-    { sub: user.id, email: user.email, role: user.role },
+    { sub: user.id, email: user.email, role: user.role, employeeId: user.employeeId || null },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   )
@@ -64,7 +64,7 @@ router.post('/register', authRateLimit, asyncHandler(async (req, res) => {
   const token = signToken(user)
 
   // สมัครสมาชิกเอง — ผู้ทำรายการคือ user ที่เพิ่งสร้างขึ้นเอง (ตอนนี้ยังไม่มี req.user เพราะ endpoint นี้ไม่ผ่าน requireAuth)
-  logAudit({
+  await logAudit({
     action: 'CREATE', entityType: 'User', entityId: user.id,
     description: `สมัครสมาชิกใหม่: ${user.email}`,
     newValues: { email: user.email, name: user.name, role: user.role },
@@ -91,7 +91,7 @@ router.post('/login', authRateLimit, asyncHandler(async (req, res) => {
 
   const token = signToken(user)
 
-  logAudit({
+  await logAudit({
     action: 'LOGIN', entityType: 'User', entityId: user.id,
     description: `เข้าสู่ระบบ: ${user.email}`,
     performedById: user.id, ipAddress: req.ip, userAgent: req.get('user-agent'),

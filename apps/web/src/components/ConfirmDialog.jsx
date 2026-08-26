@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
-export default function ConfirmDialog({ title, message, note, confirmLabel = 'ยืนยัน', busy, onConfirm, onCancel }) {
+export default function ConfirmDialog({ title, message, note, confirmLabel = 'ยืนยัน', busyLabel = 'กำลังลบ...', busy, onConfirm, onCancel }) {
   useDialogDismiss(onCancel, busy)
 
   return (
@@ -18,7 +18,7 @@ export default function ConfirmDialog({ title, message, note, confirmLabel = '�
         <div className="row mt end">
           <button className="secondary" onClick={onCancel} disabled={busy}>ยกเลิก</button>
           <button className="danger-solid" onClick={onConfirm} disabled={busy}>
-            {busy ? 'กำลังลบ...' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

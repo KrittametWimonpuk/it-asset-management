@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowDownToLine, Box, CheckCircle2, ChevronLeft, ChevronRight, CirclePause,
+  ArrowDownToLine, BellRing, Box, CheckCircle2, ChevronLeft, ChevronRight, CirclePause,
   Clock3, FileClock, FileDown, FilePlus2, FileX2, FilterX, History,
   LogIn, MapPin, PackageCheck, Pencil, RefreshCw, RotateCcw, Search, SearchX,
   ShieldCheck, Store, Tag, Ticket, UserRound, Users, Wrench, XCircle,
@@ -18,12 +18,17 @@ const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABELS).map(([value, labe
 const EMPTY_FILTERS = { action: '', entityType: '', performedBy: '', dateFrom: '', dateTo: '' }
 
 const ACTION_UI = {
-  CREATE: ['green', FilePlus2], UPDATE: ['blue', Pencil], DELETE: ['red', FileX2],
+  CREATE: ['green', FilePlus2], UPDATE: ['blue', Pencil], DELETE: ['red', FileX2], RESTORE: ['green', RotateCcw],
   ASSIGN: ['violet', PackageCheck], RETURN: ['cyan', RotateCcw], OPEN: ['blue', Ticket],
   START_PROGRESS: ['amber', Wrench], ON_HOLD: ['amber', CirclePause], RESOLVE: ['green', CheckCircle2],
   CLOSE: ['slate', XCircle], LOGIN: ['cyan', LogIn], EXPORT_REPORT: ['violet', FileDown],
+  BORROW_REQUEST_CREATED: ['blue', FilePlus2], BORROW_REQUEST_APPROVED: ['green', CheckCircle2],
+  BORROW_REQUEST_REJECTED: ['red', XCircle], BORROW_REQUEST_CANCELLED: ['slate', CirclePause],
+  APPROVAL_STARTED: ['amber', Clock3], APPROVAL_APPROVED: ['green', CheckCircle2],
+  APPROVAL_REJECTED: ['red', XCircle],
+  NOTIFICATION_SENT: ['blue', BellRing], NOTIFICATION_READ: ['green', BellRing],
 }
-const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock }
+const ENTITY_ICONS = { Asset: Box, Assignment: PackageCheck, Ticket, Employee: Users, BorrowRequest: FileClock, Category: Tag, Department: Users, Location: MapPin, Vendor: Store, User: UserRound, Report: FileClock, Notification: BellRing }
 
 function AuditSkeleton() {
   return <div className="audit-skeleton" aria-label="กำลังโหลด Audit Log" aria-busy="true">{[1, 2, 3, 4].map((item) => <div className="audit-shimmer" key={item} />)}</div>

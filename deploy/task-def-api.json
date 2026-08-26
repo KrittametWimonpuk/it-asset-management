@@ -12,10 +12,14 @@
       "essential": true,
       "portMappings": [{ "containerPort": 4000 }],
       "environment": [
-        { "name": "DATABASE_URL", "value": "${DB_URL_FINAL}" },
-        { "name": "JWT_SECRET", "value": "${JWT_SECRET}" },
         { "name": "PORT", "value": "4000" },
-        { "name": "NODE_ENV", "value": "production" }
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "TRUST_PROXY", "value": "1" },
+        { "name": "CORS_ORIGIN", "value": "${CORS_ORIGIN}" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "${DATABASE_URL_SECRET_ARN}" },
+        { "name": "JWT_SECRET", "valueFrom": "${JWT_SECRET_ARN}" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

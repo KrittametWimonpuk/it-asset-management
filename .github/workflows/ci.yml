@@ -2,8 +2,8 @@
 # Continuous Integration — Milestone 10: CI/CD & Release Engineering
 #
 # ตรวจสอบคุณภาพโค้ดอัตโนมัติทุกครั้งที่ push หรือเปิด/อัปเดต pull request เข้า master หรือ feature/*
-# ไม่มีขั้นตอนไหน migrate/เชื่อมต่อฐานข้อมูลจริง — "Prisma validation" ตรวจแค่ syntax ของ schema.prisma
-# เท่านั้น (ไม่ใช่ "Test" — โปรเจกต์นี้ยังไม่มี automated test suite ดู README: Known Limitations)
+# RC2 เพิ่ม PostgreSQL service และรัน migration/integration gate จริง เพื่อป้องกัน migration ที่ validate
+# ผ่านแต่ deploy ไม่ได้ รวมถึงตรวจ unique FK, notification dedupe และ assignment state transaction
 #
 # ทุก step รันตามลำดับในจ็อบเดียว ล้มเหลว step ไหนหยุดทันที (ไม่มี continue-on-error ที่ไหนเลย)
 # ---------------------------------------------------------------------------
@@ -21,13 +21,27 @@ on:
 
 jobs:
   ci:
-    name: Build, Lint & Validate
+    name: Test, Build, Lint & Validate
     runs-on: ubuntu-latest
 
-    # DATABASE_URL ใส่ค่าหลอกไว้เท่านั้น — Prisma อ่านค่านี้ตอน parse schema (env("DATABASE_URL"))
-    # แต่ไม่มี step ไหนเชื่อมต่อฐานข้อมูลจริงเลย (validate/generate ไม่ query DB)
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: appdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d appdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci_placeholder?schema=public'
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/appdb?schema=public'
+      RUN_DB_TESTS: '1'
 
     steps:
       - name: Checkout repository
@@ -54,6 +68,14 @@ jobs:
         working-directory: apps/api
         run: npm run validate
 
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: npm run migrate
+
+      - name: Generate Prisma Client
+        working-directory: apps/api
+        run: npm run generate
+
       - name: Lint backend
         working-directory: apps/api
         run: npm run lint
@@ -61,6 +83,10 @@ jobs:
       - name: Lint frontend
         working-directory: apps/web
         run: npm run lint
+
+      - name: Test backend
+        working-directory: apps/api
+        run: npm test
 
       - name: Build backend (generate Prisma Client)
         working-directory: apps/api
@@ -77,7 +103,9 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "All quality checks completed successfully:" >> "$GITHUB_STEP_SUMMARY"
           echo "- Prisma schema validated" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PostgreSQL migrations and RC2 integration checks passed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backend lint passed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend lint passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend tests passed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backend build succeeded (Prisma Client generated)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Frontend build succeeded (Vite production bundle)" >> "$GITHUB_STEP_SUMMARY"

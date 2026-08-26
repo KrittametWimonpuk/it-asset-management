@@ -106,7 +106,7 @@ export const api = {
   departments: createEntityApi('/departments'),
   vendors: createEntityApi('/vendors'),
 
-  // Milestone 5: มอบหมาย/รับคืนครุภัณฑ์ — params รองรับ: page, pageSize, sortBy, sortOrder, search, status, assetId, userId
+  // v1.1 Phase 2: params รองรับ employeeId; userId เดิมยังรับได้เพื่อ backward compatibility
   // (เขียนเองแทน createEntityApi เพราะ backend ไม่มี DELETE /assignments/:id — ประวัติการมอบหมายห้ามลบ)
   assignments: {
     list: (params) => request(`/assignments${toQueryString(params)}`),
@@ -114,11 +114,39 @@ export const api = {
     add: (body) => request('/assignments', { method: 'POST', body: JSON.stringify(body) }),
     update: (id, body) => request(`/assignments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     return: (id, body) => request(`/assignments/${id}/return`, { method: 'POST', body: JSON.stringify(body) }),
+    startReturn: (id, body = {}) => request(`/assignments/${id}/return/start`, { method: 'POST', body: JSON.stringify(body) }),
+    inspectReturn: (id, body) => request(`/assignments/${id}/return/inspect`, { method: 'POST', body: JSON.stringify(body) }),
   },
 
   // Milestone 5: รายชื่อผู้ใช้ (ดูอย่างเดียว) — ใช้เลือก "พนักงาน" ตอนมอบหมายครุภัณฑ์
   users: {
     list: (params) => request(`/users${toQueryString(params)}`),
+  },
+
+  // v1.1.0: ข้อมูลพนักงานและ business identity ของผู้ถือครองครุภัณฑ์
+  employees: {
+    ...createEntityApi('/employees'),
+    restore: (id) => request(`/employees/${id}/restore`, { method: 'POST' }),
+  },
+
+  // v1.1.0 Phase 3: คำขอยืมก่อนสร้าง Assignment
+  borrowRequests: {
+    list: (params) => request(`/borrow-requests${toQueryString(params)}`),
+    get: (id) => request(`/borrow-requests/${id}`),
+    add: (body) => request('/borrow-requests', { method: 'POST', body: JSON.stringify(body) }),
+    approve: (id, body = {}) => request(`/borrow-requests/${id}/approve`, { method: 'POST', body: JSON.stringify(body) }),
+    reject: (id, body) => request(`/borrow-requests/${id}/reject`, { method: 'POST', body: JSON.stringify(body) }),
+    cancel: (id) => request(`/borrow-requests/${id}/cancel`, { method: 'POST' }),
+    availableAssets: (params) => request(`/borrow-requests/options/assets${toQueryString(params)}`),
+  },
+
+  // v1.1.0 Beta 1: user-scoped operational notifications
+  notifications: {
+    list: (params) => request(`/notifications${toQueryString(params)}`),
+    unreadCount: () => request('/notifications/unread-count'),
+    markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+    markAllRead: () => request('/notifications/read-all', { method: 'POST' }),
+    remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
   },
 
   // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
@@ -149,6 +177,10 @@ export const api = {
     helpdesk: (params) => request(`/reports/helpdesk${toQueryString(params)}`),
     departments: (params) => request(`/reports/departments${toQueryString(params)}`),
     vendors: (params) => request(`/reports/vendors${toQueryString(params)}`),
+    borrowRequests: (params) => request(`/reports/borrow-requests${toQueryString(params)}`),
+    approvals: (params) => request(`/reports/approvals${toQueryString(params)}`),
+    returns: (params) => request(`/reports/returns${toQueryString(params)}`),
+    notifications: (params) => request(`/reports/notifications${toQueryString(params)}`),
     download: (reportKey, params, format) => downloadReport(reportKey, params, format),
   },
 

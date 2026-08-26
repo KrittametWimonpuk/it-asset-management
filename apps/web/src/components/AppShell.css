@@ -531,6 +531,7 @@
   width: 18px;
   height: 18px;
 }
+.notification-item-icon.priority-high{color:#b45309;background:#fffbeb}.notification-item-icon.priority-critical{color:#dc2626;background:#fef2f2}.notification-item-icon.priority-low{color:#64748b;background:#f1f5f9}[data-theme=dark] .notification-item-icon.priority-high{background:#f59e0b22}[data-theme=dark] .notification-item-icon.priority-critical{background:#ef444422}[data-theme=dark] .notification-item-icon.priority-low{background:#64748b22}
 
 .notification-item-copy {
   min-width: 0;

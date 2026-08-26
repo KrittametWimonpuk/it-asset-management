@@ -16,7 +16,7 @@ const LATIN_FONT_PATH = path.join(__dirname, '../../assets/fonts/Sarabun-Latin.w
 const EXPORT_FORMATS = ['csv', 'xlsx', 'pdf']
 
 // ---------------------------------------------------------------------------
-// (1) Filter parsing — ใช้ร่วมกันทั้ง 6 รายงาน แต่ละ endpoint หยิบไปใช้เฉพาะฟิลด์ที่เกี่ยวข้องกับตัวเอง
+// (1) Filter parsing — ใช้ร่วมกันทั้ง 10 รายงาน แต่ละ endpoint หยิบไปใช้เฉพาะฟิลด์ที่เกี่ยวข้องกับตัวเอง
 // หมายเหตุ: category ของ asset (categoryId เป็น master data id) กับ category ของ ticket (enum
 // TicketCategory) เป็นคนละชนิดข้อมูล จึงตั้งใจแยกชื่อ param กัน (categoryId vs ticketCategory)
 // เช่นเดียวกับ status (AssetStatus) vs assignmentStatus vs ticketStatus — กันความกำกวมของฟิลเตอร์ร่วม
@@ -39,6 +39,9 @@ export function parseReportQuery(query) {
     status: query.status || '',
     assignmentStatus: query.assignmentStatus || '',
     ticketStatus: query.ticketStatus || '',
+    borrowRequestStatus: query.borrowRequestStatus || '',
+    notificationType: query.notificationType || '',
+    notificationPriority: query.notificationPriority || '',
     ticketCategory: query.ticketCategory || '',
     bucket: query.bucket || '',
     search: (query.search || '').trim(),

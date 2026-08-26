@@ -18,6 +18,7 @@ source "$HERE/config.sh"
 # ไฟล์เก็บ ID ของ resource ที่สร้างไว้ (สคริปต์ตัวถัด ๆ ไปจะอ่านต่อ)
 STATE_FILE="$HERE/.state.sh"
 touch "$STATE_FILE"
+chmod 600 "$STATE_FILE"
 # shellcheck disable=SC1090
 source "$STATE_FILE"
 
@@ -29,6 +30,13 @@ save_state() {
   mv "$STATE_FILE.tmp" "$STATE_FILE"
   echo "export ${key}=\"${val}\"" >> "$STATE_FILE"
   export "${key}=${val}"
+}
+
+remove_state() {
+  local key="$1"
+  grep -v "^export ${key}=" "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null || true
+  mv "$STATE_FILE.tmp" "$STATE_FILE"
+  chmod 600 "$STATE_FILE"
 }
 
 # สั่ง aws โดยแนบ region ให้อัตโนมัติ

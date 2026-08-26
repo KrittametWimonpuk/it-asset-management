@@ -27,11 +27,13 @@ const CORE_NAVIGATION = [
   { key: 'dashboard', label: 'แดชบอร์ด', group: 'ภาพรวม', icon: 'dashboard' },
   { key: 'assets', label: 'ครุภัณฑ์', group: 'การจัดการ', icon: 'assets' },
   { key: 'assignments', label: 'การมอบหมาย', group: 'การจัดการ', icon: 'assignment' },
+  { key: 'borrowRequests', label: 'คำขอยืม', group: 'การจัดการ', icon: 'borrow' },
   { key: 'tickets', label: 'Helpdesk', group: 'การจัดการ', icon: 'ticket' },
   { key: 'reports', label: 'รายงาน', group: 'การจัดการ', icon: 'report' },
 ]
 
 const ADMIN_NAVIGATION = [
+  { key: 'employees', label: 'พนักงาน', group: 'ผู้ดูแลระบบ', icon: 'employee' },
   { key: 'audit', label: 'Audit Log', group: 'ผู้ดูแลระบบ', icon: 'audit' },
   { key: 'categories', label: 'หมวดหมู่', group: 'ผู้ดูแลระบบ', icon: 'category' },
   { key: 'locations', label: 'สถานที่ตั้ง', group: 'ผู้ดูแลระบบ', icon: 'location' },
@@ -43,9 +45,12 @@ const PAGE_META = {
   dashboard: { title: 'แดชบอร์ด', eyebrow: 'ภาพรวมองค์กร' },
   assets: { title: 'ครุภัณฑ์', eyebrow: 'การจัดการสินทรัพย์' },
   assignments: { title: 'การมอบหมาย', eyebrow: 'การใช้งานครุภัณฑ์' },
+  borrowRequests: { title: 'คำขอยืม', eyebrow: 'ขั้นตอนการอนุมัติ' },
   tickets: { title: 'Helpdesk', eyebrow: 'งานบริการไอที' },
   reports: { title: 'รายงาน', eyebrow: 'ข้อมูลและการวิเคราะห์' },
+  notifications: { title: 'การแจ้งเตือน', eyebrow: 'ศูนย์การสื่อสาร' },
   audit: { title: 'Audit Log', eyebrow: 'การกำกับดูแลระบบ' },
+  employees: { title: 'พนักงาน', eyebrow: 'การจัดการบุคลากร' },
   categories: { title: 'หมวดหมู่', eyebrow: 'ข้อมูลหลัก' },
   locations: { title: 'สถานที่ตั้ง', eyebrow: 'ข้อมูลหลัก' },
   departments: { title: 'แผนก', eyebrow: 'ข้อมูลหลัก' },
@@ -57,9 +62,11 @@ function Icon({ name }) {
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     assets: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 5V3h8v2M3 10h18M9 14h6" /></>,
     assignment: <><path d="M8 4h8M9 2h6v4H9z" /><rect x="5" y="4" width="14" height="18" rx="2" /><path d="m9 14 2 2 4-4" /></>,
+    borrow: <><path d="M8 4h8M9 2h6v4H9z" /><rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 12h6M9 16h4" /></>,
     ticket: <><path d="M4 7a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2v-3a2 2 0 0 0 0-4V7Z" /><path d="M12 8v8" /></>,
     report: <><path d="M5 20V10M12 20V4M19 20v-7" /><path d="M3 20h18" /></>,
     audit: <><path d="M12 3 20 6v6c0 5-3.2 8.1-8 10-4.8-1.9-8-5-8-10V6l8-3Z" /><path d="m9 12 2 2 4-4" /></>,
+    employee: <><circle cx="9" cy="8" r="4" /><path d="M2.5 21a6.5 6.5 0 0 1 13 0M17 11a4 4 0 0 0 0-7M17 15a6 6 0 0 1 5 6" /></>,
     category: <><path d="m4 4 6 1 9 9-5 5-9-9-1-6Z" /><circle cx="7.5" cy="7.5" r="1" /></>,
     location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     department: <><path d="M3 21h18M5 21V8l7-4 7 4v13M9 12h2M13 12h2M9 16h2M13 16h2" /></>,
@@ -89,6 +96,9 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [systemNotifications, setSystemNotifications] = useState([])
+  const [systemUnreadCount, setSystemUnreadCount] = useState(0)
+  const [systemNotificationsLoading, setSystemNotificationsLoading] = useState(true)
   const userNotificationKey = user.id || user.email
   const [seenNotificationIds, setSeenNotificationIds] = useState(() => loadSeenNotificationIds(userNotificationKey))
   const [profileOpen, setProfileOpen] = useState(false)
@@ -111,6 +121,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const displayName = user.name || user.email
   const initials = displayName.split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
   const unreadNotifications = notifications.filter((ticket) => !seenNotificationIds.includes(ticket.id))
+  const totalUnreadNotifications = unreadNotifications.length + systemUnreadCount
 
   useEffect(() => {
     localStorage.setItem('ui-theme', theme)
@@ -154,6 +165,44 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
       document.removeEventListener('visibilitychange', refreshWhenVisible)
       window.removeEventListener('focus', loadNotifications)
       window.removeEventListener('helpdesk-ticket-created', addCreatedTicket)
+    }
+  }, [user.id])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadSystemNotifications() {
+      try {
+        const [list, unread] = await Promise.all([
+          api.notifications.list({ page: 1, pageSize: 6, sortBy: 'createdAt', sortOrder: 'desc' }),
+          api.notifications.unreadCount(),
+        ])
+        if (!cancelled) {
+          setSystemNotifications(list.items)
+          setSystemUnreadCount(unread.count)
+        }
+      } catch {
+        // Notification is an enhancement layer; navigation must remain available if it is offline.
+      } finally {
+        if (!cancelled) setSystemNotificationsLoading(false)
+      }
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') loadSystemNotifications()
+    }
+
+    loadSystemNotifications()
+    const poller = window.setInterval(loadSystemNotifications, NOTIFICATION_POLL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', loadSystemNotifications)
+    window.addEventListener('notifications:refresh', loadSystemNotifications)
+    return () => {
+      cancelled = true
+      window.clearInterval(poller)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', loadSystemNotifications)
+      window.removeEventListener('notifications:refresh', loadSystemNotifications)
     }
   }, [user.id])
 
@@ -207,6 +256,25 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
     navigate('tickets')
   }
 
+  async function openSystemNotification(notification) {
+    if (!notification.isRead) {
+      setSystemNotifications((current) => current.map((item) => item.id === notification.id
+        ? { ...item, isRead: true, readAt: new Date().toISOString() }
+        : item))
+      setSystemUnreadCount((count) => Math.max(0, count - 1))
+      try { await api.notifications.markRead(notification.id) } catch { window.dispatchEvent(new Event('notifications:refresh')) }
+    }
+    setNotificationsOpen(false)
+    navigate('notifications')
+  }
+
+  async function markAllNotificationsRead() {
+    markNotificationsRead(notifications.map((ticket) => ticket.id))
+    setSystemNotifications((current) => current.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() })))
+    setSystemUnreadCount(0)
+    try { await api.notifications.markAllRead() } catch { window.dispatchEvent(new Event('notifications:refresh')) }
+  }
+
   const groupedNavigation = navigation.reduce((groups, item) => {
     const existing = groups.find((group) => group.label === item.group)
     if (existing) existing.items.push(item)
@@ -255,7 +323,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
         <div className="sidebar-footer">
           <div className="sidebar-version">
             <span className="sidebar-status-dot" />
-            <span>v1.0.0 Stable</span>
+            <span>v1.1.0 Beta 1</span>
           </div>
           <button
             className="sidebar-collapse"
@@ -316,7 +384,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
 
           <div className="topbar-popover-wrap" ref={notificationRef}>
             <button
-              className={`topbar-icon-button notification-trigger${unreadNotifications.length ? ' has-unread' : ''}`}
+              className={`topbar-icon-button notification-trigger${totalUnreadNotifications ? ' has-unread' : ''}`}
               type="button"
               onClick={() => {
                 setNotificationsOpen((value) => !value)
@@ -326,9 +394,9 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
               aria-expanded={notificationsOpen}
             >
               <Icon name="bell" />
-              {unreadNotifications.length > 0 && (
-                <span className="notification-count" aria-label={`มีการแจ้งเตือนใหม่ ${unreadNotifications.length} รายการ`}>
-                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+              {totalUnreadNotifications > 0 && (
+                <span className="notification-count" aria-label={`มีการแจ้งเตือนใหม่ ${totalUnreadNotifications} รายการ`}>
+                  {totalUnreadNotifications > 9 ? '9+' : totalUnreadNotifications}
                 </span>
               )}
             </button>
@@ -337,26 +405,45 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                 <div className="popover-heading">
                   <div>
                     <strong>การแจ้งเตือน</strong>
-                    <span>{unreadNotifications.length > 0 ? `ใหม่ ${unreadNotifications.length} รายการ` : 'ล่าสุด'}</span>
+                    <span>{totalUnreadNotifications > 0 ? `ใหม่ ${totalUnreadNotifications} รายการ` : 'ล่าสุด'}</span>
                   </div>
-                  {unreadNotifications.length > 0 && (
-                    <button type="button" onClick={() => markNotificationsRead(notifications.map((ticket) => ticket.id))}>
+                  {totalUnreadNotifications > 0 && (
+                    <button type="button" onClick={markAllNotificationsRead}>
                       อ่านทั้งหมด
                     </button>
                   )}
                 </div>
-                {notificationsLoading ? (
+                {notificationsLoading || systemNotificationsLoading ? (
                   <div className="notification-loading" aria-label="กำลังโหลดการแจ้งเตือน">
                     {Array.from({ length: 3 }, (_, index) => <span key={index} />)}
                   </div>
-                ) : notifications.length === 0 ? (
+                ) : notifications.length === 0 && systemNotifications.length === 0 ? (
                   <div className="notification-empty">
                     <span><Icon name="bell" /></span>
                     <strong>ไม่มีการแจ้งเตือนใหม่</strong>
-                    <p>เมื่อมีการแจ้งปัญหา รายการจะแสดงที่นี่</p>
+                    <p>เมื่อมีรายการที่ต้องติดตาม ระบบจะแสดงที่นี่</p>
                   </div>
                 ) : (
                   <div className="notification-list">
+                    {systemNotifications.map((notification) => (
+                      <button
+                        type="button"
+                        className={`notification-item${notification.isRead ? '' : ' is-unread'}`}
+                        key={`system-${notification.id}`}
+                        onClick={() => openSystemNotification(notification)}
+                      >
+                        <span className={`notification-item-icon priority-${notification.priority.toLowerCase()}`}><Icon name="bell" /></span>
+                        <span className="notification-item-copy">
+                          <span className="notification-item-meta">
+                            <strong>{notification.type.replaceAll('_', ' ')}</strong>
+                            <time dateTime={notification.createdAt}>{formatNotificationTime(notification.createdAt)}</time>
+                          </span>
+                          <b>{notification.title}</b>
+                          <small>{notification.message}</small>
+                        </span>
+                        {!notification.isRead && <i className="notification-unread-dot" aria-hidden="true" />}
+                      </button>
+                    ))}
                     {notifications.map((ticket) => {
                       const unread = !seenNotificationIds.includes(ticket.id)
                       return (
@@ -381,9 +468,9 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                     })}
                   </div>
                 )}
-                {notifications.length > 0 && (
-                  <button type="button" className="notification-view-all" onClick={() => { setNotificationsOpen(false); navigate('tickets') }}>
-                    ดู Helpdesk ทั้งหมด <span aria-hidden="true">→</span>
+                {(notifications.length > 0 || systemNotifications.length > 0) && (
+                  <button type="button" className="notification-view-all" onClick={() => { setNotificationsOpen(false); navigate('notifications') }}>
+                    ดูการแจ้งเตือนทั้งหมด <span aria-hidden="true">→</span>
                   </button>
                 )}
               </div>

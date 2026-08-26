@@ -5,6 +5,282 @@
 
 ---
 
+## [v1.1.0] — Stable Release
+
+v1.1.0 รวม Employee Management เข้ากับวงจรครุภัณฑ์ครบตั้งแต่คำขอยืม การอนุมัติ การมอบหมาย
+การตรวจรับคืน และการแจ้งเตือน โดยผ่าน RC2 production hardening และรักษา backward compatibility
+กับ User authentication, RBAC, API และข้อมูล Assignment เดิม
+
+### Released
+- Employee Management และ explicit User–Employee identity relationship
+- Borrow Request, Approval, Assignment และ Return Inspection workflows แบบครบวงจร
+- Notification/Reminder scheduler, deduplication และ durable Audit Outbox
+- Dashboard, Reports, Audit Log และ OpenAPI สำหรับโมดูล v1.1.0
+- CI บน PostgreSQL จริง, production Docker/nginx healthcheck, HTTPS deployment และ accessibility hardening
+
+### Compatibility
+- Migration ทั้งหมดเป็น expand-only; `Assignment.userId` และ legacy rows ยังคงอ่านได้
+- ไม่มี endpoint เดิมถูกลบ และ authentication/RBAC flow ยังคงเดิม
+
+## [v1.1.0-rc2] — Production Hardening
+
+RC2 แก้เฉพาะ Critical/High findings จาก RC1 โดยคง API, authentication flow และข้อมูลเดิมทั้งหมด
+
+### Fixed
+- เพิ่มความสัมพันธ์ one-to-one แบบ explicit `User.employeeId → Employee.id` พร้อม unique/FK และ backfill
+  เฉพาะอีเมลที่จับคู่ได้แบบไม่กำกวม; แถว legacy ที่จับคู่ไม่ได้ยังใช้ fallback เดิมได้
+- ทำให้การสร้าง Assignment/อนุมัติ Borrow Request และการปิด Return อัปเดต `Asset.status` ใน transaction
+  เดียวกัน (`IN_USE`, `AVAILABLE`, `LOST`, `MAINTENANCE`) พร้อม conditional update กัน race
+- ย้าย due/overdue reminder ออกจาก Dashboard/Notification read path ไปเป็น scheduler entry point
+  `npm run scheduler`; เพิ่ม database dedupe key แบบ unique และทำซ้ำ/concurrent ได้อย่าง idempotent
+- เปลี่ยน Audit จาก fire-and-forget เป็น durable `AuditOutbox` พร้อม idempotent dispatch, exponential retry
+  และ scheduler flush; Notification กับ audit event ถูกบันทึกแบบ atomic
+- ตั้ง Express `trust proxy` ให้ production topology, ทำให้ `req.ip`, audit IP และ rate limit อิง client IP จริง
+- แก้ nginx/API upstream และ runtime DNS resolver, `/healthz`, Swagger routing, HTTPS/TLS, AWS ACM listener,
+  Secrets Manager และ RDS encryption
+- เพิ่ม index สำหรับ due-date Assignment, Employee lookup และ Notification dedupe; Notification Summary ใช้
+  database `groupBy` และ export จำกัด 25,000 แถวเพื่อคุม memory
+- รวม modal focus trap, Escape, initial focus และ focus restoration ไว้ใน hook เดียว
+- อัปเดต Vite เป็น 6.4.3 และ dependency ทางอ้อมจน frontend `npm audit` เหลือ 0 ช่องโหว่
+
+### Testing
+- CI ใช้ PostgreSQL 16 จริง รัน migration ทั้งชุดและ RC2 integration checks สำหรับ FK/unique/dedupe/
+  Assignment state transaction ก่อน lint/test/build
+- เพิ่ม contract tests สำหรับ expand-only migration, scheduler separation, audit outbox, proxy และ healthcheck
+
+### Compatibility
+- ไม่ลบ `Assignment.userId`, email fallback หรือ endpoint เดิม; JWT รุ่นก่อน RC2 ถูก enrich `employeeId`
+  จากฐานข้อมูลระหว่างตรวจ token โดยไม่บังคับ logout
+- Migration `0015_rc2_production_hardening` เป็น expand-only และไม่ hard-delete ข้อมูลใด
+
+### Known Limitations
+- ต้องให้ orchestrator/cron เรียก `npm run scheduler`; repository เตรียม worker interface แต่ไม่ผูกกับผู้ให้บริการรายใด
+- Rate-limit store ยังอยู่ใน memory ต่อ instance; deployment ที่ scale หลาย API replicas ควรใช้ shared store
+- Backend audit พบเฉพาะ advisory ระดับ Moderate ใน dependency ภายใน ExcelJS; ไม่มี High/Critical และโค้ดไม่ได้
+  เรียก UUID custom buffer API ที่ได้รับผลกระทบ
+
+## [v1.1.0-beta.1] — Notifications & Reminder System
+
+Beta 1 เพิ่มชั้นการสื่อสารบน lifecycle เดิม โดย Notification เป็น best-effort หลังธุรกรรมสำเร็จ จึงไม่ทำให้
+Borrow Request, Approval, Assignment หรือ Return ล้มเหลวหากการแจ้งเตือนมีปัญหา
+
+### Added
+- Migration expand-only `0014_notifications_reminders`: เพิ่ม `Notification`, `NotificationType`,
+  `NotificationPriority`, recipient index และ soft delete โดยไม่แก้ตาราง lifecycle เดิม
+- REST API สำหรับ list/unread count/read/read-all/soft delete ทุก endpoint จำกัดด้วย `userId` ของ JWT
+- Workflow hooks สำหรับคำขอใหม่, อนุมัติ/ปฏิเสธ, มอบหมาย, รอตรวจรับ และผลคืนปกติ/ชำรุด/สูญหาย
+- Due reminder 3 วันและ overdue reminder แบบ idempotent โดย generate เมื่อเปิด Notification/Dashboard
+- กระดิ่ง unread badge/dropdown, หน้า Notification พร้อม search/filter/pagination/read/archive,
+  responsive, dark mode, semantic list และ live status สำหรับ assistive technology
+- Dashboard เพิ่ม Unread Notifications, Overdue Assets, Pending Actions
+- Notification Summary Report พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `NOTIFICATION_SENT`, `NOTIFICATION_READ` และ entity `Notification`
+- OpenAPI/Swagger อัปเดตเป็น 75 methods พร้อม schema และ path ของ Notification
+
+### Compatibility & Security
+- Notification ทำงานหลัง core transaction และ helper จับ error ภายในเสมอ จึงไม่เปลี่ยนผลลัพธ์ workflow เดิม
+- User ทุก role เห็น/อ่าน/ลบได้เฉพาะ notification ที่ส่งถึงบัญชีตนเอง; staff ได้เฉพาะ approval/pending inspection/
+  overdue ที่เกี่ยวข้องกับงานฝ่ายดูแล
+- Helpdesk notification เดิมในกระดิ่งยังคงอยู่และถูกผสานกับ Notification API
+
+### Testing
+- Prisma validate/generate, API/frontend lint, frontend production build และ backend tests `31/31` ผ่าน
+- Migration `0014` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 14 migrations
+- Docker E2E ผ่าน 23 assertions: workflow events, ไม่แจ้งผู้ส่งคำขอ, recipient scope/cross-user 404,
+  unread/read/read-all, soft delete, upcoming/overdue/idempotency, return pending/completed, Dashboard,
+  Notification Report, Audit และ unauthenticated 401
+- ล้าง E2E marker หลังทดสอบและยืนยันเหลือ `0` รายการ
+
+### Known Limitations
+- Reminder รุ่น Beta ใช้ on-access sweep ยังไม่มี background scheduler จึงถูกสร้างเมื่อผู้ใช้เปิด Dashboard/
+  Notification แทนการส่งตรงตามวินาทีขณะไม่มีผู้ใช้งาน
+- Employee ที่ไม่มี User account อีเมลตรงกันจะไม่มีช่องทางรับ in-app notification
+- ยังไม่มี email/push/WebSocket delivery และไม่มี source key สำหรับ dedupe ระดับ database
+- Environment รอบนี้ไม่มี browser session เชื่อมต่อ จึงยืนยัน accessibility จาก semantic markup,
+  keyboard-operable native controls, responsive CSS, lint/build แต่ยังไม่ได้ทดสอบด้วย NVDA และ visual regression จริง
+
+---
+
+## [v1.1.0-alpha.5] — Return Workflow Enhancement
+
+เฟส 5 ขยายการรับคืนเดิมเป็น workflow ตรวจรับที่ติดตามได้ครบ โดยคง `Assignment.status`, Authentication,
+RBAC, ผู้ถือครองแบบ Employee และ endpoint `/api/assignments/:id/return` เดิมไว้ทั้งหมด
+
+### Added
+- Migration expand-only `0013_return_workflow_enhancement`: เพิ่มสถานะ/ข้อมูลสรุปการตรวจรับแบบ nullable และ
+  `AssignmentReturnEvent` สำหรับ Timeline append-only พร้อม backfill ประวัติปิด Assignment เดิมโดยไม่สร้างผู้ตรวจปลอม
+- API `POST /api/assignments/:id/return/start` และ `/return/inspect`; ผู้ตรวจมาจาก User ที่ล็อกอินเท่านั้น
+- ผลตรวจบังคับ condition/notes/date สำหรับการคืนจริง, ปิด Assignment อัตโนมัติเมื่อผ่าน และอัปเดต
+  `Asset.assetCondition` เมื่อชำรุด
+- Return dialog รองรับเริ่มตรวจ, บันทึก condition/notes/inspector/timestamps, status badges, timeline/history,
+  keyboard focus, responsive และ dark mode
+- Dashboard เพิ่ม Pending Inspections, Completed Returns Today, Damaged Returns, Lost Assets และ Average Return Processing Time
+- Return Report แสดง Employee, Asset, Return Date, Inspector, Condition, Inspection Result และ Processing Time
+  พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `RETURN_STARTED`, `RETURN_INSPECTED`, `RETURN_COMPLETED`, `RETURN_DAMAGED`, `RETURN_LOST`
+- OpenAPI/Swagger อัปเดตเป็น 69 methods พร้อม schema สำหรับ Return Workflow และ Return Report
+
+### Compatibility & Security
+- `/api/assignments/:id/return` เดิมยังรับ request body แบบเดิมและทำงานแบบ atomic inspection เพื่อไม่ทำให้ client เก่าพัง
+- ฟิลด์ใหม่ทั้งหมด nullable และไม่ลบ/เปลี่ยน `userId`, `employeeId`, `AssignmentStatus` หรือข้อมูลเดิม
+- ADMIN/IT_STAFF เท่านั้นที่เริ่มและตรวจรับ; EMPLOYEE ยังคง read-only ตาม scope เดิม
+
+### Testing
+- Prisma validate/generate, API lint, frontend lint (0 errors), backend tests `25/25` และ production build ผ่าน
+- Migration `0013` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 13 migrations
+- Docker E2E ผ่าน Start/Inspect/Return, normal/damaged/lost, API `/return` เดิม, ADMIN/IT_STAFF,
+  EMPLOYEE 403, Dashboard metrics, Return Report และ Audit actions ครบ 5 รายการ
+- ล้างข้อมูล E2E marker หลังทดสอบและยืนยัน Asset/Employee/Assignment คงเหลือ `0/0/0`
+
+### Known Limitations
+- Workflow เป็นการตรวจรับหนึ่งขั้นโดยผู้ตรวจคนเดียว ยังไม่มี re-inspection, checklist รายชิ้น, attachment หรือ e-signature
+- ประวัติก่อน alpha.5 ไม่มีข้อมูล inspector/result เดิม จึงแสดงว่าไม่มีข้อมูลย้อนหลัง แต่วันคืน สภาพ หมายเหตุ และสถานะยังอยู่ครบ
+- รอบตรวจนี้ไม่มี browser session เชื่อมต่อ จึงตรวจ accessibility จาก semantic markup/focus handling/lint/build
+  แต่ยังไม่ได้ทำ screen-reader และ visual regression แบบ manual
+
+---
+
+## [v1.1.0-alpha.4] — Approval Workflow Enhancement
+
+เฟส 4 เพิ่มข้อมูลประกอบการอนุมัติและประวัติการตัดสินใจบน Borrow Request เดิม โดยไม่เปลี่ยน Authentication,
+RBAC หรือสถาปัตยกรรม Assignment
+
+### Added
+- `BorrowRequestApproval` และ enum `BorrowRequestApprovalAction` สำหรับ Timeline แบบ append-only พร้อม
+  migration `0012_borrow_request_approval_history` ที่ backfill ข้อมูลคำขอเดิมเท่าที่ระบุผู้ดำเนินการได้
+- Approve/Reject รองรับความคิดเห็น พร้อมผู้พิจารณาและเวลาตัดสินใจ; Reject ยังคงบังคับเหตุผลเหมือนเดิม
+- Approval Queue มีแท็บ Pending/Approved/Rejected และ Timeline modal ที่แสดง reviewer, timestamp และ comment
+- Dashboard เพิ่ม Average Approval Time โดยคำนวณที่ PostgreSQL; คง Pending/Approved Today/Rejected Today เดิม
+- Approval Report แสดงระยะเวลาพิจารณาและ Top Approvers พร้อม Preview และ export CSV/Excel/PDF
+- Audit actions `APPROVAL_STARTED`, `APPROVAL_APPROVED`, `APPROVAL_REJECTED`
+- OpenAPI/Swagger อัปเดตเป็น 66 methods พร้อม schema ของ approval history/report
+
+### Security & Compatibility
+- ADMIN/IT_STAFF เท่านั้นที่ Approve/Reject; EMPLOYEE ไม่ได้รับสิทธิ์ใหม่และยังเห็นเฉพาะคำขอของตนเอง
+- Approve ยังคงสร้าง Assignment ใน Serializable transaction เดิม และ request body แบบเดิมที่ไม่ส่ง comment
+  ยังทำงานได้
+- ไม่มีการแก้ Assignment schema, endpoint เดิม, Authentication หรือ role definitions
+
+### Testing
+- Prisma validate/generate, API lint, backend tests `21/21` และ frontend production build ผ่าน
+- Migration `0012` apply สำเร็จบน PostgreSQL 16 และยืนยันครบ 12 migrations
+- Docker E2E ผ่าน STARTED/APPROVED/REJECTED timeline, comments, reviewer, timestamps, automatic Assignment,
+  ADMIN/IT_STAFF permissions, EMPLOYEE 403, Dashboard average time, Approval Report/Top Approvers และ Audit
+- ล้างข้อมูล E2E ด้วย marker หลังทดสอบและยืนยัน BorrowRequest/Assignment/Approval คงเหลือ `0/0/0`
+
+### Known Limitations
+- เป็น single-step approval เท่านั้น ยังไม่มีหลายลำดับผู้อนุมัติ, delegation หรือ attachment
+- รายการ REJECTED ก่อน alpha.4 ไม่มี reviewer เก็บไว้ใน BorrowRequest เดิม จึง backfill ผู้พิจารณาไม่ได้และแสดง
+  "ไม่ทราบผู้ดำเนินการ"; เหตุผลและเวลายังคงอยู่ครบ
+
+---
+
+## [v1.1.0-alpha.3] — Borrow Request Workflow
+
+เฟส 3 เพิ่มขั้นตอนคำขอยืมก่อนสร้าง Assignment โดยยังคง User authentication/RBAC และสถาปัตยกรรม
+Assignment เดิมทั้งหมด Employee เป็นผู้ยืม และ User ของ ADMIN/IT_STAFF เป็นผู้อนุมัติหรือปฏิเสธ
+
+### Added
+- Prisma model/enum `BorrowRequest`/`BorrowRequestStatus` และ migration `0011_borrow_request_workflow`
+  พร้อมเลขคำขอ `BR-000001` จาก PostgreSQL sequence, foreign keys, indexes และ soft delete
+- REST workflow สำหรับ list/detail/create/approve/reject/cancel พร้อม pagination, sorting, status filter,
+  search, response envelope, Zod validation และ RBAC ตาม role
+- การ Approve ทำใน Serializable transaction: ตรวจ Employee ACTIVE และ active assignment ซ้ำอีกครั้ง,
+  สร้าง Assignment อัตโนมัติ แล้วจบคำขอเป็น `COMPLETED`
+- หน้า Borrow Request responsive: Employee request form/own history/cancel และ ADMIN/IT_STAFF approval
+  queue/approve/reject พร้อม status badges, loading/empty/error states และ dark mode
+- Dashboard summary: Pending Borrow Requests, Approved Today, Rejected Today
+- Borrow Request Report พร้อม Preview และ export CSV/Excel/PDF โดยคง data scope ตาม role
+- Audit actions `BORROW_REQUEST_CREATED`, `BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`,
+  `BORROW_REQUEST_CANCELLED` และ entity `BorrowRequest`
+- OpenAPI/Swagger schemas และ paths สำหรับ workflow/report ใหม่
+
+### Security & Compatibility
+- EMPLOYEE สร้าง/ดู/ยกเลิกได้เฉพาะคำขอของตนเองผ่าน Employee email mapping; ADMIN/IT_STAFF
+  ดูทั้งหมดและอนุมัติ/ปฏิเสธได้ แต่สร้างคำขอแทนไม่ได้
+- ไม่เปลี่ยน endpoint, relation, RBAC หรือพฤติกรรมเดิมของ Assignment; การมอบหมายโดยตรงยังทำงานเหมือนเดิม
+- conditional update ป้องกัน Reject/Cancel ซ้ำ และ partial unique index เดิมของ Assignment ร่วมกับ
+  Serializable transaction ป้องกันการอนุมัติครุภัณฑ์ชิ้นเดียวพร้อมกัน
+
+### Testing
+- Prisma validate/generate, backend lint/test (20/20), frontend lint/build ผ่าน
+- Migration `0011` apply สำเร็จบน PostgreSQL 16 และยืนยันสถานะครบ 11 migrations
+- Docker E2E ผ่าน Create/own scope/Cancel/Reject/Approve/automatic Assignment/RBAC 403/Report/Audit;
+  ล้างเฉพาะข้อมูลทดสอบด้วย marker หลังตรวจเสร็จ
+
+### Known Limitations
+- คำขอ `PENDING` ยังไม่ reserve ครุภัณฑ์ ผู้อนุมัติจึงอาจเห็นหลายคำขอสำหรับชิ้นเดียวกันได้; คำขอแรกที่
+  อนุมัติสำเร็จจะสร้าง Assignment ส่วนคำขอถัดไปตอบ 409 และต้องปฏิเสธภายหลัง
+- User ↔ Employee ยังเชื่อมด้วย case-insensitive email ตาม Phase 2; บัญชีที่ไม่พบ Employee ACTIVE ส่งคำขอไม่ได้
+- `APPROVED` เก็บไว้ใน enum สำหรับ workflow extension แต่ flow ปัจจุบันเปลี่ยนจาก PENDING เป็น COMPLETED
+  ภายใน transaction เดียวหลังสร้าง Assignment สำเร็จ
+
+---
+
+## [v1.1.0-alpha.2] — Assignment Employee Integration
+
+เฟส 2 เปลี่ยน business identity ของผู้ถือครองครุภัณฑ์จากบัญชี `User` เป็น `Employee` แบบ incremental
+โดยยังคง User authentication/RBAC, `assignedById` และข้อมูล assignment เดิมไว้ครบถ้วน
+
+### Added
+- Migration `0010_assignment_employee_integration`: เพิ่ม `Assignment.employeeId` และ Foreign Key ไปยัง
+  Employee พร้อม index; backfill เฉพาะคู่ User/Employee ที่มีอีเมลตรงกันแบบไม่กำกวม
+- Assignment API ส่ง nested Employee (รหัส/ชื่อ/แผนก/ตำแหน่ง/สถานะ), ค้นหารหัสพนักงาน ชื่อ และแผนก
+  พร้อมตัวกรอง `employeeId`
+- Employee selector ในฟอร์มมอบหมาย รองรับค้นหารหัส ชื่อ และแผนก แสดงสถานะ และเลือกเฉพาะพนักงาน
+  Active ที่ไม่ถูก archive
+- Current Holder, Assignment History, Employee dashboard และ Assignment Report แสดงข้อมูล Employee
+- Audit ASSIGN/RETURN ระบุ Employee identity และเก็บ `employeeId`/`employeeCode` ใน audit values
+
+### Changed
+- Assignment ใหม่บังคับ `employeeId`; `User` ยังคงระบุ operator ผ่าน `assignedById` และ `userId` เดิม
+  ยังรับได้แบบ deprecated เพื่อ backward compatibility
+- EMPLOYEE data scope ตรวจทั้ง relation Employee ที่ match อีเมลบัญชี และ legacy `userId` เดิม
+- Assignment Report เพิ่ม Employee Code, Employee Name, Department และ Position
+- Swagger/OpenAPI และ package version อัปเดตเป็น `v1.1.0-alpha.2`
+
+### Backward Compatibility
+- `employeeId` เป็น nullable ที่ฐานข้อมูลเพื่อให้ migration ไม่ทำข้อมูลเก่าหาย; assignment เก่าที่ยัง map ไม่ได้
+  แสดง User เดิม หรือ `Unknown Employee` แทนโดยไม่ crash
+- ไม่ลบ User authentication, RBAC, `Assignment.userId` หรือ endpoint/filter เดิม
+
+### Known Limitations
+- การเชื่อม User ↔ Employee ยังใช้ case-insensitive email matching ระหว่างช่วงเปลี่ยนผ่าน ยังไม่มี account link table
+- ข้อมูลเก่าที่ไม่มี Employee อีเมลตรงกันจะไม่ถูกเดาและคง `employeeId = null`
+- Borrow Request, Approval Workflow, Notifications และ HR Integration ยังไม่รวมใน alpha นี้
+
+---
+
+## [v1.1.0-alpha.1] — Employee Management Foundation
+
+เฟสแรกของ v1.1.0 เพิ่มทะเบียนพนักงานแบบ incremental โดยแยก `Employee` ออกจากบัญชี `User` อย่างชัดเจน
+และคง `Assignment.userId` เดิมไว้ทั้งหมด เพื่อให้ระบบเดิม backward-compatible และพร้อมต่อยอด Phase 2
+
+### Added
+- Prisma model/enum `Employee`/`EmployeeStatus` พร้อม migration `0009_employee_management`, unique
+  `employeeCode`, relation แบบ optional กับ Department และ soft delete (`deletedAt`)
+- REST API 6 endpoint: list/detail/create/update/archive/restore พร้อม response envelope, pagination,
+  sorting, filter, search (รหัส/ชื่อเต็ม/อีเมล/โทรศัพท์), Zod validation และ duplicate conflict `409`
+- RBAC: ADMIN ทำได้ครบทุก action, IT_STAFF อ่าน/สร้าง/แก้ไข, EMPLOYEE ไม่มีสิทธิ์เข้าถึง
+- Audit Log entity `Employee` และ action `RESTORE`; บันทึก CREATE/UPDATE/DELETE/RESTORE พร้อม before/after values
+- หน้า Employee Management ใช้ Design System เดิม รองรับ search/filter/pagination, status badges,
+  Department/Position, Create/Edit/Archive/Restore, loading/empty/error states, responsive และ dark mode
+- OpenAPI/Swagger schemas และ paths สำหรับ Employee ทั้งหมด
+- Node test suite สำหรับ validation, search/filter, RBAC และ audit policy พร้อมเพิ่ม `npm test` ใน CI
+
+### Testing
+- Migration `0009` apply สำเร็จบน PostgreSQL 16 ผ่าน Docker Compose; API container healthy
+- Integration CRUD/RBAC ผ่านครบ: EMPLOYEE `403`, IT_STAFF create/update แต่ archive `403`, ADMIN archive/restore
+- ยืนยัน unique employee code `409`, search/pagination, active/archive scopes และ Audit Log ครบ 4 action
+- Prisma validate/generate, backend test/lint, frontend lint/build และ OpenAPI generation ผ่าน
+
+### Known Limitations
+- Employee ยังไม่เชื่อมกับ User และ Assignment ยังอ้าง User ตามเดิมโดยตั้งใจ; การเชื่อมเป็นงาน Phase 2
+- ยังไม่มี Borrow Request, Approval Workflow, HR Integration หรือ employee notifications ใน alpha นี้
+- Automated integration test กับฐานข้อมูลและ browser E2E ยังไม่รันใน CI; รอบนี้ตรวจ integration ผ่าน Docker แบบ manual
+
+---
+
 ## [v1.0.0-rc3] — Release Candidate 3: Production Deployment & Operations
 
 Milestone ด้าน production deployment/operations ล้วน ๆ — ไม่มี business feature ใหม่, ไม่มี API/schema

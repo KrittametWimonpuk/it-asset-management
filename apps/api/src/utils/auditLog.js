@@ -1,28 +1,29 @@
 // ---------------------------------------------------------------------------
 // Audit Log — Milestone 9
 //
-// logAudit() คือทางเดียวที่สร้าง AuditLog record — เรียกแบบ "fire and forget" เสมอ (ไม่ await ตอนเรียกใช้)
-// เพื่อไม่ให้การเขียน audit log ไปหน่วง response ของ business action จริง ถ้าเขียนล้มเหลว (เช่น DB มีปัญหา
-// ชั่วคราว) จะ log error ที่ server console เฉย ๆ ไม่ throw ออกไปกระทบ request ที่ตอบกลับผู้ใช้ไปแล้ว
-//
-// เรียกใช้แบบนี้เสมอ (ไม่มี await):
-//   logAudit({ ...auditContext(req), action: 'CREATE', entityType: 'Asset', entityId: asset.id, ... })
+// RC2: ทุกเหตุการณ์ถูก persist ลง AuditOutbox ก่อน แล้ว dispatcher จึงคัดลอกไป AuditLog แบบ idempotent
+// พร้อม retry ทำให้ database failure ชั่วคราวไม่ทำหลักฐานหายแบบเงียบ ๆ
 // ---------------------------------------------------------------------------
 import { prisma } from '../db.js'
 
 // action ที่รองรับ — ครอบคลุมทุก business action ที่ spec ต้องการให้ตรวจสอบย้อนหลังได้
 export const AUDIT_ACTIONS = [
-  'CREATE', 'UPDATE', 'DELETE',
+  'CREATE', 'UPDATE', 'DELETE', 'RESTORE',
   'ASSIGN', 'RETURN',
   'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE',
   'LOGIN', 'EXPORT_REPORT',
+  'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED',
+  'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED',
+  'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED',
+  'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST',
+  'NOTIFICATION_SENT', 'NOTIFICATION_READ',
 ]
 
 // entityType ที่รองรับ
 export const AUDIT_ENTITY_TYPES = [
-  'Asset', 'Assignment', 'Ticket',
+  'Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest',
   'Category', 'Department', 'Location', 'Vendor',
-  'User', 'Report',
+  'User', 'Report', 'Notification',
 ]
 
 // ดึงข้อมูลบริบทของผู้ทำรายการจาก request — ใช้ร่วมกับทุกจุดที่เรียก logAudit()
@@ -37,18 +38,65 @@ export function auditContext(req) {
 // สร้าง audit record หนึ่งแถว — ไม่ throw ออกไปนอกฟังก์ชันนี้เด็ดขาด (ดูเหตุผลด้านบน)
 // oldValues/newValues ควรเป็น plain object ที่ผู้เรียกเลือกเฉพาะฟิลด์ที่จำเป็นมาเองแล้ว (ห้ามมี
 // password/token ปนมา) — ฟังก์ชันนี้ไม่ทำ sanitize ให้ ผู้เรียกต้องกรองเองก่อนส่งเข้ามา
-export async function logAudit({
+function serializable(value) {
+  return value == null ? null : JSON.parse(JSON.stringify(value))
+}
+
+function auditPayload({
   action, entityType, entityId = null, description = null,
   oldValues = null, newValues = null,
   performedById = null, ipAddress = null, userAgent = null,
 }) {
-  try {
-    await prisma.auditLog.create({
-      data: { action, entityType, entityId, description, oldValues, newValues, performedById, ipAddress, userAgent },
-    })
-  } catch (err) {
-    console.error('เขียน audit log ไม่สำเร็จ:', err)
+  return {
+    action, entityType, entityId, description,
+    oldValues: serializable(oldValues),
+    newValues: serializable(newValues),
+    performedById, ipAddress, userAgent,
   }
+}
+
+async function dispatchOutboxItem(item) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.auditLog.create({ data: { ...item.payload, outboxId: item.id } })
+      await tx.auditOutbox.update({ where: { id: item.id }, data: { processedAt: new Date(), lastError: null } })
+    })
+    return true
+  } catch (error) {
+    if (error?.code === 'P2002') {
+      await prisma.auditOutbox.update({ where: { id: item.id }, data: { processedAt: new Date(), lastError: null } })
+      return true
+    }
+    const attempts = item.attempts + 1
+    const delayMs = Math.min(60_000, 2 ** Math.min(attempts, 6) * 1_000)
+    await prisma.auditOutbox.update({
+      where: { id: item.id },
+      data: {
+        attempts,
+        lastError: String(error?.message || error).slice(0, 1000),
+        nextAttemptAt: new Date(Date.now() + delayMs),
+      },
+    }).catch((updateError) => console.error('อัปเดตสถานะ audit outbox ไม่สำเร็จ:', updateError))
+    return false
+  }
+}
+
+export async function logAudit(event, client = prisma) {
+  const item = await client.auditOutbox.create({ data: { payload: auditPayload(event) } })
+  // Immediate best effort keeps the Audit Log current; the durable row remains for scheduler retry.
+  if (client === prisma) await dispatchOutboxItem(item)
+  return item
+}
+
+export async function flushAuditOutbox({ limit = 100, now = new Date() } = {}) {
+  const items = await prisma.auditOutbox.findMany({
+    where: { processedAt: null, nextAttemptAt: { lte: now } },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+  })
+  const results = []
+  for (const item of items) results.push(await dispatchOutboxItem(item))
+  return { checked: items.length, processed: results.filter(Boolean).length }
 }
 
 // แนบข้อมูลผู้ทำรายการ (name/email) ให้ audit record แต่ละแถว — join ด้วยมือครั้งเดียวต่อชุดข้อมูล

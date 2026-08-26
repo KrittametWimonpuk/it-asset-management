@@ -158,8 +158,72 @@ const masterDataSchemas = {
   },
 }
 
+const employeeSchemas = {
+  EmployeeStatus: {
+    type: 'string',
+    enum: ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'RESIGNED'],
+  },
+  Employee: {
+    type: 'object',
+    description: 'ข้อมูลบุคลากรซึ่งเป็น business identity ของผู้ถือครอง แยกจากบัญชี User สำหรับ authentication/RBAC',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      employeeCode: { type: 'string', example: 'EMP-0001' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      fullName: { type: 'string', example: 'สมชาย ใจดี', readOnly: true },
+      email: { type: 'string', format: 'email', nullable: true, example: 'somchai@example.com' },
+      phone: { type: 'string', nullable: true, example: '0812345678' },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      department: { allOf: [{ $ref: '#/components/schemas/MasterDataItem' }], nullable: true },
+      position: { type: 'string', nullable: true, example: 'IT Support' },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date-time', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean', example: true },
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
+      deletedAt: { type: 'string', format: 'date-time', nullable: true },
+    },
+  },
+  EmployeeCreateRequest: {
+    type: 'object',
+    required: ['employeeCode', 'firstName', 'lastName'],
+    properties: {
+      employeeCode: { type: 'string', example: 'EMP-0001', description: 'ห้ามซ้ำ ระบบแปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      email: { type: 'string', format: 'email', nullable: true },
+      phone: { type: 'string', nullable: true },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      position: { type: 'string', nullable: true },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean', default: true },
+    },
+  },
+  EmployeeUpdateRequest: {
+    type: 'object',
+    description: 'ทุกฟิลด์ optional; fullName คำนวณจาก firstName + lastName ที่ backend',
+    properties: {
+      employeeCode: { type: 'string', example: 'EMP-0001', description: 'ห้ามซ้ำ ระบบแปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ' },
+      firstName: { type: 'string', example: 'สมชาย' },
+      lastName: { type: 'string', example: 'ใจดี' },
+      email: { type: 'string', format: 'email', nullable: true },
+      phone: { type: 'string', nullable: true },
+      departmentId: { type: 'string', format: 'uuid', nullable: true },
+      position: { type: 'string', nullable: true },
+      status: { $ref: '#/components/schemas/EmployeeStatus' },
+      hireDate: { type: 'string', format: 'date', nullable: true },
+      remark: { type: 'string', nullable: true },
+      isActive: { type: 'boolean' },
+    },
+  },
+}
+
 const assetSchemas = {
-  AssetStatus: { type: 'string', enum: ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED'] },
+  AssetStatus: { type: 'string', enum: ['AVAILABLE', 'IN_USE', 'REPAIR', 'DISPOSED', 'LOST', 'MAINTENANCE'] },
   AssetCondition: { type: 'string', enum: ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'] },
   Asset: {
     type: 'object',
@@ -264,12 +328,26 @@ const assetSchemas = {
 
 const assignmentSchemas = {
   AssignmentStatus: { type: 'string', enum: ['ASSIGNED', 'RETURNED', 'LOST', 'DAMAGED'] },
+  ReturnWorkflowStatus: { type: 'string', enum: ['PENDING_INSPECTION', 'PASSED', 'FAILED', 'RETURNED', 'DAMAGED', 'LOST'] },
+  ReturnInspectionResult: { type: 'string', enum: ['PASSED', 'FAILED'] },
+  AssignmentReturnEvent: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      status: { $ref: '#/components/schemas/ReturnWorkflowStatus' },
+      condition: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
+      notes: { type: 'string', nullable: true },
+      createdAt: { type: 'string', format: 'date-time' },
+      actorUser: { type: 'object', nullable: true, properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string', nullable: true }, email: { type: 'string' } } },
+    },
+  },
   Assignment: {
     type: 'object',
     properties: {
       id: { type: 'string', format: 'uuid' },
       assetId: { type: 'string', format: 'uuid' },
-      userId: { type: 'string', format: 'uuid' },
+      employeeId: { type: 'string', format: 'uuid', nullable: true, description: 'ผู้ถือครองทางธุรกิจ; null ได้เฉพาะข้อมูลเก่าที่ backfill ไม่ได้' },
+      userId: { type: 'string', format: 'uuid', nullable: true, deprecated: true, description: 'บัญชีผู้ถือครองเดิม เก็บไว้เพื่อ backward compatibility' },
       assignedById: { type: 'string', format: 'uuid' },
       assignedAt: { type: 'string', format: 'date-time' },
       expectedReturnDate: { type: 'string', format: 'date-time', nullable: true },
@@ -277,6 +355,13 @@ const assignmentSchemas = {
       status: { $ref: '#/components/schemas/AssignmentStatus' },
       conditionBefore: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
       conditionAfter: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], nullable: true },
+      returnStatus: { allOf: [{ $ref: '#/components/schemas/ReturnWorkflowStatus' }], nullable: true },
+      returnStartedAt: { type: 'string', format: 'date-time', nullable: true },
+      inspectionResult: { allOf: [{ $ref: '#/components/schemas/ReturnInspectionResult' }], nullable: true },
+      inspectedById: { type: 'string', format: 'uuid', nullable: true },
+      inspectionNotes: { type: 'string', nullable: true },
+      inspectedAt: { type: 'string', format: 'date-time', nullable: true },
+      returnEvents: { type: 'array', items: { $ref: '#/components/schemas/AssignmentReturnEvent' } },
       remark: { type: 'string', nullable: true },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
@@ -292,11 +377,26 @@ const assignmentSchemas = {
       },
       user: {
         type: 'object',
-        description: 'ผู้ถือครอง (พนักงานที่ได้รับมอบหมาย)',
+        nullable: true,
+        deprecated: true,
+        description: 'ข้อมูลบัญชีผู้ถือครองเดิม — ใช้ fallback สำหรับ assignment เก่าเท่านั้น',
         properties: {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string', nullable: true, example: 'Admin User' },
           email: { type: 'string', example: 'admin@example.com' },
+        },
+      },
+      employee: {
+        type: 'object',
+        nullable: true,
+        description: 'Employee business identity ของผู้ถือครอง; null ได้สำหรับข้อมูลเก่าที่ยัง map ไม่ได้',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          employeeCode: { type: 'string', example: 'EMP-IT-001' },
+          fullName: { type: 'string', example: 'IT Staff' },
+          department: { type: 'object', nullable: true, properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string', example: 'IT' } } },
+          position: { type: 'string', nullable: true, example: 'IT Support' },
+          status: { $ref: '#/components/schemas/EmployeeStatus' },
         },
       },
       assignedBy: {
@@ -312,10 +412,11 @@ const assignmentSchemas = {
   },
   AssignmentCreateRequest: {
     type: 'object',
-    required: ['assetId', 'userId'],
+    required: ['assetId', 'employeeId'],
     properties: {
       assetId: { type: 'string', format: 'uuid', description: 'ต้องเป็นครุภัณฑ์ที่ยังไม่มีผู้ถือครองอยู่' },
-      userId: { type: 'string', format: 'uuid', description: 'พนักงานที่จะรับมอบหมาย' },
+      employeeId: { type: 'string', format: 'uuid', description: 'Employee ที่ active และไม่ถูก archive เท่านั้น' },
+      userId: { type: 'string', format: 'uuid', deprecated: true, description: 'รองรับ client เดิม; API จะ resolve Employee ทางอีเมลและยังบังคับว่าต้องพบ Employee ที่ active' },
       assignedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = ใช้วันที่ปัจจุบัน' },
       expectedReturnDate: { type: 'string', format: 'date', nullable: true },
       conditionBefore: { $ref: '#/components/schemas/AssetCondition' },
@@ -333,12 +434,27 @@ const assignmentSchemas = {
   },
   AssignmentReturnRequest: {
     type: 'object',
-    description: 'ทางเดียวที่จะปิดรายการมอบหมาย (ตั้ง returnedAt) — ผลลัพธ์เป็น RETURNED/LOST/DAMAGED',
+    description: 'API เดิมแบบ atomic inspection สำหรับ client ที่ยังไม่ใช้ start/inspect — ผลลัพธ์เป็น RETURNED/LOST/DAMAGED',
     properties: {
       status: { type: 'string', enum: ['RETURNED', 'LOST', 'DAMAGED'], default: 'RETURNED' },
       conditionAfter: { $ref: '#/components/schemas/AssetCondition' },
       returnedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = ใช้วันที่ปัจจุบัน' },
       remark: { type: 'string', nullable: true },
+    },
+  },
+  AssignmentReturnStartRequest: {
+    type: 'object',
+    properties: { notes: { type: 'string', nullable: true, description: 'หมายเหตุเริ่มกระบวนการตรวจรับ' } },
+  },
+  AssignmentReturnInspectionRequest: {
+    type: 'object',
+    required: ['status', 'inspectionNotes'],
+    properties: {
+      status: { type: 'string', enum: ['RETURNED', 'DAMAGED', 'LOST'] },
+      conditionAfter: { allOf: [{ $ref: '#/components/schemas/AssetCondition' }], description: 'บังคับสำหรับ RETURNED/DAMAGED; ไม่บังคับสำหรับ LOST' },
+      inspectionNotes: { type: 'string', minLength: 1, maxLength: 2000 },
+      inspectedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = เวลาปัจจุบัน' },
+      returnedAt: { type: 'string', format: 'date', description: 'ไม่ส่งมา = inspectedAt' },
     },
   },
 }
@@ -436,6 +552,61 @@ const ticketSchemas = {
   },
 }
 
+const borrowRequestSchemas = {
+  BorrowRequestStatus: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'] },
+  BorrowRequestApprovalAction: { type: 'string', enum: ['STARTED', 'APPROVED', 'REJECTED'] },
+  BorrowRequestApproval: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      action: { $ref: '#/components/schemas/BorrowRequestApprovalAction' },
+      actorUserId: { type: 'string', format: 'uuid', nullable: true },
+      actorUser: { allOf: [{ $ref: '#/components/schemas/User' }], nullable: true },
+      comment: { type: 'string', nullable: true },
+      createdAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  BorrowRequest: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      requestNumber: { type: 'string', example: 'BR-000001' },
+      employeeId: { type: 'string', format: 'uuid' },
+      assetId: { type: 'string', format: 'uuid' },
+      requestedAt: { type: 'string', format: 'date-time' },
+      expectedReturnDate: { type: 'string', format: 'date-time', nullable: true },
+      reason: { type: 'string' },
+      status: { $ref: '#/components/schemas/BorrowRequestStatus' },
+      approvedByUserId: { type: 'string', format: 'uuid', nullable: true },
+      approvedAt: { type: 'string', format: 'date-time', nullable: true },
+      rejectedReason: { type: 'string', nullable: true },
+      remark: { type: 'string', nullable: true },
+      employee: { $ref: '#/components/schemas/Employee' },
+      asset: { type: 'object', properties: { id: { type: 'string', format: 'uuid' }, assetTag: { type: 'string' }, name: { type: 'string' }, status: { $ref: '#/components/schemas/AssetStatus' } } },
+      approvedByUser: { allOf: [{ $ref: '#/components/schemas/User' }], nullable: true },
+      approvalHistory: { type: 'array', items: { $ref: '#/components/schemas/BorrowRequestApproval' } },
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  BorrowRequestCreateRequest: {
+    type: 'object', required: ['assetId', 'reason'],
+    properties: {
+      assetId: { type: 'string', format: 'uuid' },
+      expectedReturnDate: { type: 'string', format: 'date', nullable: true },
+      reason: { type: 'string', minLength: 3 }, remark: { type: 'string', nullable: true },
+    },
+  },
+  BorrowRequestRejectRequest: {
+    type: 'object', required: ['rejectedReason'],
+    properties: { rejectedReason: { type: 'string', minLength: 3 }, comment: { type: 'string', maxLength: 1000, nullable: true } },
+  },
+  BorrowRequestApproveRequest: {
+    type: 'object',
+    properties: { comment: { type: 'string', maxLength: 1000, nullable: true } },
+  },
+}
+
 // ---- Dashboard (Milestone 6/7) ----
 const chartItemSchema = {
   type: 'object',
@@ -467,6 +638,10 @@ const dashboardSchemas = {
     type: 'object',
     description: 'ผลลัพธ์ต่างกันตาม role — ADMIN/IT_STAFF เห็นภาพรวมองค์กร, EMPLOYEE เห็นเฉพาะของตัวเอง (ฟิลด์ org-wide เป็น null/array ว่าง)',
     properties: {
+      currentEmployee: {
+        allOf: [{ $ref: '#/components/schemas/Employee' }], nullable: true,
+        description: 'Employee ที่เชื่อมกับบัญชีปัจจุบันทางอีเมล; ส่งใน dashboard ของ EMPLOYEE และอาจเป็น null',
+      },
       summary: {
         type: 'object',
         properties: {
@@ -514,6 +689,23 @@ const dashboardSchemas = {
         properties: {
           open: { type: 'integer' }, inProgress: { type: 'integer' },
           resolvedToday: { type: 'integer' }, closedToday: { type: 'integer' },
+        },
+      },
+      borrowRequests: {
+        type: 'object',
+        properties: { pending: { type: 'integer' }, approvedToday: { type: 'integer' }, rejectedToday: { type: 'integer' }, averageApprovalTimeHours: { type: 'number' } },
+      },
+      returns: {
+        type: 'object',
+        properties: {
+          pendingInspections: { type: 'integer' }, completedToday: { type: 'integer' },
+          damaged: { type: 'integer' }, lost: { type: 'integer' }, averageProcessingTimeHours: { type: 'number' },
+        },
+      },
+      notifications: {
+        type: 'object',
+        properties: {
+          unread: { type: 'integer' }, overdueAssets: { type: 'integer' }, pendingActions: { type: 'integer' },
         },
       },
       charts: {
@@ -565,13 +757,24 @@ const reportSchemas = {
     type: 'object',
     properties: {
       asset: { type: 'string', example: 'IT-0001 — โน้ตบุ๊ค Dell Latitude 5440' },
-      employee: { type: 'string', example: 'Admin User' },
+      employeeCode: { type: 'string', example: 'EMP-ADMIN-001' },
+      employeeName: { type: 'string', example: 'Admin User' },
+      department: { type: 'string', example: 'IT' },
+      position: { type: 'string', example: 'IT Administrator' },
       assignedDate: { type: 'string', example: '2025-04-03' },
       returnedDate: { type: 'string', example: '' },
       status: { type: 'string', example: 'กำลังถือครอง' },
       conditionBefore: { type: 'string', example: 'สภาพดี' },
       conditionAfter: { type: 'string', example: '-' },
       remark: { type: 'string', example: 'มอบให้ทีมพัฒนาใช้งานประจำ' },
+    },
+  },
+  ReturnReportRow: {
+    type: 'object',
+    properties: {
+      employee: { type: 'string' }, asset: { type: 'string' }, returnDate: { type: 'string' },
+      inspector: { type: 'string' }, condition: { type: 'string' }, inspectionResult: { type: 'string' },
+      returnStatus: { type: 'string' }, processingTimeHours: { oneOf: [{ type: 'number' }, { type: 'string', enum: ['-'] }] },
     },
   },
   WarrantyReportRow: {
@@ -601,6 +804,32 @@ const reportSchemas = {
       resolutionTimeHours: { type: 'number', example: 11.2 },
     },
   },
+  BorrowRequestReportRow: {
+    type: 'object',
+    properties: {
+      requestNumber: { type: 'string', example: 'BR-000001' }, employeeCode: { type: 'string' },
+      employeeName: { type: 'string' }, department: { type: 'string' }, position: { type: 'string' },
+      asset: { type: 'string' }, requestedAt: { type: 'string' }, expectedReturnDate: { type: 'string' },
+      status: { type: 'string' }, approvedBy: { type: 'string' }, approvedAt: { type: 'string' },
+      reason: { type: 'string' }, rejectedReason: { type: 'string' }, remark: { type: 'string' },
+    },
+  },
+  ApprovalReportRow: {
+    type: 'object',
+    properties: {
+      requestNumber: { type: 'string' }, employeeName: { type: 'string' }, department: { type: 'string' },
+      asset: { type: 'string' }, decision: { type: 'string', enum: ['อนุมัติ', 'ปฏิเสธ'] }, reviewer: { type: 'string' },
+      requestedAt: { type: 'string' }, decisionAt: { type: 'string' }, approvalDurationHours: { type: 'number' },
+      comment: { type: 'string' }, rejectedReason: { type: 'string' },
+    },
+  },
+  NotificationSummaryReportRow: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', example: 'การอนุมัติ' }, priority: { type: 'string', example: 'สูง' },
+      total: { type: 'integer' }, unread: { type: 'integer' }, read: { type: 'integer' },
+    },
+  },
   DepartmentSummaryRow: {
     type: 'object',
     properties: {
@@ -623,16 +852,33 @@ const reportSchemas = {
   },
 }
 
+const notificationSchemas = {
+  NotificationType: { type: 'string', enum: ['BORROW_REQUEST', 'APPROVAL', 'ASSIGNMENT', 'RETURN', 'REMINDER', 'SYSTEM'] },
+  NotificationPriority: { type: 'string', enum: ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] },
+  Notification: {
+    type: 'object',
+    required: ['id', 'userId', 'title', 'message', 'type', 'priority', 'isRead', 'createdAt'],
+    properties: {
+      id: { type: 'string', format: 'uuid' }, userId: { type: 'string', format: 'uuid' },
+      title: { type: 'string' }, message: { type: 'string' },
+      type: { $ref: '#/components/schemas/NotificationType' },
+      priority: { $ref: '#/components/schemas/NotificationPriority' },
+      isRead: { type: 'boolean' }, createdAt: { type: 'string', format: 'date-time' },
+      readAt: { type: 'string', format: 'date-time', nullable: true }, deletedAt: { type: 'string', format: 'date-time', nullable: true },
+    },
+  },
+}
+
 // ---- Audit Log (Milestone 9) — record เดียวใช้ทั้ง GET /api/audit, GET /api/audit/:id และ
 // DashboardResponse.recentAuditLogs (โครงสร้างเดียวกันทุกจุด) ----
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST', 'NOTIFICATION_SENT', 'NOTIFICATION_READ'],
   },
   AuditEntityType: {
     type: 'string',
-    enum: ['Asset', 'Assignment', 'Ticket', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report'],
+    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report', 'Notification'],
   },
   AuditLog: {
     type: 'object',
@@ -661,10 +907,10 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '0.9.0',
+    version: '1.1.0',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
-      'Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, และ Audit Log\n\n' +
+      'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, Notifications และ Audit Log แบบ durable outbox\n\n' +
       'เอกสารชุดนี้สร้างจาก JSDoc annotation ที่อ่าน route/validation/response จริงจากซอร์สโค้ด ' +
       '(ดู `src/docs/paths/*.js`) — ไม่มี endpoint ไหนถูกเพิ่ม/เดาขึ้นมาเอง\n\n' +
       '**สิทธิ์การใช้งาน (RBAC)** บังคับที่ backend เสมอในทุก endpoint ที่ต้องล็อกอิน ' +
@@ -678,9 +924,12 @@ const definition = {
   ],
   tags: [
     { name: 'Authentication', description: 'สมัครสมาชิก / เข้าสู่ระบบ / ข้อมูลตัวเอง' },
-    { name: 'Users', description: 'รายชื่อผู้ใช้ (ดูอย่างเดียว) — ใช้เลือกพนักงานตอนมอบหมาย/มอบหมายตั๋ว' },
+    { name: 'Users', description: 'บัญชีผู้ใช้สำหรับ authentication/RBAC และผู้รับผิดชอบตั๋ว Helpdesk' },
+    { name: 'Employees', description: 'ข้อมูลพนักงานและ business identity สำหรับผู้ถือครองครุภัณฑ์; ADMIN CRUD, IT_STAFF อ่าน/สร้าง/แก้ไข' },
     { name: 'Assets', description: 'ครุภัณฑ์ IT — CRUD เต็มรูปแบบ' },
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
+    { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ ความคิดเห็น Timeline และการสร้าง Assignment อัตโนมัติ' },
+    { name: 'Notifications', description: 'การแจ้งเตือนส่วนตัว การอ่าน และ soft delete พร้อม reminder กำหนดคืน' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },
@@ -703,9 +952,12 @@ const definition = {
       ...errorResponse,
       ...userSchemas,
       ...masterDataSchemas,
+      ...employeeSchemas,
       ...assetSchemas,
       ...assignmentSchemas,
       ...ticketSchemas,
+      ...borrowRequestSchemas,
+      ...notificationSchemas,
       ...dashboardSchemas,
       ...reportSchemas,
       ...auditSchemas,
@@ -735,6 +987,16 @@ const definition = {
         name: 'id', in: 'path', required: true,
         schema: { type: 'string', format: 'uuid' },
         description: 'ID ของรายการ master data (UUID)',
+      },
+      EmployeeId: {
+        name: 'id', in: 'path', required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Employee ID (UUID)',
+      },
+      BorrowRequestId: {
+        name: 'id', in: 'path', required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Borrow Request ID (UUID)',
       },
       PageParam: { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
       PageSizeParam: { name: 'pageSize', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },

@@ -12,7 +12,8 @@
       "essential": true,
       "portMappings": [{ "containerPort": 80 }],
       "environment": [
-        { "name": "API_UPSTREAM", "value": "127.0.0.1:4000" }
+        { "name": "API_UPSTREAM", "value": "${ALB_DNS}" },
+        { "name": "API_UPSTREAM_SCHEME", "value": "https" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

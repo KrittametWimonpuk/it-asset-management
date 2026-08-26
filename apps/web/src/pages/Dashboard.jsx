@@ -6,17 +6,20 @@ import {
   Archive,
   ArrowRight,
   BarChart3,
+  BellRing,
   Boxes,
   Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   Clock3,
   FolderTree,
   Gauge,
   Headphones,
   History,
   MapPin,
+  ListTodo,
   PackageCheck,
   PackageOpen,
   RefreshCw,
@@ -24,6 +27,7 @@ import {
   ShieldCheck,
   Store,
   TicketCheck,
+  Timer,
   TriangleAlert,
   UserRound,
   UsersRound,
@@ -70,6 +74,27 @@ const TICKET_SUMMARY_CARDS = [
   { key: 'inProgress', label: 'กำลังดำเนินการ', icon: Clock3, tone: 'amber' },
   { key: 'resolvedToday', label: 'แก้ไขวันนี้', icon: CheckCircle2, tone: 'green' },
   { key: 'closedToday', label: 'ปิดงานวันนี้', icon: TicketCheck, tone: 'violet' },
+]
+
+const BORROW_REQUEST_SUMMARY_CARDS = [
+  { key: 'pending', label: 'คำขอรออนุมัติ', icon: Clock3, tone: 'amber', detail: 'รายการที่ต้องดำเนินการ' },
+  { key: 'approvedToday', label: 'อนุมัติวันนี้', icon: CheckCircle2, tone: 'green', detail: 'สร้างการมอบหมายแล้ว' },
+  { key: 'rejectedToday', label: 'ปฏิเสธวันนี้', icon: XCircle, tone: 'red', detail: 'คำขอที่ไม่ผ่านอนุมัติ' },
+  { key: 'averageApprovalTimeHours', label: 'เวลาอนุมัติเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่ส่งถึงอนุมัติ', suffix: ' ชม.' },
+]
+
+const RETURN_SUMMARY_CARDS = [
+  { key: 'pendingInspections', label: 'รอตรวจรับคืน', icon: Clock3, tone: 'amber', detail: 'Assignment ที่รอดำเนินการ' },
+  { key: 'completedToday', label: 'คืนเสร็จวันนี้', icon: CheckCircle2, tone: 'green', detail: 'ปิดกระบวนการแล้ว' },
+  { key: 'damaged', label: 'รับคืนแบบชำรุด', icon: AlertTriangle, tone: 'amber', detail: 'รายการสะสม' },
+  { key: 'lost', label: 'ครุภัณฑ์สูญหาย', icon: XCircle, tone: 'red', detail: 'รายการสะสม' },
+  { key: 'averageProcessingTimeHours', label: 'เวลารับคืนเฉลี่ย', icon: Timer, tone: 'violet', detail: 'ชั่วโมงตั้งแต่เริ่มตรวจถึงปิดงาน', suffix: ' ชม.' },
+]
+
+const NOTIFICATION_SUMMARY_CARDS = [
+  { key: 'unread', label: 'การแจ้งเตือนที่ยังไม่อ่าน', icon: BellRing, tone: 'blue', detail: 'รายการที่ส่งถึงคุณ' },
+  { key: 'overdueAssets', label: 'ครุภัณฑ์เกินกำหนด', icon: TriangleAlert, tone: 'red', detail: 'รายการที่ต้องติดตาม' },
+  { key: 'pendingActions', label: 'งานที่รอดำเนินการ', icon: ListTodo, tone: 'amber', detail: 'คำขอและการตรวจรับ' },
 ]
 
 const ACTIVITY_TYPE_LABELS = {
@@ -219,7 +244,9 @@ export default function Dashboard({ role }) {
         <div className="dashboard-hero-copy">
           <span className="dashboard-hero-eyebrow"><Zap size={15} aria-hidden="true" /> Enterprise Overview</span>
           <h1>ยินดีต้อนรับสู่แดชบอร์ด</h1>
-          <p>{role === 'EMPLOYEE' ? 'ติดตามครุภัณฑ์และงานบริการไอทีของคุณได้จากที่นี่' : 'ติดตามสถานะครุภัณฑ์ การใช้งาน และงานบริการไอทีขององค์กรแบบครบวงจร'}</p>
+          <p>{role === 'EMPLOYEE'
+            ? `Current Employee: ${data.currentEmployee ? `${data.currentEmployee.employeeCode} · ${data.currentEmployee.fullName}` : 'Unknown Employee'}`
+            : 'ติดตามสถานะครุภัณฑ์ การใช้งาน และงานบริการไอทีขององค์กรแบบครบวงจร'}</p>
         </div>
         <div className="dashboard-today">
           <span><CalendarDays size={21} aria-hidden="true" /></span>
@@ -280,6 +307,45 @@ export default function Dashboard({ role }) {
             })}
           </div>
         )}
+      </section>
+
+      <section id="dashboard-borrow-requests" className="dashboard-block">
+        <SectionHeading icon={ClipboardList} title="Borrow Request Summary" description="ภาพรวมขั้นตอนคำขอยืมครุภัณฑ์วันนี้" />
+        <div className="dashboard-kpi-grid">
+          {BORROW_REQUEST_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.borrowRequests?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
+      </section>
+
+      <section id="dashboard-notifications" className="dashboard-block">
+        <SectionHeading icon={BellRing} title="Notification & Action Summary" description="การสื่อสารและรายการที่ต้องดำเนินการของคุณ" />
+        <div className="dashboard-kpi-grid">
+          {NOTIFICATION_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.notifications?.[card.key] || 0).toLocaleString('th-TH')}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
+      </section>
+
+      <section id="dashboard-returns" className="dashboard-block">
+        <SectionHeading icon={RotateCcw} title="Return Workflow Summary" description="ภาพรวมการตรวจรับคืนครุภัณฑ์" />
+        <div className="dashboard-kpi-grid dashboard-return-grid">
+          {RETURN_SUMMARY_CARDS.map((card) => {
+            const CardIcon = card.icon
+            return <article className={`dashboard-card dashboard-kpi-card tone-${card.tone}`} key={card.key}>
+              <div className="dashboard-kpi-header"><span className="dashboard-kpi-icon"><CardIcon size={22} aria-hidden="true" /></span><span className="dashboard-kpi-trend"><Activity size={13} aria-hidden="true" /> Live</span></div>
+              <p>{card.label}</p><strong>{(data.returns?.[card.key] || 0).toLocaleString('th-TH')}{card.suffix || ''}</strong><small>{card.detail}</small>
+            </article>
+          })}
+        </div>
       </section>
 
       <div className="dashboard-summary-grid">

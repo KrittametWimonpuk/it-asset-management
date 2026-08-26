@@ -8,12 +8,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { Boxes, X } from 'lucide-react'
 import DateInput from './DateInput.jsx'
+import { useDialogDismiss } from '../hooks/useDialogDismiss.js'
 
 export const STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'พร้อมใช้งาน' },
   { value: 'IN_USE', label: 'กำลังใช้งาน' },
   { value: 'REPAIR', label: 'ซ่อมบำรุง' },
   { value: 'DISPOSED', label: 'เลิกใช้งาน' },
+  { value: 'LOST', label: 'สูญหาย' },
+  { value: 'MAINTENANCE', label: 'รอตรวจสอบ/ซ่อมบำรุง' },
 ]
 
 // สภาพครุภัณฑ์ — ต้องตรงกับ enum AssetCondition ใน schema.prisma (Milestone 3)
@@ -115,19 +118,13 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
   const [fieldErrors, setFieldErrors] = useState({})  // error รายฟิลด์ เช่น { assetTag: '...' }
   const [busy, setBusy] = useState(false)
   const firstInputRef = useRef(null)
+  const dialogRef = useRef(null)
+  useDialogDismiss(onCancel, busy, dialogRef)
 
   // auto-focus ช่องแรกทันทีที่เปิดฟอร์ม ให้พิมพ์ต่อได้เลยโดยไม่ต้องคลิก
   useEffect(() => {
     firstInputRef.current?.focus()
   }, [])
-
-  useEffect(() => {
-    function handleEscape(event) {
-      if (event.key === 'Escape' && !busy) onCancel()
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [busy, onCancel])
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -282,7 +279,7 @@ export default function AssetForm({ asset, onSubmit, onCancel, onNavigateToMaste
 
   return (
     <div className="overlay" onClick={busy ? undefined : onCancel}>
-      <div className="card modal asset-form-modal" role="dialog" aria-modal="true" aria-labelledby="asset-form-title" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="card modal asset-form-modal" role="dialog" aria-modal="true" aria-labelledby="asset-form-title" onClick={(e) => e.stopPropagation()}>
         <header className="assets-modal-header">
           <div className="assets-modal-title">
             <span><Boxes size={20} /></span>

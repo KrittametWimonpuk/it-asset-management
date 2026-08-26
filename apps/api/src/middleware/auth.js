@@ -10,8 +10,9 @@
 // ---------------------------------------------------------------------------
 import jwt from 'jsonwebtoken'
 import { fail } from '../utils/response.js'
+import { prisma } from '../db.js'
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
 
@@ -21,7 +22,28 @@ export function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = { id: payload.sub, email: payload.email, role: payload.role }
+    // Tokens issued before RC2 do not contain employeeId. Resolve it once from the explicit FK so
+    // existing sessions keep working without falling back to ambiguous e-mail ownership checks.
+    let employeeId = payload.employeeId || null
+    if (!employeeId) {
+      const account = await prisma.user.findUnique({ where: { id: payload.sub }, select: { employeeId: true, email: true } })
+      employeeId = account?.employeeId || null
+      if (!employeeId && account?.email) {
+        const [accounts, employees] = await Promise.all([
+          prisma.user.findMany({
+            where: { email: { equals: account.email, mode: 'insensitive' } }, select: { id: true }, take: 2,
+          }),
+          prisma.employee.findMany({
+            where: {
+              email: { equals: account.email, mode: 'insensitive' }, deletedAt: null,
+            },
+            select: { id: true }, take: 2,
+          }),
+        ])
+        if (accounts.length === 1 && employees.length === 1) employeeId = employees[0].id
+      }
+    }
+    req.user = { id: payload.sub, email: payload.email, role: payload.role, employeeId }
     next()
   } catch {
     return fail(res, 401, 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง')

@@ -28,9 +28,14 @@
  *         name: assetId
  *         schema: { type: string, format: uuid }
  *       - in: query
- *         name: userId
+ *         name: employeeId
  *         schema: { type: string, format: uuid }
  *         description: กรองตามผู้ถือครอง — ใช้ได้เฉพาะ ADMIN/IT_STAFF (EMPLOYEE ถูกจำกัดที่ตัวเองอยู่แล้ว)
+ *       - in: query
+ *         name: userId
+ *         deprecated: true
+ *         schema: { type: string, format: uuid }
+ *         description: ตัวกรองบัญชีผู้ถือครองเดิมสำหรับ backward compatibility
  *     responses:
  *       200:
  *         description: รายการมอบหมาย
@@ -70,7 +75,7 @@
  *               type: object
  *               properties: { success: { type: boolean, example: true }, data: { $ref: '#/components/schemas/Assignment' } }
  *       400:
- *         description: ข้อมูลไม่ผ่าน validation, ครุภัณฑ์ไม่ถูกต้อง/ถูกลบไปแล้ว, หรือไม่พบผู้ใช้ที่เลือก
+ *         description: ข้อมูลไม่ผ่าน validation, ครุภัณฑ์ไม่ถูกต้อง/ถูกลบไปแล้ว, หรือ Employee ไม่ active/ถูก archive
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
@@ -143,8 +148,8 @@
  *     tags: [Assignments]
  *     summary: รับคืนครุภัณฑ์ (ปิดรายการมอบหมาย)
  *     description: >
- *       เฉพาะ ADMIN, IT_STAFF — ทางเดียวที่จะปิดรายการมอบหมาย (ตั้ง returnedAt) ผลลัพธ์เป็น RETURNED/LOST/DAMAGED
- *       (default RETURNED) เคลียร์สถานะ "ผู้ถือครองปัจจุบัน" ของครุภัณฑ์นั้นโดยอัตโนมัติ
+ *       API เดิมสำหรับ backward compatibility — ประมวลผลเริ่มตรวจ ตรวจรับ และปิดรายการแบบ atomic
+ *       ผลลัพธ์เป็น RETURNED/LOST/DAMAGED และบันทึก Return Timeline/Audit ให้โดยอัตโนมัติ
  *     parameters:
  *       - $ref: '#/components/parameters/AssignmentId'
  *     requestBody:
@@ -170,4 +175,50 @@
  *       404:
  *         description: ไม่พบรายการนี้ หรือถูกรับคืนไปแล้ว
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+ */
+
+/**
+ * @openapi
+ * /api/assignments/{id}/return/start:
+ *   post:
+ *     tags: [Assignments]
+ *     summary: เริ่มกระบวนการตรวจรับคืน
+ *     description: เฉพาะ ADMIN/IT_STAFF — เปลี่ยน returnStatus เป็น PENDING_INSPECTION โดยยังไม่ปิด Assignment
+ *     parameters:
+ *       - $ref: '#/components/parameters/AssignmentId'
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/AssignmentReturnStartRequest' }
+ *     responses:
+ *       200:
+ *         description: เริ่มตรวจรับสำเร็จ
+ *         content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, data: { $ref: '#/components/schemas/Assignment' } } } } }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { description: ไม่พบ Assignment ที่ยัง active }
+ *       409: { description: เริ่มกระบวนการรับคืนไปแล้ว }
+ */
+
+/**
+ * @openapi
+ * /api/assignments/{id}/return/inspect:
+ *   post:
+ *     tags: [Assignments]
+ *     summary: บันทึกผลตรวจและปิดการรับคืน
+ *     description: เฉพาะ ADMIN/IT_STAFF — ต้องเริ่มตรวจรับก่อน ผู้ตรวจคือบัญชีที่ล็อกอิน และระบบบันทึก Timeline/Audit แบบ append-only
+ *     parameters:
+ *       - $ref: '#/components/parameters/AssignmentId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/AssignmentReturnInspectionRequest' }
+ *     responses:
+ *       200:
+ *         description: ตรวจรับและปิด Assignment สำเร็จ
+ *         content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, data: { $ref: '#/components/schemas/Assignment' } } } } }
+ *       400: { description: ข้อมูลตรวจรับไม่ครบหรือวันที่ไม่ถูกต้อง }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { description: ไม่พบ Assignment ที่ยัง active }
+ *       409: { description: ยังไม่เริ่มตรวจรับ หรือ Assignment ถูกปิดแล้ว }
  */
