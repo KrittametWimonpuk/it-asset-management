@@ -58,7 +58,7 @@ export default function Login({ onAuthed, goRegister }) {
           </div>
         </div>
 
-        <footer className="login-version">Version 1.0.1 · Stable</footer>
+        <footer className="login-version">Version 1.1.0 · Stable</footer>
       </section>
 
       <section className="login-form-panel">
@@ -162,7 +162,7 @@ export default function Login({ onAuthed, goRegister }) {
           </svg>
           การเชื่อมต่อได้รับการปกป้องและเข้ารหัส
         </p>
-        <p className="login-mobile-version">Version 1.0.1 · Stable</p>
+        <p className="login-mobile-version">Version 1.1.0 · Stable</p>
       </section>
     </main>
   )
