@@ -1,6 +1,6 @@
 # Deployment Guide
 
-> v1.1.0 RC2 — Production Deployment & Operations. เอกสารนี้ครอบคลุมการ deploy ระบบขึ้น production จริง
+> v1.1.0 Stable — Production Deployment & Operations. เอกสารนี้ครอบคลุมการ deploy ระบบขึ้น production จริง
 > ทั้งสองเส้นทางที่โปรเจกต์นี้รองรับ ดูภาพรวมสถาปัตยกรรมที่ [README.md](../README.md) ก่อนอ่านต่อ
 
 ## สารบัญ

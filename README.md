@@ -8,7 +8,7 @@
 
 > โค้ดทุกส่วนมี **คอมเมนต์ภาษาไทย** อธิบายเหตุผลของการตัดสินใจ (ไม่ใช่แค่บอกว่าโค้ดทำอะไร)
 
-**เวอร์ชัน Stable ปัจจุบัน:** `v1.0.1` · **เวอร์ชันใน branch นี้:** `v1.1.0-rc2`
+**เวอร์ชัน Stable ปัจจุบัน:** `v1.1.0`
 
 ---
 
@@ -29,10 +29,10 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Asset Explorer** | รายการครุภัณฑ์: ค้นหา, กรองหลายเงื่อนไข, เรียงลำดับ, แบ่งหน้า, เลือกคอลัมน์ที่จะแสดง (จำค่าไว้ใน localStorage) |
 | **Asset Details** | ข้อมูลทางเทคนิคครบ: การจัดซื้อ (ราคา/ผู้ขาย/ใบแจ้งหนี้/ประกัน), ฮาร์ดแวร์ (CPU/RAM/Storage), เครือข่าย (IP/MAC/Hostname), lifecycle dates |
 | **Master Data** | หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต — CRUD เต็มรูปแบบ ใช้ฟอร์ม/หน้าเดียวกันขับเคลื่อนด้วย config |
-| **Employee Management (v1.1 RC2)** | ทะเบียนพนักงานและความสัมพันธ์ one-to-one กับ User แบบ explicit FK/unique: ค้นหา/กรอง/แบ่งหน้า, สถานะ, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log |
+| **Employee Management (v1.1 Stable)** | ทะเบียนพนักงานและความสัมพันธ์ one-to-one กับ User แบบ explicit FK/unique: ค้นหา/กรอง/แบ่งหน้า, สถานะ, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log |
 | **Asset Assignment & Return Inspection** | Employee เป็น business identity ของผู้ถือครอง, User เป็น operator/RBAC; รองรับมอบหมาย, เริ่มตรวจรับ, สภาพ/ผลตรวจ/ผู้ตรวจ/เวลา, Return Timeline และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
-| **Borrow Request & Approval Workflow (v1.1 Alpha 4)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
-| **Notifications & Reminders (v1.1 RC2)** | การแจ้งเตือน in-app พร้อม unread badge, reminder ก่อนกำหนด 3 วัน/overdue แบบ scheduler-ready และ database dedupe, search/filter/pagination, soft delete และ recipient-scoped RBAC |
+| **Borrow Request & Approval Workflow (v1.1 Stable)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
+| **Notifications & Reminders (v1.1 Stable)** | การแจ้งเตือน in-app พร้อม unread badge, reminder ก่อนกำหนด 3 วัน/overdue แบบ scheduler-ready และ database dedupe, search/filter/pagination, soft delete และ recipient-scoped RBAC |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 10 รายงาน (เพิ่ม Notification Summary จาก 9 รายงานเดิม) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
@@ -446,7 +446,7 @@ CSV / Excel / PDF ที่มุมขวาบนของตาราง ท�
 
 ---
 
-## 👥 Employee Management & Assignment Integration (v1.1.0-alpha.5)
+## 👥 Employee Management & Assignment Integration (v1.1.0)
 
 Employee เป็นทะเบียนบุคลากรที่แยกจากบัญชี `User` และเป็น business identity ของผู้ถือครองครุภัณฑ์
 หน้า **พนักงาน** เปิดให้ ADMIN/IT_STAFF ใช้งานผ่าน sidebar เดิม รองรับค้นหารหัส ชื่อเต็ม อีเมล โทรศัพท์,
@@ -468,7 +468,7 @@ Employee เป็นทะเบียนบุคลากรที่แย�
 
 ---
 
-## 📋 Borrow Request & Approval Workflow (v1.1.0-alpha.4)
+## 📋 Borrow Request & Approval Workflow (v1.1.0)
 
 หน้า **คำขอยืม** เป็นขั้นตอนก่อน Assignment: Employee ที่เชื่อมกับทะเบียนพนักงานสถานะ ACTIVE เลือก
 ครุภัณฑ์ที่ไม่มีผู้ถือครอง ส่งเหตุผลและวันที่คาดว่าจะคืน จากนั้น ADMIN/IT_STAFF ตรวจคิวอนุมัติ
@@ -493,7 +493,7 @@ Report กับ Approval Report ซึ่งแสดง Approval Duration แ�
 
 ---
 
-## 🔄 Return Inspection Workflow (v1.1.0-alpha.5)
+## 🔄 Return Inspection Workflow (v1.1.0)
 
 การรับคืนยังเริ่มจากหน้า **การมอบหมาย** เดิม แต่เพิ่มขั้นตรวจรับก่อนปิด Assignment:
 
@@ -515,7 +515,7 @@ Processing Time ส่วนข้อมูลก่อน alpha.5 จะถู�
 
 ---
 
-## 🔔 Notifications & Reminder System (v1.1.0-rc2)
+## 🔔 Notifications & Reminder System (v1.1.0)
 
 ระบบสร้าง Notification หลัง workflow สำเร็จสำหรับคำขอยืม, ผลอนุมัติ, การมอบหมาย, รอตรวจรับ และผลการคืน
 โดยความล้มเหลวของชั้นการสื่อสารไม่ rollback ธุรกรรม lifecycle เดิม ผู้ใช้ทุก role เห็นเฉพาะรายการที่ส่งถึง
@@ -630,7 +630,7 @@ endpoint สร้าง/แก้ไข/ลบ audit record เลยแม้�
 ## 🌿 Git Workflow
 
 - Branch หลักคือ `master` — งานแต่ละ milestone ทำใน feature branch (เช่น `feature/asset-assignment`, `feature/ci-cd`)
-- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.0.1`, branch นี้ `v1.1.0-rc2`)
+- หนึ่ง milestone = หนึ่ง commit + หนึ่ง annotated tag (`v0.2.0` ... `v1.1.0`)
 - ไม่ rewrite ประวัติ (ไม่ force-push, ไม่ amend commit ที่ผ่านไปแล้ว)
 - ดูรายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชันได้ที่ [CHANGELOG.md](CHANGELOG.md)
 

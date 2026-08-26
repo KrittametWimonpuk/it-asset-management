@@ -1,4 +1,4 @@
-# Architecture — v1.1.0 RC2
+# Architecture — v1.1.0 Stable
 
 RC2 คง modular monolith เดิมและเพิ่มเฉพาะ reliability boundary ที่พบจาก RC1
 

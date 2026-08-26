@@ -1,6 +1,6 @@
 # Production Readiness Checklist
 
-> v1.1.0 RC2 — Production Deployment & Operations. ใช้ checklist นี้ก่อนปล่อยจริงขึ้น production
+> v1.1.0 Stable — Production Deployment & Operations. ใช้ checklist นี้ก่อนปล่อยจริงขึ้น production
 > ครั้งแรก และก่อน deploy เวอร์ชันสำคัญทุกครั้งถัดไป — ทำเครื่องหมายทีละข้อ ไม่ข้าม
 
 ## Infrastructure

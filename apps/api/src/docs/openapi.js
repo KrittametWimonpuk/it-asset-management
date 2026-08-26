@@ -907,7 +907,7 @@ const definition = {
   openapi: '3.1.0',
   info: {
     title: 'IT Asset Management API',
-    version: '1.1.0-rc2',
+    version: '1.1.0',
     description:
       'REST API ของระบบจัดการครุภัณฑ์ IT — Asset CRUD, RBAC (ADMIN/IT_STAFF/EMPLOYEE), มอบหมาย/รับคืนครุภัณฑ์, ' +
       'คำขอยืม, Helpdesk, แดชบอร์ด, รายงาน/ส่งออกข้อมูล, Notifications และ Audit Log แบบ durable outbox\n\n' +

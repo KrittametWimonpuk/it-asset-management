@@ -5,6 +5,23 @@
 
 ---
 
+## [v1.1.0] — Stable Release
+
+v1.1.0 รวม Employee Management เข้ากับวงจรครุภัณฑ์ครบตั้งแต่คำขอยืม การอนุมัติ การมอบหมาย
+การตรวจรับคืน และการแจ้งเตือน โดยผ่าน RC2 production hardening และรักษา backward compatibility
+กับ User authentication, RBAC, API และข้อมูล Assignment เดิม
+
+### Released
+- Employee Management และ explicit User–Employee identity relationship
+- Borrow Request, Approval, Assignment และ Return Inspection workflows แบบครบวงจร
+- Notification/Reminder scheduler, deduplication และ durable Audit Outbox
+- Dashboard, Reports, Audit Log และ OpenAPI สำหรับโมดูล v1.1.0
+- CI บน PostgreSQL จริง, production Docker/nginx healthcheck, HTTPS deployment และ accessibility hardening
+
+### Compatibility
+- Migration ทั้งหมดเป็น expand-only; `Assignment.userId` และ legacy rows ยังคงอ่านได้
+- ไม่มี endpoint เดิมถูกลบ และ authentication/RBAC flow ยังคงเดิม
+
 ## [v1.1.0-rc2] — Production Hardening
 
 RC2 แก้เฉพาะ Critical/High findings จาก RC1 โดยคง API, authentication flow และข้อมูลเดิมทั้งหมด

@@ -16,7 +16,7 @@ const HIGHLIGHTS = [
   { title: 'Helpdesk', copy: 'Structured ticket workflow with priority and status tracking.', icon: Headphones },
   { title: 'Reports', copy: 'Filterable previews with CSV, Excel, and PDF export.', icon: Activity },
   { title: 'Audit Log', copy: 'Immutable activity history with before-and-after evidence.', icon: FileClock },
-  { title: 'Swagger', copy: 'Interactive OpenAPI 3.1 documentation for 66 endpoints.', icon: BookOpen },
+  { title: 'Swagger', copy: 'Interactive OpenAPI 3.1 documentation for 75 endpoint methods.', icon: BookOpen },
   { title: 'CI/CD', copy: 'Automated quality gates for every push and pull request.', icon: GitPullRequest },
   { title: 'Docker', copy: 'Production-ready containers with Nginx reverse proxy.', icon: Container },
 ]
@@ -37,6 +37,7 @@ const TIMELINE = [
   ['v0.2.0', 'Foundation'], ['v0.3.0', 'Asset Details'], ['v0.4.0', 'RBAC'],
   ['v0.5.0', 'Assignments'], ['v0.6.0', 'Dashboard'], ['v0.7.0', 'Helpdesk'],
   ['v0.8.0', 'Reports'], ['v0.8.1', 'OpenAPI'], ['v0.9.0', 'Audit Log'], ['v1.0.0', 'Stable'],
+  ['v1.0.1', 'Enterprise UI'], ['v1.1.0', 'Lifecycle Stable'],
 ]
 
 const STATS = ['12 Milestones', 'Production Ready', 'CI/CD', 'OpenAPI', 'Audit Logging', 'Responsive UI', 'Dark Mode']
@@ -92,7 +93,7 @@ export default function PortfolioShowcase({ onViewDemo }) {
               <a className="showcase-secondary-action" href={GITHUB_URL} target="_blank" rel="noreferrer"><GitPullRequest size={17} /> GitHub</a>
               <a className="showcase-tertiary-action" href="/docs" target="_blank" rel="noreferrer"><BookOpen size={17} /> API Docs</a>
             </div>
-            <div className="showcase-proof"><span><CheckCircle2 size={15} /> Stable v1.0.1</span><span><CheckCircle2 size={15} /> 57 documented endpoints</span><span><CheckCircle2 size={15} /> 3-role RBAC</span></div>
+            <div className="showcase-proof"><span><CheckCircle2 size={15} /> Stable v1.1.0</span><span><CheckCircle2 size={15} /> 75 documented endpoint methods</span><span><CheckCircle2 size={15} /> 3-role RBAC</span></div>
           </div>
 
           <div className="showcase-command-center" aria-label="Product interface preview">
@@ -137,7 +138,7 @@ export default function PortfolioShowcase({ onViewDemo }) {
 
       <section className="showcase-section showcase-timeline" aria-labelledby="timeline-title">
         <div className="showcase-container">
-          <div className="showcase-section-heading"><span>Project Timeline</span><h2 id="timeline-title">From foundation to stable release</h2><p>Ten deliberate releases, each delivering one cohesive engineering milestone.</p></div>
+          <div className="showcase-section-heading"><span>Project Timeline</span><h2 id="timeline-title">From foundation to stable release</h2><p>Twelve deliberate releases, each delivering one cohesive engineering milestone.</p></div>
           <ol className="showcase-release-track">{TIMELINE.map(([version, label], index) => <li key={version} className={index === TIMELINE.length - 1 ? 'current' : ''}><span>{index + 1}</span><div><strong>{version}</strong><small>{label}</small></div></li>)}</ol>
         </div>
       </section>
@@ -154,6 +155,6 @@ export default function PortfolioShowcase({ onViewDemo }) {
       <section className="showcase-cta"><div className="showcase-container"><div><span>Explore the working product</span><h2>See the full lifecycle in action.</h2><p>Open the demo to review the dashboard, asset workflows, reports, and audit trail.</p></div><button type="button" onClick={onViewDemo}>Launch Demo <ArrowRight size={18} /></button></div></section>
     </div>
 
-    <footer className="showcase-footer"><div className="showcase-container"><a className="showcase-brand" href="#top"><BrandMark /><span><strong>IT Asset Management</strong><small>v1.0.1 Stable</small></span></a><div><span>MIT License</span><a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitPullRequest size={15} /> GitHub Repository</a></div></div></footer>
+    <footer className="showcase-footer"><div className="showcase-container"><a className="showcase-brand" href="#top"><BrandMark /><span><strong>IT Asset Management</strong><small>v1.1.0 Stable</small></span></a><div><span>MIT License</span><a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitPullRequest size={15} /> GitHub Repository</a></div></div></footer>
   </main>
 }
