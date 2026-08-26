@@ -13,7 +13,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build          # ได้ผลลัพธ์อยู่ในโฟลเดอร์ dist/
+# Docker/nginx เป็น deployment แบบ same-origin จึงใช้ production mode ปกติ ไม่โหลดค่า
+# Cloudflare-specific จาก .env.cloudflare
+RUN npm run build:self-hosted          # ได้ผลลัพธ์อยู่ในโฟลเดอร์ dist/
 
 # ---- ขั้นที่ 2: serve ----
 FROM nginx:alpine

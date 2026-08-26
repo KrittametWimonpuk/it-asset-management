@@ -1,33 +1,65 @@
 // ---------------------------------------------------------------------------
-// CORS configuration — RC2: Production Hardening (Milestone 11)
+// CORS configuration
 //
-// เดิม (ก่อน RC2) ใช้ cors() เฉย ๆ ซึ่งเท่ากับอนุญาตทุก origin แบบไม่มีเงื่อนไข — RC2 เปลี่ยนให้อ่าน
-// origin ที่อนุญาตจาก environment variable แทน (ไม่ hardcode ชื่อ domain ไว้ในโค้ดเด็ดขาด)
-//
-//   CORS_ORIGIN — รายชื่อ origin ที่อนุญาต คั่นด้วยจุลภาค เช่น
-//                 "http://localhost:5173,https://asset.example.com"
-//
-// ถ้าไม่ตั้งค่า CORS_ORIGIN ไว้เลย:
-//   - NODE_ENV !== 'production' (ค่าเริ่มต้นตอน dev): reflect origin ที่ขอมา (เหมือนพฤติกรรมเดิมก่อน
-//     RC2 ทุกประการ) — สะดวกตอนพัฒนาที่ frontend/backend คนละพอร์ต ไม่ต้องตั้งค่าอะไรเพิ่ม
-//   - NODE_ENV === 'production': ปิดไปเลย (fail closed) — ปลอดภัยกว่าเปิดกว้างทุก origin โดยไม่ตั้งใจ
-//     (ในทางปฏิบัติ production จริงของโปรเจกต์นี้ deploy ผ่าน ALB ที่ path-based route /api/* กับ /
-//     ไปคนละ target group แต่ origin เดียวกันอยู่แล้ว — ดู deploy/02-infra.sh — จึงไม่นับเป็น
-//     cross-origin request ตั้งแต่ต้น การตั้งค่านี้จึงมีผลจริงเฉพาะกรณีมี client อื่นเรียกข้าม origin)
+// CORS_ORIGIN is a comma-separated allowlist of exact origins. When
+// CORS_ALLOW_PAGES_PREVIEWS=true, HTTPS subdomains of an allowlisted Cloudflare
+// Pages production hostname are also accepted. The server always reflects the
+// verified request origin; it never returns a wildcard with credentials.
 // ---------------------------------------------------------------------------
+
+function normalizeOrigin(value) {
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function isCloudflarePagesPreview(origin, allowedOrigins) {
+  let candidate
+  try {
+    candidate = new URL(origin)
+  } catch {
+    return false
+  }
+
+  if (candidate.protocol !== 'https:') return false
+
+  return allowedOrigins.some((allowedOrigin) => {
+    const allowed = new URL(allowedOrigin)
+    return allowed.protocol === 'https:'
+      && allowed.hostname.endsWith('.pages.dev')
+      && candidate.hostname.endsWith(`.${allowed.hostname}`)
+  })
+}
+
+export function isOriginAllowed(origin, allowedOrigins, allowPagesPreviews = false) {
+  if (!origin) return true // curl, health checks, server-to-server requests
+
+  const normalized = normalizeOrigin(origin)
+  if (!normalized) return false
+  if (allowedOrigins.includes(normalized)) return true
+
+  return allowPagesPreviews && isCloudflarePagesPreview(normalized, allowedOrigins)
+}
 
 export function buildCorsOptions() {
   const nodeEnv = process.env.NODE_ENV || 'development'
   const allowedOrigins = (process.env.CORS_ORIGIN || '')
     .split(',')
-    .map((s) => s.trim())
+    .map((value) => normalizeOrigin(value.trim()))
     .filter(Boolean)
+  const allowPagesPreviews = process.env.CORS_ALLOW_PAGES_PREVIEWS === 'true'
 
-  if (allowedOrigins.length > 0) {
-    return { origin: allowedOrigins }
+  if (allowedOrigins.length === 0 && nodeEnv !== 'production') {
+    return { origin: true, credentials: true }
   }
-  if (nodeEnv === 'production') {
-    return { origin: false }
+
+  return {
+    origin(origin, callback) {
+      callback(null, isOriginAllowed(origin, allowedOrigins, allowPagesPreviews))
+    },
+    credentials: true,
+    optionsSuccessStatus: 204,
   }
-  return { origin: true }
 }

@@ -10,8 +10,22 @@
 
 const TOKEN_KEY = 'token'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:10000";
+// Cloudflare Pages injects VITE_API_URL at build time. Development keeps an explicit
+// localhost fallback, while legacy same-origin deployments (Docker/nginx) use an
+// absolute window.location.origin URL. Requests are therefore never sent with a
+// relative "/api/..." URL in a production browser.
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+const fallbackApiUrl = import.meta.env.DEV
+  ? 'http://localhost:4000'
+  : globalThis.location?.origin
+const API_BASE_URL = (configuredApiUrl || fallbackApiUrl || '').replace(/\/+$/, '')
+
+function apiUrl(path) {
+  if (!API_BASE_URL) {
+    throw new Error('ไม่ได้ตั้งค่า VITE_API_URL สำหรับการเชื่อมต่อ API')
+  }
+  return `${API_BASE_URL}/api${path}`
+}
 
 export const auth = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -24,10 +38,10 @@ async function request(path, options = {}) {
   const token = auth.get()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE_URL}/api${path}`, {
-  ...options,
-  headers,
-})
+  const res = await fetch(apiUrl(path), {
+    ...options,
+    headers,
+  })
   const body = await res.json().catch(() => ({}))
 
   if (!res.ok || !body.success) {
@@ -59,7 +73,7 @@ async function downloadReport(reportKey, params, format) {
   const token = auth.get()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE_URL}/api/reports/${reportKey}${toQueryString({ ...params, format })}`, { headers })
+  const res = await fetch(apiUrl(`/reports/${reportKey}${toQueryString({ ...params, format })}`), { headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const err = new Error(body.message || 'ไม่สามารถส่งออกรายงานได้')
