@@ -33,6 +33,7 @@ const CORE_NAVIGATION = [
 ]
 
 const ADMIN_NAVIGATION = [
+  { key: 'users', label: 'สิทธิ์ผู้ใช้', group: 'ผู้ดูแลระบบ', icon: 'userRole' },
   { key: 'employees', label: 'พนักงาน', group: 'ผู้ดูแลระบบ', icon: 'employee' },
   { key: 'audit', label: 'Audit Log', group: 'ผู้ดูแลระบบ', icon: 'audit' },
   { key: 'categories', label: 'หมวดหมู่', group: 'ผู้ดูแลระบบ', icon: 'category' },
@@ -50,6 +51,7 @@ const PAGE_META = {
   reports: { title: 'รายงาน', eyebrow: 'ข้อมูลและการวิเคราะห์' },
   notifications: { title: 'การแจ้งเตือน', eyebrow: 'ศูนย์การสื่อสาร' },
   audit: { title: 'Audit Log', eyebrow: 'การกำกับดูแลระบบ' },
+  users: { title: 'สิทธิ์ผู้ใช้', eyebrow: 'การจัดการบัญชีและ RBAC' },
   employees: { title: 'พนักงาน', eyebrow: 'การจัดการบุคลากร' },
   categories: { title: 'หมวดหมู่', eyebrow: 'ข้อมูลหลัก' },
   locations: { title: 'สถานที่ตั้ง', eyebrow: 'ข้อมูลหลัก' },
@@ -66,6 +68,7 @@ function Icon({ name }) {
     ticket: <><path d="M4 7a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2v-3a2 2 0 0 0 0-4V7Z" /><path d="M12 8v8" /></>,
     report: <><path d="M5 20V10M12 20V4M19 20v-7" /><path d="M3 20h18" /></>,
     audit: <><path d="M12 3 20 6v6c0 5-3.2 8.1-8 10-4.8-1.9-8-5-8-10V6l8-3Z" /><path d="m9 12 2 2 4-4" /></>,
+    userRole: <><circle cx="9" cy="8" r="4" /><path d="M2.5 21a6.5 6.5 0 0 1 13 0" /><path d="m17 12 2 2 3-4" /></>,
     employee: <><circle cx="9" cy="8" r="4" /><path d="M2.5 21a6.5 6.5 0 0 1 13 0M17 11a4 4 0 0 0 0-7M17 15a6 6 0 0 1 5 6" /></>,
     category: <><path d="m4 4 6 1 9 9-5 5-9-9-1-6Z" /><circle cx="7.5" cy="7.5" r="1" /></>,
     location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
@@ -106,10 +109,13 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const profileRef = useRef(null)
   const searchRef = useRef(null)
 
-  const navigation = useMemo(
-    () => canManageMasterData ? [...CORE_NAVIGATION, ...ADMIN_NAVIGATION] : CORE_NAVIGATION,
-    [canManageMasterData],
-  )
+  const navigation = useMemo(() => {
+    if (!canManageMasterData) return CORE_NAVIGATION
+    const managementItems = user.role === 'ADMIN'
+      ? ADMIN_NAVIGATION
+      : ADMIN_NAVIGATION.filter((item) => item.key !== 'users')
+    return [...CORE_NAVIGATION, ...managementItems]
+  }, [canManageMasterData, user.role])
 
   const searchResults = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('th')

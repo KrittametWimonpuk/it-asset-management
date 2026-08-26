@@ -30,8 +30,8 @@ const loginSchema = z.object({
 })
 
 // สร้าง JWT ที่หมดอายุใน 7 วัน
-// แนบ role มาด้วย (Milestone 4) — requireAuth/requireRole ใช้ตรวจสิทธิ์จากค่านี้โดยไม่ต้อง query DB ซ้ำทุก request
-// หมายเหตุ: ถ้า role ถูกเปลี่ยนภายหลัง ผู้ใช้ต้องล็อกอินใหม่ token เก่าจะยังพก role เดิมไปจนกว่าจะหมดอายุ (เหมือน email/name)
+// แนบ role มาด้วยเพื่อให้ client แสดง UI เริ่มต้นได้ทันที แต่ requireAuth จะตรวจ role ปัจจุบันจากฐานข้อมูล
+// ทุก request ทำให้การเปลี่ยนสิทธิ์โดย ADMIN มีผลกับ authorization ทันทีแม้ token เดิมยังไม่หมดอายุ
 function signToken(user) {
   return jwt.sign(
     { sub: user.id, email: user.email, role: user.role, employeeId: user.employeeId || null },

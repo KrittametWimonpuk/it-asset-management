@@ -10,7 +10,7 @@
  *     summary: รายชื่อผู้ใช้ทั้งหมด
  *     description: >
  *       เฉพาะ ADMIN, IT_STAFF (EMPLOYEE เข้าไม่ได้) — ใช้เลือกพนักงานตอนมอบหมายครุภัณฑ์ หรือมอบหมายผู้ดูแลตั๋ว
- *       เป็นการ "ดูอย่างเดียว" ยังไม่มี endpoint สร้าง/แก้ไข/ลบ/เปลี่ยน role ให้ role ไหนเรียกได้เลย — ไม่ส่ง password กลับมาเด็ดขาด
+ *       ไม่ส่ง password กลับมาเด็ดขาด รองรับค้นหาจากชื่อ อีเมล รหัสพนักงาน และชื่อพนักงาน
  *     parameters:
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/PageSizeParam'
@@ -41,4 +41,48 @@
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
  *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @openapi
+ * /api/users/{id}/role:
+ *   patch:
+ *     tags: [Users]
+ *     summary: เปลี่ยนสิทธิ์บัญชีผู้ใช้
+ *     description: เฉพาะ ADMIN; ห้ามเปลี่ยนสิทธิ์ตัวเองและห้ามลดสิทธิ์ ADMIN คนสุดท้าย
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             additionalProperties: false
+ *             properties:
+ *               role: { $ref: '#/components/schemas/UserRole' }
+ *     responses:
+ *       200:
+ *         description: เปลี่ยนสิทธิ์สำเร็จ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/User' }
+ *       400:
+ *         description: role ไม่ถูกต้องหรือพยายามเปลี่ยนสิทธิ์บัญชีตัวเอง
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         description: ไม่สามารถลดสิทธิ์ ADMIN คนสุดท้ายหรือมีการแก้ไขพร้อมกัน
  */
