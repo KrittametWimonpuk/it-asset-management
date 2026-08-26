@@ -7,10 +7,11 @@
 //     สำเร็จ   { success: true, data: ... }         -> คืนแค่ data ให้หน้าจอใช้ตรง ๆ
 //     ผิดพลาด  { success: false, message, errors }  -> throw Error(message) พร้อมแนบ .errors ไว้ด้วย
 // ---------------------------------------------------------------------------
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:10000";
 
 const TOKEN_KEY = 'token'
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:10000";
 
 export const auth = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -23,7 +24,10 @@ async function request(path, options = {}) {
   const token = auth.get()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE_URL}/api${path}`, ...)
+  const res = await fetch(`${API_BASE_URL}/api${path}`, {
+  ...options,
+  headers,
+})
   const body = await res.json().catch(() => ({}))
 
   if (!res.ok || !body.success) {
@@ -55,7 +59,7 @@ async function downloadReport(reportKey, params, format) {
   const token = auth.get()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE_URL}/api/reports/${reportKey}...`)
+  const res = await fetch(`${API_BASE_URL}/api/reports/${reportKey}${toQueryString({ ...params, format })}`, { headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const err = new Error(body.message || 'ไม่สามารถส่งออกรายงานได้')
