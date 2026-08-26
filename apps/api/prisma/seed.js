@@ -61,7 +61,12 @@ async function main() {
   }
 
   // ---- ผู้ใช้ตัวอย่าง (Milestone 4: RBAC) — หนึ่งบัญชีต่อ role ให้ทดสอบสิทธิ์ได้ครบ ----
-  const password = await bcrypt.hash('password123', 10)
+  const demoPassword = process.env.DEMO_ACCOUNT_PASSWORD
+    || (process.env.NODE_ENV === 'production' ? null : 'password123')
+  if (!demoPassword) {
+    throw new Error('DEMO_ACCOUNT_PASSWORD is required when seeding production')
+  }
+  const password = await bcrypt.hash(demoPassword, 10)
 
   const itStaff = await prisma.user.upsert({
     where: { email: 'itstaff@example.com' },
@@ -442,7 +447,7 @@ async function main() {
   })
 
   console.log(`Seeded master data: ${categoryNames.length} categories, ${locationNames.length} locations, ${departmentNames.length} departments, ${vendorSeed.length} vendors`)
-  console.log(`Seeded users: ${admin.email} (ADMIN), ${itStaff.email} (IT_STAFF), ${employee.email} (EMPLOYEE) — รหัสผ่านทุกบัญชี: password123`)
+  console.log(`Seeded users: ${admin.email} (ADMIN), ${itStaff.email} (IT_STAFF), ${employee.email} (EMPLOYEE) — password source: ${process.env.DEMO_ACCOUNT_PASSWORD ? 'deployment secret' : 'local development default'}`)
   console.log('Seeded assignments: Dell->Admin (active), HP->IT Staff (returned), Lenovo->IT Staff (active), iPhone->Employee (active)')
   console.log('Seeded assets: +printer (IT-0005), +network switch (IT-0006)')
   console.log('Seeded tickets: Dell blue screen (IN_PROGRESS), Printer jam (RESOLVED), Network packet loss (CLOSED), Lenovo software (OPEN), iPhone account (ON_HOLD)')

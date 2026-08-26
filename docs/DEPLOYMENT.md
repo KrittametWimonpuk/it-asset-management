@@ -64,12 +64,19 @@ JWT_SECRET=<long random secret>
 CORS_ORIGIN=https://it-asset-management.pages.dev
 CORS_ALLOW_PAGES_PREVIEWS=true # optional; set false to disable Pages previews
 TRUST_PROXY=1
+SEED_DEMO_DATA=true
+DEMO_ACCOUNT_PASSWORD=<strong secret, Render Secret>
 ```
 
 Render inject `PORT` ให้ Web Service อยู่แล้ว; Express อ่าน `process.env.PORT` ก่อน fallback ไป 4000
 เมื่อ `CORS_ORIGIN` เป็นโดเมน `pages.dev` ระบบจะอนุญาตเฉพาะ HTTPS preview subdomain ของ project
 เดียวกันโดยอัตโนมัติ หากไม่ต้องการ Preview ให้ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` โดย production
 origin หลักยังทำงานตามปกติ
+
+`SEED_DEMO_DATA=true` ใช้สำหรับ Portfolio/Demo deployment เท่านั้น โดย entrypoint จะรัน seed แบบ
+idempotent หลัง migration และก่อนเปิด API ต้องกำหนด `DEMO_ACCOUNT_PASSWORD` เป็น secret ที่คาดเดายาก
+และห้ามใส่ไว้ใน Git; production seed จะหยุดทันทีหากไม่มี secret นี้ สำหรับระบบที่ใช้ข้อมูลจริงให้ละตัวแปร
+`SEED_DEMO_DATA` ไว้หรือตั้งเป็น `false`
 
 ### CORS verification
 

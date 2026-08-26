@@ -189,7 +189,8 @@ npm run dev                     # เปิด http://localhost:5173
 
 Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 4000) ให้อัตโนมัติ ([vite.config.js](apps/web/vite.config.js))
 
-**บัญชีตัวอย่างหลัง `npm run seed`** (รหัสผ่านทุกบัญชี: `password123`):
+**บัญชีตัวอย่างหลัง `npm run seed`** (local development ใช้ `password123`; production ต้องกำหนด
+`DEMO_ACCOUNT_PASSWORD` เป็น secret ที่คาดเดายาก):
 
 | Email | Role |
 |-------|------|
@@ -223,6 +224,8 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `CORS_ALLOW_PAGES_PREVIEWS` | ควบคุม HTTPS preview subdomain ของ Cloudflare Pages; เมื่อไม่กำหนดจะเปิดอัตโนมัติเฉพาะ project ที่มี production origin อยู่ใน allowlist | auto |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | ความยาวหน้าต่างเวลานับจำนวนครั้ง login/register ต่อ IP (ms) — ไม่บังคับ ค่า default 900000 (15 นาที) (RC2) | `900000` |
 | `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
+| `SEED_DEMO_DATA` | รัน seed แบบ idempotent ตอน container เริ่ม หลัง migration; เปิดเฉพาะ Portfolio/Demo deployment | `false` |
+| `DEMO_ACCOUNT_PASSWORD` | รหัสผ่านบัญชีตัวอย่างเมื่อ seed บน production; ต้องเก็บเป็น deployment secret และห้าม commit | ไม่กำหนด |
 
 Frontend อ่าน `VITE_API_URL` ผ่าน `import.meta.env` โดยกำหนดใน `apps/web/.env*` หรือ build environment
 ของผู้ให้บริการ ค่า `VITE_*` เป็นข้อมูลสาธารณะที่ถูกฝังลง JavaScript bundle ห้ามนำ secret มาใส่:

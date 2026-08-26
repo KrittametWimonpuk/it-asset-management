@@ -40,6 +40,25 @@ test('Express and production deployment declare real-client proxy and health set
   assert.match(nginx, /proxy_set_header X-Forwarded-For/)
 })
 
+test('Docker demo seed is explicit, ordered after migration, and disabled by default', async () => {
+  const [entrypoint, seed] = await Promise.all([
+    readFile(new URL('../docker-entrypoint.sh', import.meta.url), 'utf8'),
+    readFile(new URL('../prisma/seed.js', import.meta.url), 'utf8'),
+  ])
+  const migrationIndex = entrypoint.indexOf('npx prisma migrate deploy')
+  const seedGuardIndex = entrypoint.indexOf('SEED_DEMO_DATA:-false')
+  const seedIndex = entrypoint.indexOf('npm run seed')
+  const serverIndex = entrypoint.indexOf('exec node src/index.js')
+
+  assert.ok(migrationIndex >= 0)
+  assert.ok(seedGuardIndex > migrationIndex)
+  assert.ok(seedIndex > seedGuardIndex)
+  assert.ok(serverIndex > seedIndex)
+  assert.match(seed, /DEMO_ACCOUNT_PASSWORD/)
+  assert.match(seed, /NODE_ENV === 'production'/)
+  assert.match(seed, /required when seeding production/)
+})
+
 test('Audit delivery uses a persisted outbox and a retry scheduler', async () => {
   const [audit, scheduler] = await Promise.all([
     readFile(new URL('./utils/auditLog.js', import.meta.url), 'utf8'),
