@@ -18,6 +18,58 @@ test('CORS only accepts Cloudflare Pages preview subdomains when enabled', () =>
   assert.equal(isOriginAllowed('http://preview.it-asset-management.pages.dev', [productionOrigin], true), false)
 })
 
+test('CORS enables secure previews by default for an allowlisted Pages project', async () => {
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalCorsOrigin = process.env.CORS_ORIGIN
+  const originalPreviewSetting = process.env.CORS_ALLOW_PAGES_PREVIEWS
+  process.env.NODE_ENV = 'production'
+  process.env.CORS_ORIGIN = productionOrigin
+  delete process.env.CORS_ALLOW_PAGES_PREVIEWS
+
+  try {
+    const options = buildCorsOptions()
+    const resolveOrigin = (origin) => new Promise((resolve, reject) => {
+      options.origin(origin, (error, result) => error ? reject(error) : resolve(result))
+    })
+
+    assert.equal(await resolveOrigin('https://preview-123.it-asset-management.pages.dev'), true)
+    assert.equal(await resolveOrigin('https://preview-123.other-project.pages.dev'), false)
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
+    if (originalCorsOrigin === undefined) delete process.env.CORS_ORIGIN
+    else process.env.CORS_ORIGIN = originalCorsOrigin
+    if (originalPreviewSetting === undefined) delete process.env.CORS_ALLOW_PAGES_PREVIEWS
+    else process.env.CORS_ALLOW_PAGES_PREVIEWS = originalPreviewSetting
+  }
+})
+
+test('CORS preview auto-detection can be disabled explicitly', async () => {
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalCorsOrigin = process.env.CORS_ORIGIN
+  const originalPreviewSetting = process.env.CORS_ALLOW_PAGES_PREVIEWS
+  process.env.NODE_ENV = 'production'
+  process.env.CORS_ORIGIN = productionOrigin
+  process.env.CORS_ALLOW_PAGES_PREVIEWS = 'false'
+
+  try {
+    const options = buildCorsOptions()
+    const allowed = await new Promise((resolve, reject) => {
+      options.origin('https://preview-123.it-asset-management.pages.dev', (error, result) => (
+        error ? reject(error) : resolve(result)
+      ))
+    })
+    assert.equal(allowed, false)
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
+    if (originalCorsOrigin === undefined) delete process.env.CORS_ORIGIN
+    else process.env.CORS_ORIGIN = originalCorsOrigin
+    if (originalPreviewSetting === undefined) delete process.env.CORS_ALLOW_PAGES_PREVIEWS
+    else process.env.CORS_ALLOW_PAGES_PREVIEWS = originalPreviewSetting
+  }
+})
+
 test('production CORS fails closed without an allowlist', async () => {
   const originalNodeEnv = process.env.NODE_ENV
   const originalCorsOrigin = process.env.CORS_ORIGIN

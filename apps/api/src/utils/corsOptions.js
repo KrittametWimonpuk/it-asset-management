@@ -3,8 +3,11 @@
 //
 // CORS_ORIGIN is a comma-separated allowlist of exact origins. When
 // CORS_ALLOW_PAGES_PREVIEWS=true, HTTPS subdomains of an allowlisted Cloudflare
-// Pages production hostname are also accepted. The server always reflects the
-// verified request origin; it never returns a wildcard with credentials.
+// Pages production hostname are also accepted. When the toggle is omitted,
+// preview support is enabled automatically only when an exact allowlisted
+// origin is a Cloudflare Pages hostname. Set the toggle to false to opt out.
+// The server always reflects the verified request origin; it never returns a
+// wildcard with credentials.
 // ---------------------------------------------------------------------------
 
 function normalizeOrigin(value) {
@@ -49,7 +52,13 @@ export function buildCorsOptions() {
     .split(',')
     .map((value) => normalizeOrigin(value.trim()))
     .filter(Boolean)
-  const allowPagesPreviews = process.env.CORS_ALLOW_PAGES_PREVIEWS === 'true'
+  const pagesPreviewSetting = process.env.CORS_ALLOW_PAGES_PREVIEWS
+  const hasCloudflarePagesOrigin = allowedOrigins.some((origin) => (
+    new URL(origin).hostname.endsWith('.pages.dev')
+  ))
+  const allowPagesPreviews = pagesPreviewSetting === undefined
+    ? hasCloudflarePagesOrigin
+    : pagesPreviewSetting === 'true'
 
   if (allowedOrigins.length === 0 && nodeEnv !== 'production') {
     return { origin: true, credentials: true }

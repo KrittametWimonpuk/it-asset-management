@@ -220,7 +220,7 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `PORT` | พอร์ตที่ backend จะรัน | `4000` |
 | `NODE_ENV` | `development` (ค่าเริ่มต้น) หรือ `production` — กำหนดพฤติกรรม default ของ CORS เวลาไม่ได้ตั้ง `CORS_ORIGIN` (RC2) | `development` |
 | `CORS_ORIGIN` | origin ที่อนุญาตให้เรียก API ข้าม origin ได้ (คั่นด้วยจุลภาคถ้ามีหลายตัว) — ไม่บังคับ ดูรายละเอียดที่หัวข้อ [🌐 CORS](#-cors) ด้านล่าง (RC2) | `http://localhost:5173,https://asset.example.com` |
-| `CORS_ALLOW_PAGES_PREVIEWS` | อนุญาต HTTPS preview subdomain ของ Cloudflare Pages production origin ที่กำหนดไว้ | `false` |
+| `CORS_ALLOW_PAGES_PREVIEWS` | ควบคุม HTTPS preview subdomain ของ Cloudflare Pages; เมื่อไม่กำหนดจะเปิดอัตโนมัติเฉพาะ project ที่มี production origin อยู่ใน allowlist | auto |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | ความยาวหน้าต่างเวลานับจำนวนครั้ง login/register ต่อ IP (ms) — ไม่บังคับ ค่า default 900000 (15 นาที) (RC2) | `900000` |
 | `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
 
@@ -302,8 +302,9 @@ inline script/style ที่ Swagger UI (`/docs`) ต้องใช้ — hea
 - ไม่ได้ตั้งค่า + `NODE_ENV=development` (ค่าเริ่มต้น) → reflect origin ที่ขอมา เหมือนพฤติกรรมเดิมก่อน RC2
   ทุกประการ (สะดวกตอน dev ที่ frontend/backend คนละพอร์ต)
 - ไม่ได้ตั้งค่า + `NODE_ENV=production` → ปิดรับ cross-origin request ทั้งหมด (fail closed เพื่อความปลอดภัย)
-- ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=true` → อนุญาตเฉพาะ HTTPS subdomain ของ Cloudflare Pages production
-  origin ที่อยู่ใน `CORS_ORIGIN` เช่น `https://<branch>.it-asset-management.pages.dev`
+- เมื่อ `CORS_ORIGIN` เป็น Cloudflare Pages production origin ระบบจะอนุญาตเฉพาะ HTTPS preview
+  subdomain ของ project เดียวกันโดยอัตโนมัติ เช่น `https://<branch>.it-asset-management.pages.dev`
+- ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` เพื่อปิด Preview หรือ `true` เพื่อเปิดอย่างชัดเจน
 
 Backend สะท้อนกลับเฉพาะ origin ที่ผ่าน allowlist จึงไม่ส่ง `Access-Control-Allow-Origin: *` เมื่อเปิด
 credentials และไม่ยอมรับ hostname ที่เพียงแค่ต่อท้ายด้วยโดเมนหลอก
@@ -435,7 +436,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 | `NODE_ENV` | ต้องเป็น `production` เสมอสำหรับไฟล์นี้ |
 | `TRUST_PROXY` | จำนวน reverse proxy hop หน้า Express (topology มาตรฐานใช้ `1`) |
 | `CORS_ORIGIN` | ปกติปล่อยว่างได้ — topology มาตรฐานของ compose นี้เป็น same-origin ผ่าน nginx อยู่แล้ว |
-| `CORS_ALLOW_PAGES_PREVIEWS` | ปกติ `false`; เปิดเฉพาะ deployment ที่ใช้ Cloudflare Pages Preview |
+| `CORS_ALLOW_PAGES_PREVIEWS` | ปกติ auto ตาม `CORS_ORIGIN`; ตั้ง `false` สำหรับ self-hosted ที่ไม่ใช้ Pages Preview |
 | `AUTH_RATE_LIMIT_WINDOW_MS`/`AUTH_RATE_LIMIT_MAX` | ค่า default ใช้งานได้เลย ไม่บังคับตั้ง |
 | `PORT` | พอร์ตภายใน container ของ backend (default `4000`) |
 | `TLS_CERT_PATH`/`TLS_KEY_PATH` | certificate/private key สำหรับ nginx self-hosted |
