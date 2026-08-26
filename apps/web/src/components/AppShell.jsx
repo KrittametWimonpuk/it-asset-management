@@ -329,7 +329,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
         <div className="sidebar-footer">
           <div className="sidebar-version">
             <span className="sidebar-status-dot" />
-            <span>v1.1.0 Beta 1</span>
+            <span>v1.1.0 Stable</span>
           </div>
           <button
             className="sidebar-collapse"
