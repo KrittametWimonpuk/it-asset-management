@@ -62,12 +62,14 @@ NODE_ENV=production
 DATABASE_URL=<Render PostgreSQL connection string>
 JWT_SECRET=<long random secret>
 CORS_ORIGIN=https://it-asset-management.pages.dev
-CORS_ALLOW_PAGES_PREVIEWS=true
+CORS_ALLOW_PAGES_PREVIEWS=true # optional; set false to disable Pages previews
 TRUST_PROXY=1
 ```
 
 Render inject `PORT` ให้ Web Service อยู่แล้ว; Express อ่าน `process.env.PORT` ก่อน fallback ไป 4000
-หากไม่ต้องการ Preview ให้ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` โดย production origin หลักยังทำงานตามปกติ
+เมื่อ `CORS_ORIGIN` เป็นโดเมน `pages.dev` ระบบจะอนุญาตเฉพาะ HTTPS preview subdomain ของ project
+เดียวกันโดยอัตโนมัติ หากไม่ต้องการ Preview ให้ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` โดย production
+origin หลักยังทำงานตามปกติ
 
 ### CORS verification
 
