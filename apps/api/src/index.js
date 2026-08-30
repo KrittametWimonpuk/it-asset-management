@@ -26,6 +26,7 @@ import employeeRoutes from './routes/employees.js'
 import borrowRequestRoutes from './routes/borrowRequests.js'
 import notificationRoutes from './routes/notifications.js'
 import notificationSettingsRoutes from './routes/notificationSettings.js'
+import internalSchedulerRoutes from './routes/internalScheduler.js'
 import { fail } from './utils/response.js'
 
 const app = express()
@@ -89,6 +90,7 @@ app.use('/api/employees', employeeRoutes)
 app.use('/api/borrow-requests', borrowRequestRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/settings/notifications', notificationSettingsRoutes)
+app.use('/api/internal/scheduler', internalSchedulerRoutes)
 
 // ---- ดักกรณีเรียก path ที่ไม่มี ----
 app.use((_req, res) => fail(res, 404, 'ไม่พบ endpoint นี้'))

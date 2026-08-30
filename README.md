@@ -231,6 +231,7 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `EMAIL_ENABLED` | เปิดการส่งอีเมล; เมื่อเป็น `false` ระบบบันทึก outbox เป็น `SKIPPED` และ In-app/workflow ยังทำงาน | `false` |
 | `EMAIL_PROVIDER` | Provider adapter เริ่มต้น (ปัจจุบันรองรับ `resend`) | `resend` |
 | `RESEND_API_KEY` | API key ของ Resend — backend secret เท่านั้น ห้ามใส่ใน `VITE_*` หรือ commit | ไม่กำหนด |
+| `SCHEDULER_SECRET` | secret แบบสุ่มอย่างน้อย 32 ตัวอักษร สำหรับ GitHub Actions เรียก scheduler endpoint ภายใน | ไม่กำหนด |
 | `EMAIL_FROM` | ผู้ส่งบนโดเมนที่ Verify แล้ว | `IT Asset Management <noreply@example.com>` |
 | `EMAIL_REPLY_TO` | Reply-To (ไม่บังคับ) | `support@example.com` |
 | `APP_URL` | URL หน้าเว็บที่ปุ่มในอีเมลพากลับมา | `http://localhost:5173` |
@@ -621,6 +622,19 @@ npm run scheduler
 
 ตั้ง cron/EventBridge ให้เรียกคำสั่งนี้เป็นระยะ (แนะนำทุก 5 นาที) การเรียกซ้ำหรือทำงานพร้อมกันไม่สร้างรายการซ้ำ
 
+Production บน Cloudflare Pages + Render ใช้ `.github/workflows/scheduler.yml` เพื่อไม่ต้องเปิด Render Cron Job:
+
+1. สร้าง secret แบบสุ่มอย่างน้อย 32 ตัวอักษร แล้วตั้งค่า `SCHEDULER_SECRET` ค่าเดียวกันทั้ง Render Web Service
+   และ GitHub Actions repository secret
+2. สร้าง GitHub Actions repository variable ชื่อ `SCHEDULER_URL` เป็น
+   `https://it-asset-management-api.onrender.com/api/internal/scheduler/run`
+3. Workflow รันทุก 5 นาทีและเรียก endpoint ผ่าน HTTPS ด้วย Bearer secret; endpoint ไม่ใช้ User JWT,
+   ไม่อยู่ใน Swagger และตอบ `401` เมื่อ secret หาย/สั้น/ไม่ตรง
+4. ทดสอบทันทีได้จาก GitHub Actions > Notification and Outbox Scheduler > Run workflow
+
+วิธีนี้ไม่เก็บ `DATABASE_URL` หรือ `RESEND_API_KEY` ใน GitHub เพราะ Scheduler ทำงานภายใน Render Web Service
+และใช้ environment เดิมของ Backend
+
 ---
 
 ## 📘 API Documentation (Swagger)
@@ -865,8 +879,9 @@ cd deploy
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
   ไม่ใช่ข้อจำกัดทางเทคนิค
-- **Email delivery ต้องมี scheduler ภายนอก** — API ทำหน้าที่ enqueue เท่านั้น ต้องให้ Render Cron Job,
-  EventBridge หรือ cron เรียก `npm run scheduler`; การส่งจริงต้องใช้โดเมนที่ Verify SPF/DKIM กับ Resend แล้ว
+- **Email delivery ต้องมี scheduler ภายนอก** — production ใช้ GitHub Actions เรียก operational endpoint ที่ป้องกัน
+  ด้วย `SCHEDULER_SECRET`; deployment อื่นยังใช้ Render Cron Job, EventBridge หรือ `npm run scheduler` ได้
+  การส่งจริงต้องใช้โดเมนที่ Verify SPF/DKIM กับ Resend แล้ว
 - **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
   (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
 - **Export ดึงข้อมูลสูงสุด 25,000 แถวในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ

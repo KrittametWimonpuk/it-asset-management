@@ -8,6 +8,8 @@
 ## [Unreleased]
 
 ### Added
+- เพิ่ม GitHub Actions Scheduler ทุก 5 นาทีและ operational endpoint ที่ป้องกันด้วย Bearer
+  `SCHEDULER_SECRET` เพื่อส่ง Email/Audit outbox บน Render โดยไม่ต้องใช้ Render Cron Job
 - เพิ่มหน้า “สิทธิ์ผู้ใช้” สำหรับ ADMIN เพื่อกำหนดบทบาท `EMPLOYEE`, `IT_STAFF` และ `ADMIN`
 - เพิ่ม `PATCH /api/users/{id}/role` พร้อม validation, Audit Log, ป้องกันแก้สิทธิ์ตัวเอง และป้องกันลดสิทธิ์ ADMIN คนสุดท้าย
 - เพิ่ม Email Notification ผ่าน Resend adapter โดยใช้ durable `EmailOutbox`, dedupe, scheduler worker,

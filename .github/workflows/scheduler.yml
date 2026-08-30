@@ -1,0 +1,33 @@
+name: Notification and Outbox Scheduler
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-notification-scheduler
+  cancel-in-progress: false
+
+jobs:
+  run-scheduler:
+    name: Run production scheduler
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger scheduler securely
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+          SCHEDULER_URL: ${{ vars.SCHEDULER_URL }}
+        run: |
+          test -n "$SCHEDULER_SECRET"
+          test -n "$SCHEDULER_URL"
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-delay 5 --retry-all-errors \
+            --max-time 180 \
+            -X POST "$SCHEDULER_URL" \
+            -H "Authorization: Bearer $SCHEDULER_SECRET" \
+            -H "Accept: application/json"
