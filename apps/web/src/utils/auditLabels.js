@@ -31,6 +31,10 @@ export const ACTION_LABELS = {
   RETURN_LOST: 'บันทึกสูญหาย',
   NOTIFICATION_SENT: 'ส่งการแจ้งเตือน',
   NOTIFICATION_READ: 'อ่านการแจ้งเตือน',
+  NOTIFICATION_SETTINGS_UPDATED: 'แก้ไขการตั้งค่าแจ้งเตือน',
+  EMAIL_VERIFICATION_REQUESTED: 'ขอยืนยันอีเมล',
+  EMAIL_VERIFIED: 'ยืนยันอีเมล',
+  EMAIL_TEST_QUEUED: 'ส่งอีเมลทดสอบเข้าคิว',
 }
 
 export const ENTITY_TYPE_LABELS = {
@@ -46,4 +50,6 @@ export const ENTITY_TYPE_LABELS = {
   User: 'ผู้ใช้',
   Report: 'รายงาน',
   Notification: 'การแจ้งเตือน',
+  NotificationPreference: 'การตั้งค่าแจ้งเตือน',
+  EmailOutbox: 'คิวอีเมล',
 }

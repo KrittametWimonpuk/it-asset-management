@@ -1,15 +1,17 @@
 import { generateDueReminders } from '../services/notificationService.js'
 import { flushAuditOutbox } from '../utils/auditLog.js'
 import { prisma } from '../db.js'
+import { flushEmailOutbox } from '../services/emailWorker.js'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 export async function runSchedulerTick(now = new Date()) {
-  const [reminders, audit] = await Promise.all([
+  const [reminders, audit, email] = await Promise.all([
     generateDueReminders(now),
     flushAuditOutbox(),
+    flushEmailOutbox({ now }),
   ])
-  return { reminders, audit, ranAt: now.toISOString() }
+  return { reminders, audit, email, ranAt: now.toISOString() }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

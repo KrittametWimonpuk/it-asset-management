@@ -867,6 +867,17 @@ const notificationSchemas = {
       readAt: { type: 'string', format: 'date-time', nullable: true }, deletedAt: { type: 'string', format: 'date-time', nullable: true },
     },
   },
+  NotificationPreferenceUpdate: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      notificationEmail: { type: 'string', format: 'email', nullable: true, maxLength: 254 },
+      emailEnabled: { type: 'boolean' }, inAppEnabled: { type: 'boolean' },
+      borrowRequestEnabled: { type: 'boolean' }, approvalEnabled: { type: 'boolean' },
+      assignmentEnabled: { type: 'boolean' }, returnEnabled: { type: 'boolean' },
+      helpdeskEnabled: { type: 'boolean' }, reminderEnabled: { type: 'boolean' },
+    },
+  },
 }
 
 // ---- Audit Log (Milestone 9) — record เดียวใช้ทั้ง GET /api/audit, GET /api/audit/:id และ
@@ -874,11 +885,11 @@ const notificationSchemas = {
 const auditSchemas = {
   AuditAction: {
     type: 'string',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST', 'NOTIFICATION_SENT', 'NOTIFICATION_READ'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'RETURN', 'OPEN', 'START_PROGRESS', 'ON_HOLD', 'RESOLVE', 'CLOSE', 'LOGIN', 'EXPORT_REPORT', 'BORROW_REQUEST_CREATED', 'BORROW_REQUEST_APPROVED', 'BORROW_REQUEST_REJECTED', 'BORROW_REQUEST_CANCELLED', 'APPROVAL_STARTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED', 'RETURN_STARTED', 'RETURN_INSPECTED', 'RETURN_COMPLETED', 'RETURN_DAMAGED', 'RETURN_LOST', 'NOTIFICATION_SENT', 'NOTIFICATION_READ', 'NOTIFICATION_SETTINGS_UPDATED', 'EMAIL_VERIFICATION_REQUESTED', 'EMAIL_VERIFIED', 'EMAIL_TEST_QUEUED'],
   },
   AuditEntityType: {
     type: 'string',
-    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report', 'Notification'],
+    enum: ['Asset', 'Assignment', 'Ticket', 'Employee', 'BorrowRequest', 'Category', 'Department', 'Location', 'Vendor', 'User', 'Report', 'Notification', 'NotificationPreference', 'EmailOutbox'],
   },
   AuditLog: {
     type: 'object',
@@ -930,6 +941,7 @@ const definition = {
     { name: 'Assignments', description: 'มอบหมาย/รับคืนครุภัณฑ์ (ประวัติการถือครอง)' },
     { name: 'Borrow Requests', description: 'คำขอยืม การอนุมัติ ความคิดเห็น Timeline และการสร้าง Assignment อัตโนมัติ' },
     { name: 'Notifications', description: 'การแจ้งเตือนส่วนตัว การอ่าน และ soft delete พร้อม reminder กำหนดคืน' },
+    { name: 'Notification Settings', description: 'การตั้งค่า In-app/Email ของตนเอง การยืนยันอีเมล และ Test Email' },
     { name: 'Dashboard', description: 'ข้อมูลรวมสำหรับแดชบอร์ด (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)' },
     { name: 'Master Data', description: 'หมวดหมู่ / สถานที่ตั้ง / แผนก / ผู้ขาย-ผู้ผลิต' },
     { name: 'Tickets', description: 'ใบแจ้งซ่อม/ปัญหาครุภัณฑ์ (Helpdesk & Maintenance)' },

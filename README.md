@@ -32,11 +32,11 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 | **Employee Management (v1.1 Stable)** | ทะเบียนพนักงานและความสัมพันธ์ one-to-one กับ User แบบ explicit FK/unique: ค้นหา/กรอง/แบ่งหน้า, สถานะ, แผนก/ตำแหน่ง, Create/Edit/Archive/Restore, soft delete, RBAC และ Audit Log |
 | **Asset Assignment & Return Inspection** | Employee เป็น business identity ของผู้ถือครอง, User เป็น operator/RBAC; รองรับมอบหมาย, เริ่มตรวจรับ, สภาพ/ผลตรวจ/ผู้ตรวจ/เวลา, Return Timeline และประวัติเต็มรูปแบบโดยไม่ทำข้อมูล User เดิมหาย |
 | **Borrow Request & Approval Workflow (v1.1 Stable)** | Employee ส่งคำขอยืมและติดตามสถานะ; ADMIN/IT_STAFF อนุมัติ/ปฏิเสธพร้อมความคิดเห็น ผู้พิจารณา เวลา และ Approval Timeline โดยการอนุมัติสร้าง Assignment อัตโนมัติใน transaction เดียว |
-| **Notifications & Reminders (v1.1 Stable)** | การแจ้งเตือน in-app พร้อม unread badge, reminder ก่อนกำหนด 3 วัน/overdue แบบ scheduler-ready และ database dedupe, search/filter/pagination, soft delete และ recipient-scoped RBAC |
+| **Notifications, Email & Reminders** | Notification Bell พร้อม unread badge และ Email ผ่าน Resend adapter; ผู้ใช้กำหนดอีเมลแยกจาก Login, ยืนยันด้วย one-time token, เลือกประเภท, reminder ก่อนกำหนด/overdue, durable outbox, dedupe และ retry โดยไม่ทำให้ workflow หลักล้ม |
 | **Dashboard & Analytics** | การ์ดสรุป, กราฟภาพรวม (หมวดหมู่/แผนก/สถานที่/สถานะ/ประกัน/ผู้ขายยอดนิยม/ใบแจ้งซ่อม), กิจกรรมล่าสุด, ใบแจ้งซ่อมล่าสุด — คำนวณที่ backend ทั้งหมด ไม่มี N+1 query |
 | **Helpdesk & Maintenance** | แจ้งปัญหาครุภัณฑ์ (ทุก role แจ้งได้), มอบหมายให้ ADMIN/IT_STAFF ดูแล, วงจรสถานะ OPEN → IN_PROGRESS → RESOLVED → CLOSED, เลขที่ใบแจ้งอัตโนมัติ (HD-000001, ...) ไม่ซ้ำกันแน่นอน, เชื่อมกับ Asset Explorer (นับใบแจ้งที่เปิดอยู่ต่อชิ้น + ประวัติการซ่อมบำรุงล่าสุด) |
 | **Reports & Export** | 10 รายงาน (เพิ่ม Notification Summary จาก 9 รายงานเดิม) พร้อมตัวกรองร่วมกัน — preview เป็นตารางในเว็บ หรือส่งออกเป็น **CSV / Excel (.xlsx) / PDF** ได้ทันที และ RBAC ขอบเขตเดียวกับหน้าจอปกติ |
-| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 75 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
+| **API Documentation** | เอกสาร OpenAPI 3.1 ครบทั้ง 81 endpoint methods พร้อม Swagger UI แบบ interactive ที่ `/docs` — ทดลองยิง request ได้จริง (Try It Out) ใส่ JWT ครั้งเดียวใช้ได้ทุก endpoint |
 | **Audit Log** | บันทึกการกระทำสำคัญผ่าน durable outbox + retry พร้อมค่าก่อน-หลัง ผู้ทำรายการ เวลา และ real client IP — ประวัติแก้ไข/ลบไม่ได้, เฉพาะ ADMIN/IT_STAFF ดูได้ |
 | **Soft Delete** | ทุกตารางหลักใช้ soft delete (`deletedAt`) — ลบแล้วยังอยู่ในฐานข้อมูลจริง กู้คืนได้ในอนาคต |
 | **CI/CD** | GitHub Actions ตรวจสอบคุณภาพโค้ดอัตโนมัติทุก push/PR — validate Prisma schema, lint, automated backend tests, build backend/frontend, fail-fast พร้อม job summary (ดู [⚙️ CI/CD Pipeline](#️-cicd-pipeline)) |
@@ -49,12 +49,14 @@ push ล่าสุดของ `master` ผ่านทุกขั้นต�
 ```text
 Browser ─HTTPS─▶ nginx / AWS ALB ─┬─▶ React + Vite static UI
                                   └─/api,/docs─▶ Express ─▶ Prisma ─▶ PostgreSQL
-Scheduler / EventBridge ───────────────────────────┬──────▶ Reminder dedupe
-                                                   └──────▶ Audit outbox retry
+Scheduler / EventBridge ────────────────┬──────────▶ Reminder dedupe
+                                        ├──────────▶ Audit outbox retry
+                                        └──────────▶ Email outbox ─▶ Resend
 User (authentication/RBAC) ── 0..1 : 1 ── Employee (business identity)
 ```
 
 ดูแผนภาพและขอบเขต component/transaction โดยละเอียดที่ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+และ threat model ของ Email delivery ที่ [docs/EMAIL_NOTIFICATIONS_SECURITY.md](docs/EMAIL_NOTIFICATIONS_SECURITY.md)
 
 - **Frontend**: React 18 + Vite, ไม่มี router library / state management library ใด ๆ (ตั้งใจให้เรียบง่าย
   — สลับหน้าด้วย state ธรรมดาใน [App.jsx](apps/web/src/App.jsx)) หน้าจอหลักคุยกับ backend ผ่านตัวช่วยกลางที่
@@ -66,7 +68,7 @@ User (authentication/RBAC) ── 0..1 : 1 ── Employee (business identity)
   ([auth.js](apps/api/src/middleware/auth.js)) — ทุก endpoint ที่ต้องล็อกอินเรียก `requireAuth`,
   endpoint ที่จำกัด role เพิ่ม `requireRole(...roles)` ต่อท้าย
   ไม่มี endpoint ไหนรับ `role` จาก client ตอนสมัคร/แก้ไขข้อมูลตัวเอง — กันการยกระดับสิทธิ์ตัวเอง
-- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0015_rc2_production_hardening`)
+- **Data model**: Prisma + PostgreSQL, migration แบบ sequential (`0001_init` ... `0016_email_notifications`)
   แทนชื่อ timestamp ของ Prisma default เพื่อให้อ่านลำดับการเปลี่ยนแปลงได้ง่าย
 - **"ผู้ถือครองปัจจุบัน"**: ไม่ใช่ field ที่แก้ตรง ๆ ได้ แต่คำนวณจาก `Assignment` แถวล่าสุดที่
   `returnedAt IS NULL AND deletedAt IS NULL` เสมอ (source of truth เดียว) บังคับด้วย partial unique index
@@ -226,6 +228,15 @@ Vite จะส่งต่อ `/api` ไปที่ backend (พอร์ต 40
 | `AUTH_RATE_LIMIT_MAX` | จำนวนครั้งสูงสุดที่ยิง login/register ได้ต่อ IP ในหน้าต่างเวลานั้น — ไม่บังคับ ค่า default 10 (RC2) | `10` |
 | `SEED_DEMO_DATA` | รัน seed แบบ idempotent ตอน container เริ่ม หลัง migration; เปิดเฉพาะ Portfolio/Demo deployment | `false` |
 | `DEMO_ACCOUNT_PASSWORD` | รหัสผ่านบัญชีตัวอย่างเมื่อ seed บน production; ต้องเก็บเป็น deployment secret และห้าม commit | ไม่กำหนด |
+| `EMAIL_ENABLED` | เปิดการส่งอีเมล; เมื่อเป็น `false` ระบบบันทึก outbox เป็น `SKIPPED` และ In-app/workflow ยังทำงาน | `false` |
+| `EMAIL_PROVIDER` | Provider adapter เริ่มต้น (ปัจจุบันรองรับ `resend`) | `resend` |
+| `RESEND_API_KEY` | API key ของ Resend — backend secret เท่านั้น ห้ามใส่ใน `VITE_*` หรือ commit | ไม่กำหนด |
+| `EMAIL_FROM` | ผู้ส่งบนโดเมนที่ Verify แล้ว | `IT Asset Management <noreply@example.com>` |
+| `EMAIL_REPLY_TO` | Reply-To (ไม่บังคับ) | `support@example.com` |
+| `APP_URL` | URL หน้าเว็บที่ปุ่มในอีเมลพากลับมา | `http://localhost:5173` |
+| `EMAIL_MAX_ATTEMPTS` | จำนวนครั้งสูงสุดที่ worker retry แบบ exponential backoff | `5` |
+| `EMAIL_TIMEOUT_MS` | Timeout ต่อคำขอไป Provider | `10000` |
+| `EMAIL_VERIFY_RATE_LIMIT_MAX` | จำนวน Verification/Test Email สูงสุดต่อ 15 นาทีต่อบัญชี | `5` |
 
 Frontend อ่าน `VITE_API_URL` ผ่าน `import.meta.env` โดยกำหนดใน `apps/web/.env*` หรือ build environment
 ของผู้ให้บริการ ค่า `VITE_*` เป็นข้อมูลสาธารณะที่ถูกฝังลง JavaScript bundle ห้ามนำ secret มาใส่:
@@ -621,8 +632,8 @@ npm run scheduler
 ### วิธีเปิด
 1. รัน backend ตามขั้นตอนใน [Development Workflow](#️-development-workflow--วิธีรันแบบ-พัฒนา-แก้โค้ดแล้วเห็นผลทันที) ด้านบน (หรือ `docker compose up --build`)
 2. เปิดเบราว์เซอร์ไปที่ `/docs`
-3. Endpoint ทั้งหมด (75 endpoint methods) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
-   Assignments, Borrow Requests, Notifications, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
+3. Endpoint ทั้งหมด (81 endpoint methods) จัดกลุ่มตามหมวด (tag): Authentication, Users, Employees, Assets,
+   Assignments, Borrow Requests, Notifications, Notification Settings, Dashboard, Master Data, Tickets, Reports, Audit Log, Health — แต่ละอันมี summary, description, พารามิเตอร์,
    request/response schema พร้อมตัวอย่างจริงจากข้อมูล seed (`IT-0001`, `Dell Latitude 5440`, `HD-000001`, `Admin User`)
 
 ### วิธี Authorize (ทดลองยิง endpoint ที่ต้องล็อกอิน)
@@ -854,8 +865,8 @@ cd deploy
   (เช่น กด back/forward ของเบราว์เซอร์ไม่เปลี่ยนหน้าจอ)
 - **ไม่มี endpoint ลบใบแจ้งซ่อม** — เป็นการตัดสินใจเชิงออกแบบ (ประวัติการแจ้งซ่อมต้องอยู่ครบเสมอ เหมือน Assignment)
   ไม่ใช่ข้อจำกัดทางเทคนิค
-- **Helpdesk ยังไม่มี**: แจ้งเตือนอีเมล, QR Code ติดครุภัณฑ์ — ตั้งใจเว้นไว้สำหรับ milestone ถัดไปเพื่อไม่ให้
-  scope ของ Milestone 7 บวมเกินไป (ดู Roadmap)
+- **Email delivery ต้องมี scheduler ภายนอก** — API ทำหน้าที่ enqueue เท่านั้น ต้องให้ Render Cron Job,
+  EventBridge หรือ cron เรียก `npm run scheduler`; การส่งจริงต้องใช้โดเมนที่ Verify SPF/DKIM กับ Resend แล้ว
 - **EMPLOYEE แจ้งปัญหาได้เฉพาะครุภัณฑ์ที่ตัวเองถือครองอยู่** — ไม่สามารถแจ้งปัญหาแทนเพื่อนร่วมงานหรือครุภัณฑ์ส่วนกลาง
   (เช่น เครื่องพิมพ์/network switch) ได้ ต้องให้ ADMIN/IT_STAFF เป็นผู้แจ้งแทนในกรณีนี้
 - **Export ดึงข้อมูลสูงสุด 25,000 แถวในคำสั่งเดียว (ไม่ใช่ DB cursor stream)** — HTTP response ของทั้ง 3 ฟอร์แมตเขียนแบบ
@@ -908,7 +919,8 @@ cd deploy
 - [x] Notifications & Reminder System — workflow events, unread/read, due/overdue, Dashboard, Report และ Audit (`v1.1.0-beta.1`)
 - [x] RC2 Production Hardening — identity FK, state transaction, scheduler/dedupe, audit outbox, TLS/proxy/indexes/a11y (`v1.1.0-rc2`)
 - [ ] HR Integration บน Employee foundation
-- [ ] แจ้งเตือนอีเมล (มอบหมายตั๋วใหม่, SLA ใกล้ครบกำหนด, รายงานประจำสัปดาห์อัตโนมัติ) — ตั้งใจเว้นไว้จาก Milestone 7/8
+- [x] แจ้งเตือนอีเมลสำหรับ lifecycle/Helpdesk พร้อม Settings, verification, durable outbox และ retry
+- [ ] รายงานประจำสัปดาห์อัตโนมัติ (อยู่นอกขอบเขต Email Notification รอบนี้)
 - [ ] QR Code ติดครุภัณฑ์ (สแกนเพื่อดูรายละเอียด/แจ้งปัญหาได้ทันที) — ตั้งใจเว้นไว้จาก Milestone 7/8
 - [ ] SLA tracking (เวลาตอบสนอง/แก้ไขตามระดับความสำคัญ) ต่อยอดจากโครง Ticket ที่มีอยู่แล้ว
 - [ ] Background export job (queue) สำหรับรายงานขนาดใหญ่มาก — ปัจจุบัน export เป็น synchronous request

@@ -4,7 +4,7 @@
  *   get:
  *     tags: [Notifications]
  *     summary: รายการแจ้งเตือนของผู้ใช้ปัจจุบัน
- *     description: ทุก role เห็นเฉพาะ Notification ที่มี userId เป็นบัญชีของตนเอง พร้อมสร้าง due reminder แบบ idempotent ก่อนอ่าน
+ *     description: ทุก role เห็นเฉพาะ Notification ที่มี userId เป็นบัญชีของตนเอง; due reminder สร้างโดย scheduler แบบ idempotent
  *     parameters:
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/PageSizeParam'

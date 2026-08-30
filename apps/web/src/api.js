@@ -170,6 +170,14 @@ export const api = {
     remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
   },
 
+  notificationSettings: {
+    get: () => request('/settings/notifications'),
+    update: (body) => request('/settings/notifications', { method: 'PUT', body: JSON.stringify(body) }),
+    requestVerification: () => request('/settings/notifications/email/verify', { method: 'POST' }),
+    confirmEmail: (token) => request('/settings/notifications/email/confirm', { method: 'POST', body: JSON.stringify({ token }) }),
+    sendTest: () => request('/settings/notifications/email/test', { method: 'POST' }),
+  },
+
   // Milestone 6: ข้อมูลรวมสำหรับแดชบอร์ด — ยิงครั้งเดียวได้ทุกอย่าง (การ์ดสรุป/กราฟ/กิจกรรมล่าสุด)
   dashboard: {
     get: () => request('/dashboard'),

@@ -7,6 +7,7 @@
 
 - [Deployment Paths ที่รองรับ](#deployment-paths-ที่รองรับ)
 - [Cloudflare Pages + Render](#cloudflare-pages--render)
+- [Email Notifications (Resend)](#email-notifications-resend)
 - [Server Requirements](#server-requirements)
 - [Build](#build)
 - [Startup](#startup)
@@ -66,12 +67,83 @@ CORS_ALLOW_PAGES_PREVIEWS=true # optional; set false to disable Pages previews
 TRUST_PROXY=1
 SEED_DEMO_DATA=true
 DEMO_ACCOUNT_PASSWORD=<strong secret, Render Secret>
+EMAIL_ENABLED=true
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<Render Secret>
+EMAIL_FROM=IT Asset Management <noreply@your-verified-domain.com>
+EMAIL_REPLY_TO=support@your-verified-domain.com
+APP_URL=https://it-asset-management.pages.dev
 ```
 
 Render inject `PORT` ให้ Web Service อยู่แล้ว; Express อ่าน `process.env.PORT` ก่อน fallback ไป 4000
 เมื่อ `CORS_ORIGIN` เป็นโดเมน `pages.dev` ระบบจะอนุญาตเฉพาะ HTTPS preview subdomain ของ project
 เดียวกันโดยอัตโนมัติ หากไม่ต้องการ Preview ให้ตั้ง `CORS_ALLOW_PAGES_PREVIEWS=false` โดย production
 origin หลักยังทำงานตามปกติ
+
+## Email Notifications (Resend)
+
+Email เป็น delivery layer ของ Notification เดิม ไม่ได้ส่งใน HTTP workflow โดยตรง: API บันทึก
+`EmailOutbox` แล้ว `npm run scheduler` เป็นผู้ส่งภายหลัง หาก Resend ล่มหรือ config ไม่ครบ Borrow Request,
+Approval, Assignment, Return, Helpdesk และ In-app Notification ยังคงทำงานตามปกติ
+
+### 1. Verify Domain
+
+1. เพิ่มโดเมนใน Resend Dashboard
+2. เพิ่ม DNS records ที่ Resend แสดงให้ครบ โดยเฉพาะ SPF และ DKIM
+3. ตั้ง DMARC ที่ `_dmarc.<domain>` เริ่มจาก policy ที่ทีมดูแลโดเมนอนุมัติ เช่น `p=none` ระหว่างเก็บผล
+   แล้วค่อยยกระดับเป็น `quarantine`/`reject` หลังยืนยันว่า source ถูกต้อง
+4. รอจน Resend แสดงสถานะ Verified แล้วจึงตั้ง `EMAIL_FROM` เป็นอีเมลบนโดเมนนั้น
+
+ห้ามใช้โดเมน From ที่ยังไม่ Verify ใน production และห้ามใส่ `RESEND_API_KEY` ใน Cloudflare Pages,
+ไฟล์ `apps/web/.env*` หรือค่าที่ขึ้นต้น `VITE_` เพราะค่าเหล่านั้นถูกเปิดเผยใน browser bundle
+
+### 2. Render Secrets
+
+ที่ Render Dashboard → Backend Web Service → Environment ให้เพิ่ม:
+
+```dotenv
+EMAIL_ENABLED=true
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<secret จาก Resend>
+EMAIL_FROM=IT Asset Management <noreply@your-verified-domain.com>
+EMAIL_REPLY_TO=support@your-verified-domain.com
+APP_URL=https://it-asset-management.pages.dev
+EMAIL_MAX_ATTEMPTS=5
+EMAIL_TIMEOUT_MS=10000
+EMAIL_VERIFY_RATE_LIMIT_MAX=5
+```
+
+ใช้ Secret value สำหรับ `RESEND_API_KEY` และสั่ง Redeploy backend หลังเปลี่ยน environment variable
+Cloudflare Pages ไม่ต้องมีค่า email ใด ๆ
+
+### 3. Scheduler / Worker
+
+ตั้ง Render Cron Job ให้ใช้ root directory `apps/api`, environment/database เดียวกับ backend และ command:
+
+```bash
+npm run scheduler
+```
+
+แนะนำทุก 1–5 นาที งานนี้ idempotent และรันซ้อนได้: due reminder ใช้ Notification dedupe,
+EmailOutbox ใช้ unique `dedupeKey` และ Resend idempotency key เดียวกันในทุก retry
+
+### 4. Failure Handling
+
+- `EMAIL_ENABLED=false` หรือไม่มี key/from: outbox เป็น `SKIPPED`; ไม่ throw กลับ workflow
+- Provider error/timeout: outbox เป็น `FAILED`, เพิ่ม `attempts` และ retry แบบ exponential backoff
+- ครบ `EMAIL_MAX_ATTEMPTS`: หยุด retry อัตโนมัติ (`nextAttemptAt=null`) เพื่อไม่สร้าง loop ถาวร
+- Worker ที่ค้าง `PROCESSING` เกิน 10 นาทีถูกนำกลับมา retry อัตโนมัติ
+- Log เก็บเฉพาะสถานะ/รหัส error ไม่ log API key, verification token หรือ HTML body
+
+### 5. ทดสอบ
+
+ล็อกอิน → “ตั้งค่าการแจ้งเตือน” → บันทึกอีเมล → ส่งอีเมลยืนยัน → กดลิงก์ภายใน 20 นาที →
+เปิด Email Notification → กด “ส่งอีเมลทดสอบ” จากนั้นเรียก scheduler หนึ่งครั้ง หากไม่ได้รับอีเมลให้ตรวจ
+Render Cron logs, สถานะโดเมน Resend และค่า `EmailOutbox.status/lastError` โดยไม่คัดลอกเนื้อหาอีเมลลง log
+
+Known limitations: repository ไม่มี daemon worker ที่ทำงานตลอดเวลา จึงต้องพึ่ง scheduler ของ platform;
+adapter production รอบนี้รองรับ Resend เท่านั้น แต่ service boundary แยกไว้สำหรับเพิ่ม SES/SMTP ภายหลัง;
+ยังไม่มี Organization Default และ job ล้าง verification token เก่าอัตโนมัติ (token เก่าหมดอายุและใช้ไม่ได้อยู่แล้ว)
 
 `SEED_DEMO_DATA=true` ใช้สำหรับ Portfolio/Demo deployment เท่านั้น โดย entrypoint จะรัน seed แบบ
 idempotent หลัง migration และก่อนเปิด API ต้องกำหนด `DEMO_ACCOUNT_PASSWORD` เป็น secret ที่คาดเดายาก
@@ -223,7 +295,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec api np
 
 ## Scheduler
 
-Reminder และ audit outbox retry ใช้ one-shot command เดียว ซึ่งต้องให้ platform เรียกเป็นระยะ (แนะนำทุก 5 นาที):
+Reminder, audit outbox retry และ email outbox delivery ใช้ one-shot commandเดียว ซึ่งต้องให้ platformเรียกเป็นระยะ (แนะนำทุก 1–5 นาที):
 
 ```bash
 # Self-hosted cron/systemd timer
