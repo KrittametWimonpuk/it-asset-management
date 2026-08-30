@@ -1,6 +1,7 @@
 import { prisma } from '../db.js'
 import { assignmentHolderScopeForAccount } from '../utils/assignmentHelpers.js'
 import { logAudit } from '../utils/auditLog.js'
+import { EMAIL_PREFERENCE_FIELDS, queueNotificationEmail } from './emailService.js'
 
 export const NOTIFICATION_TYPES = ['BORROW_REQUEST', 'APPROVAL', 'ASSIGNMENT', 'RETURN', 'REMINDER', 'SYSTEM']
 export const NOTIFICATION_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL']
@@ -26,17 +27,35 @@ async function auditSent(notification, context = {}, client = prisma) {
 // Notification is deliberately best-effort. A communication failure must never roll back a
 // completed lifecycle transaction. Callers may await this helper for deterministic tests, but it
 // always resolves with null instead of throwing.
-export async function createNotificationSafe({ userId, title, message, type, priority = 'NORMAL', dedupeKey = null, auditContext = {} }) {
+export async function createNotificationSafe({
+  userId, title, message, type, priority = 'NORMAL', dedupeKey = null, auditContext = {},
+  preferenceField, templateKey, actionUrl,
+}) {
   if (!userId) return null
   try {
-    const notification = await prisma.$transaction(async (tx) => {
-      const created = await tx.notification.create({
-        data: { userId, title, message, type, priority, dedupeKey },
+    return await prisma.$transaction(async (tx) => {
+      const preference = await tx.notificationPreference.findUnique({ where: { userId } })
+      const categoryField = preferenceField || EMAIL_PREFERENCE_FIELDS[type]
+      const categoryEnabled = !preference || !categoryField || preference[categoryField] !== false
+      const inAppEnabled = preference?.inAppEnabled !== false && categoryEnabled
+      const notification = inAppEnabled
+        ? await tx.notification.create({ data: { userId, title, message, type, priority, dedupeKey } })
+        : null
+      if (notification) await auditSent(notification, auditContext, tx)
+      await queueNotificationEmail(tx, {
+        preference,
+        notificationId: notification?.id,
+        userId,
+        title,
+        message,
+        type,
+        dedupeKey,
+        preferenceField,
+        templateKey,
+        actionUrl,
       })
-      await auditSent(created, auditContext, tx)
-      return created
+      return notification
     })
-    return notification
   } catch (error) {
     if (error?.code === 'P2002' && dedupeKey) return null
     console.error('สร้างการแจ้งเตือนไม่สำเร็จ:', error)
@@ -70,10 +89,15 @@ export async function userIdForEmployee(employeeId) {
   return users.length === 1 ? users[0].id : null
 }
 
-export async function notifyStaff(payload) {
+export async function notifyStaff({ excludeUserIds = [], ...payload }) {
   try {
     const ids = await staffRecipientIds()
-    return Promise.all(ids.map((userId) => createNotificationSafe({ ...payload, userId })))
+    const excluded = new Set(excludeUserIds.filter(Boolean))
+    return Promise.all(ids.filter((userId) => !excluded.has(userId)).map((userId) => createNotificationSafe({
+      ...payload,
+      userId,
+      dedupeKey: payload.dedupeKey ? `${payload.dedupeKey}:user:${userId}` : null,
+    })))
   } catch (error) {
     console.error('ค้นหาผู้รับการแจ้งเตือนฝ่ายดูแลไม่สำเร็จ:', error)
     return []
@@ -110,6 +134,7 @@ async function createReminderOnce(userId, assignment, overdue) {
     type: 'REMINDER',
     priority: overdue ? 'CRITICAL' : 'HIGH',
     dedupeKey: `assignment:${assignment.id}:${overdue ? 'overdue' : 'upcoming'}:${dueKey}:user:${userId}`,
+    templateKey: overdue ? 'OVERDUE_ASSET' : 'UPCOMING_DUE_DATE',
   })
 }
 
@@ -174,9 +199,7 @@ export async function generateDueReminders(now = new Date()) {
     const overdue = assignment.expectedReturnDate < now
     const employeeUserId = userByEmployee.get(assignment.employeeId) || assignment.userId
     if (employeeUserId) jobs.push(createReminderOnce(employeeUserId, assignment, overdue))
-    if (overdue) {
-      for (const account of staff) jobs.push(createReminderOnce(account.id, assignment, true))
-    }
+    for (const account of staff) jobs.push(createReminderOnce(account.id, assignment, overdue))
   }
   const results = await Promise.all(jobs)
   return { checked: assignments.length, created: results.filter(Boolean).length }

@@ -24,6 +24,7 @@ const Employees = lazy(() => import('./pages/Employees.jsx'))
 const UserRoles = lazy(() => import('./pages/UserRoles.jsx'))
 const BorrowRequests = lazy(() => import('./pages/BorrowRequests.jsx'))
 const Notifications = lazy(() => import('./pages/Notifications.jsx'))
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings.jsx'))
 const MasterDataPage = lazy(() => import('./pages/MasterDataPage.jsx'))
 
 function PageLoading() {
@@ -69,6 +70,12 @@ export default function App() {
       .catch(() => auth.clear())     // token หมดอายุ -> ล้างทิ้ง
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const token = new URLSearchParams(window.location.search).get('verifyEmail')
+    if (token) setTab('notificationSettings')
+  }, [user])
 
   function handleAuthed(data) {
     auth.set(data.token)
@@ -159,6 +166,7 @@ export default function App() {
           {tab === 'assignments' && <Assignments role={user.role} user={user} initialAssetId={assignmentsAssetFilter} />}
           {tab === 'borrowRequests' && <BorrowRequests role={user.role} />}
           {tab === 'notifications' && <Notifications />}
+          {tab === 'notificationSettings' && <NotificationSettings />}
           {tab === 'tickets' && <Tickets role={user.role} initialAssetId={ticketsAssetFilter} />}
           {tab === 'reports' && <Reports role={user.role} />}
           {tab === 'audit' && canManageMasterData && <AuditLog />}

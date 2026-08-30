@@ -35,6 +35,8 @@ model User {
   assignmentsInspected Assignment[] @relation("AssignmentInspector")
   assignmentReturnEvents AssignmentReturnEvent[] @relation("AssignmentReturnActor")
   notifications Notification[]
+  notificationPreference NotificationPreference?
+  emailVerificationTokens EmailVerificationToken[]
   employeeId    String?   @unique
   employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 }
@@ -145,10 +147,78 @@ model Notification {
   readAt    DateTime?
   deletedAt DateTime?
   dedupeKey String?              @unique
+  emailOutbox EmailOutbox?
 
   @@index([userId, isRead, deletedAt, createdAt])
   @@index([type, priority, createdAt])
   @@index([deletedAt])
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+// Email แจ้งเตือนแยกจากอีเมล Login โดยสมบูรณ์ ผู้ใช้แก้ได้เฉพาะของตัวเองผ่าน Settings API
+model NotificationPreference {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationEmail    String?
+  emailVerifiedAt      DateTime?
+  emailEnabled         Boolean  @default(false)
+  inAppEnabled         Boolean  @default(true)
+  borrowRequestEnabled Boolean  @default(true)
+  approvalEnabled      Boolean  @default(true)
+  assignmentEnabled    Boolean  @default(true)
+  returnEnabled        Boolean  @default(true)
+  helpdeskEnabled      Boolean  @default(true)
+  reminderEnabled      Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([notificationEmail])
+}
+
+// เก็บเฉพาะ SHA-256 hash ของ one-time token; token จริงปรากฏในอีเมลเพียงครั้งเดียว
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+// Durable outbox: HTTP workflow แค่ enqueue; scheduler เป็นผู้ส่งและ retry ภายหลัง
+model EmailOutbox {
+  id             String              @id @default(uuid())
+  notificationId String?             @unique
+  notification   Notification?       @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  recipientEmail String
+  subject        String
+  htmlBody       String
+  textBody       String
+  type           NotificationType
+  status         EmailDeliveryStatus @default(PENDING)
+  attempts       Int                 @default(0)
+  nextAttemptAt  DateTime?
+  sentAt         DateTime?
+  lastError      String?
+  dedupeKey      String              @unique
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([recipientEmail])
 }
 
 // ---------------------------------------------------------------------------

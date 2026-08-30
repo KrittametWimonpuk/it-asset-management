@@ -8,7 +8,8 @@ import { runSchedulerTick } from '../jobs/runScheduler.js'
 
 const enabled = process.env.RUN_DB_TESTS === '1'
 const ids = {
-  assignments: [], notifications: [], auditLogs: [], auditOutboxes: [], assets: [], users: [], employees: [], categories: [],
+  assignments: [], notifications: [], emailOutboxes: [], notificationPreferences: [],
+  auditLogs: [], auditOutboxes: [], assets: [], users: [], employees: [], categories: [],
 }
 
 after(async () => {
@@ -16,7 +17,9 @@ after(async () => {
   await prisma.assignment.deleteMany({ where: { id: { in: ids.assignments } } })
   await prisma.auditLog.deleteMany({ where: { id: { in: ids.auditLogs } } })
   await prisma.auditOutbox.deleteMany({ where: { id: { in: ids.auditOutboxes } } })
+  await prisma.emailOutbox.deleteMany({ where: { id: { in: ids.emailOutboxes } } })
   await prisma.notification.deleteMany({ where: { id: { in: ids.notifications } } })
+  await prisma.notificationPreference.deleteMany({ where: { id: { in: ids.notificationPreferences } } })
   await prisma.asset.deleteMany({ where: { id: { in: ids.assets } } })
   await prisma.user.deleteMany({ where: { id: { in: ids.users } } })
   await prisma.employee.deleteMany({ where: { id: { in: ids.employees } } })
@@ -44,6 +47,16 @@ test('RC2 database constraints and assignment state transaction work on PostgreS
   })
   ids.users.push(operator.id, holder.id)
 
+  const preference = await prisma.notificationPreference.create({
+    data: {
+      userId: holder.id,
+      notificationEmail: holder.email,
+      emailVerifiedAt: new Date(),
+      emailEnabled: true,
+    },
+  })
+  ids.notificationPreferences.push(preference.id)
+
   await assert.rejects(
     prisma.user.create({
       data: { email: `rc2-duplicate-${suffix}@example.com`, password: 'test-hash', employeeId: employee.id },
@@ -55,11 +68,16 @@ test('RC2 database constraints and assignment state transaction work on PostgreS
     userId: holder.id, title: 'RC2', message: 'dedupe check', type: 'SYSTEM', dedupeKey: `rc2:${suffix}`,
   })
   ids.notifications.push(notification.id)
+  const emailOutbox = await prisma.emailOutbox.findUnique({ where: { notificationId: notification.id } })
+  assert.equal(emailOutbox.status, 'SKIPPED')
+  assert.equal(emailOutbox.lastError, 'EMAIL_DISABLED')
+  ids.emailOutboxes.push(emailOutbox.id)
   assert.equal(await createNotificationSafe({
     userId: holder.id, title: 'RC2 duplicate', message: 'must be ignored', type: 'SYSTEM', dedupeKey: `rc2:${suffix}`,
   }), null)
   const scheduler = await runSchedulerTick()
   assert.ok(scheduler.audit.processed >= 1)
+  assert.equal(typeof scheduler.email.sent, 'number')
   const notificationAudit = await prisma.auditLog.findFirst({
     where: { entityType: 'Notification', entityId: notification.id },
   })

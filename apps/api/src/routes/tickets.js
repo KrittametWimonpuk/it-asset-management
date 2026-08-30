@@ -32,6 +32,7 @@ import {
   nextTicketNumber, TICKET_WITH_RELATIONS, isValidTransition, PUT_EDITABLE_STATUSES,
 } from '../utils/ticketHelpers.js'
 import { logAudit, auditContext } from '../utils/auditLog.js'
+import { createNotificationSafe, notifyStaff } from '../services/notificationService.js'
 
 // ป้าย action ของ audit log ตามสถานะเป้าหมายที่ PUT ทั่วไปเปลี่ยนได้ (ไม่รวม RESOLVED/CLOSED — ใช้ action
 // คงที่ RESOLVE/CLOSE ที่ endpoint เฉพาะของมันเองแทน ดูด้านล่าง)
@@ -190,6 +191,30 @@ router.post('/', asyncHandler(async (req, res) => {
     ...auditContext(req), action: 'OPEN', entityType: 'Ticket', entityId: ticket.id,
     description: `แจ้งปัญหาใหม่ ${ticket.ticketNumber} — ${ticket.title} (${ticket.asset.assetTag})`,
     newValues: { assetId, ...rest },
+  })
+
+  const notificationContext = auditContext(req)
+  await notifyStaff({
+    excludeUserIds: [req.user.id],
+    title: `ใบแจ้งปัญหาใหม่ ${ticket.ticketNumber}`,
+    message: `${ticket.title} · ${ticket.asset.assetTag} — ${ticket.asset.name}`,
+    type: 'SYSTEM',
+    priority: ticket.priority === 'CRITICAL' ? 'CRITICAL' : (ticket.priority === 'HIGH' ? 'HIGH' : 'NORMAL'),
+    preferenceField: 'helpdeskEnabled',
+    templateKey: 'HELPDESK_NEW',
+    dedupeKey: `ticket:${ticket.id}:new:staff`,
+    auditContext: notificationContext,
+  })
+  await createNotificationSafe({
+    userId: req.user.id,
+    title: `รับแจ้งปัญหา ${ticket.ticketNumber} แล้ว`,
+    message: `ระบบได้รับเรื่อง “${ticket.title}” และจะแจ้งความคืบหน้าผ่านศูนย์การสื่อสาร`,
+    type: 'SYSTEM',
+    priority: 'NORMAL',
+    preferenceField: 'helpdeskEnabled',
+    templateKey: 'HELPDESK_CONFIRMATION',
+    dedupeKey: `ticket:${ticket.id}:confirmation:user:${req.user.id}`,
+    auditContext: notificationContext,
   })
 
   ok(res, ticket, 201)

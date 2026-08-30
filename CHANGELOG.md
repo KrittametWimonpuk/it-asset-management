@@ -10,9 +10,17 @@
 ### Added
 - เพิ่มหน้า “สิทธิ์ผู้ใช้” สำหรับ ADMIN เพื่อกำหนดบทบาท `EMPLOYEE`, `IT_STAFF` และ `ADMIN`
 - เพิ่ม `PATCH /api/users/{id}/role` พร้อม validation, Audit Log, ป้องกันแก้สิทธิ์ตัวเอง และป้องกันลดสิทธิ์ ADMIN คนสุดท้าย
+- เพิ่ม Email Notification ผ่าน Resend adapter โดยใช้ durable `EmailOutbox`, dedupe, scheduler worker,
+  exponential retry และสถานะ `SKIPPED` เมื่อปิดหรือ Provider ยังตั้งค่าไม่ครบ
+- เพิ่ม Notification Settings ส่วนบุคคล: อีเมลแยกจาก Login, one-time verification token แบบ hash อายุ 20 นาที,
+  Test Email และตัวเลือก In-app/Email แยกตาม Borrow, Approval, Assignment, Return, Helpdesk และ Reminder
+- เพิ่ม API `/api/settings/notifications` และ `/email/verify|confirm|test`, Swagger, migration expand-only
+  `0016_email_notifications` และหน้า Settings ที่ responsive/dark mode/keyboard accessible
 
 ### Security
 - `requireAuth` ตรวจ role ปัจจุบันจากฐานข้อมูลทุก request ทำให้การเลื่อนหรือลดสิทธิ์มีผลทันทีแม้ JWT เดิมยังไม่หมดอายุ
+- Verification token ไม่เก็บ plaintext, ใช้ครั้งเดียว, มี expiry/rate limit; validation ป้องกัน header injection
+  และ API key อยู่เฉพาะ backend deployment secret
 
 ## [v1.1.0] — Stable Release
 

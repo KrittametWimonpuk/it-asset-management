@@ -30,6 +30,7 @@ const CORE_NAVIGATION = [
   { key: 'borrowRequests', label: 'คำขอยืม', group: 'การจัดการ', icon: 'borrow' },
   { key: 'tickets', label: 'Helpdesk', group: 'การจัดการ', icon: 'ticket' },
   { key: 'reports', label: 'รายงาน', group: 'การจัดการ', icon: 'report' },
+  { key: 'notificationSettings', label: 'ตั้งค่าการแจ้งเตือน', group: 'บัญชี', icon: 'settings' },
 ]
 
 const ADMIN_NAVIGATION = [
@@ -50,6 +51,7 @@ const PAGE_META = {
   tickets: { title: 'Helpdesk', eyebrow: 'งานบริการไอที' },
   reports: { title: 'รายงาน', eyebrow: 'ข้อมูลและการวิเคราะห์' },
   notifications: { title: 'การแจ้งเตือน', eyebrow: 'ศูนย์การสื่อสาร' },
+  notificationSettings: { title: 'ตั้งค่าการแจ้งเตือน', eyebrow: 'การตั้งค่าบัญชี' },
   audit: { title: 'Audit Log', eyebrow: 'การกำกับดูแลระบบ' },
   users: { title: 'สิทธิ์ผู้ใช้', eyebrow: 'การจัดการบัญชีและ RBAC' },
   employees: { title: 'พนักงาน', eyebrow: 'การจัดการบุคลากร' },
@@ -82,6 +84,7 @@ function Icon({ name }) {
     chevron: <path d="m8 10 4 4 4-4" />,
     collapse: <path d="m15 18-6-6 6-6" />,
     logout: <><path d="M10 17l5-5-5-5M15 12H3M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.52-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.05V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" /></>,
   }
 
   return (
@@ -126,7 +129,12 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   const pageMeta = PAGE_META[activeTab] || PAGE_META.dashboard
   const displayName = user.name || user.email
   const initials = displayName.split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
-  const unreadNotifications = notifications.filter((ticket) => !seenNotificationIds.includes(ticket.id))
+  // ช่วงเปลี่ยนผ่าน: ซ่อน ticket polling รุ่นเดิมเมื่อมี Notification record ของ ticket เดียวกันแล้ว
+  // เพื่อไม่ให้ผู้ดูแลเห็นรายการซ้ำใน Bell ขณะที่ยังรักษา fallback ให้ deployment ก่อน migration
+  const legacyNotifications = notifications.filter((ticket) => !systemNotifications.some((notification) => (
+    notification.title.includes(ticket.ticketNumber) || notification.message.includes(ticket.ticketNumber)
+  )))
+  const unreadNotifications = legacyNotifications.filter((ticket) => !seenNotificationIds.includes(ticket.id))
   const totalUnreadNotifications = unreadNotifications.length + systemUnreadCount
 
   useEffect(() => {
@@ -180,7 +188,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
     async function loadSystemNotifications() {
       try {
         const [list, unread] = await Promise.all([
-          api.notifications.list({ page: 1, pageSize: 6, sortBy: 'createdAt', sortOrder: 'desc' }),
+          api.notifications.list({ page: 1, pageSize: 20, sortBy: 'createdAt', sortOrder: 'desc' }),
           api.notifications.unreadCount(),
         ])
         if (!cancelled) {
@@ -275,7 +283,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
   }
 
   async function markAllNotificationsRead() {
-    markNotificationsRead(notifications.map((ticket) => ticket.id))
+    markNotificationsRead(legacyNotifications.map((ticket) => ticket.id))
     setSystemNotifications((current) => current.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() })))
     setSystemUnreadCount(0)
     try { await api.notifications.markAllRead() } catch { window.dispatchEvent(new Event('notifications:refresh')) }
@@ -423,7 +431,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                   <div className="notification-loading" aria-label="กำลังโหลดการแจ้งเตือน">
                     {Array.from({ length: 3 }, (_, index) => <span key={index} />)}
                   </div>
-                ) : notifications.length === 0 && systemNotifications.length === 0 ? (
+                ) : legacyNotifications.length === 0 && systemNotifications.length === 0 ? (
                   <div className="notification-empty">
                     <span><Icon name="bell" /></span>
                     <strong>ไม่มีการแจ้งเตือนใหม่</strong>
@@ -431,7 +439,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                   </div>
                 ) : (
                   <div className="notification-list">
-                    {systemNotifications.map((notification) => (
+                    {systemNotifications.slice(0, 6).map((notification) => (
                       <button
                         type="button"
                         className={`notification-item${notification.isRead ? '' : ' is-unread'}`}
@@ -450,7 +458,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                         {!notification.isRead && <i className="notification-unread-dot" aria-hidden="true" />}
                       </button>
                     ))}
-                    {notifications.map((ticket) => {
+                    {legacyNotifications.map((ticket) => {
                       const unread = !seenNotificationIds.includes(ticket.id)
                       return (
                         <button
@@ -474,7 +482,7 @@ export default function AppShell({ activeTab, canManageMasterData, onNavigate, o
                     })}
                   </div>
                 )}
-                {(notifications.length > 0 || systemNotifications.length > 0) && (
+                {(legacyNotifications.length > 0 || systemNotifications.length > 0) && (
                   <button type="button" className="notification-view-all" onClick={() => { setNotificationsOpen(false); navigate('notifications') }}>
                     ดูการแจ้งเตือนทั้งหมด <span aria-hidden="true">→</span>
                   </button>

@@ -157,7 +157,12 @@ router.post('/', employeeOnly, asyncHandler(async (req, res) => {
   await notifyStaff({
     title: `คำขอยืมใหม่ ${item.requestNumber}`,
     message: `${item.employee.fullName} ขอใช้ ${item.asset.assetTag} — ${item.asset.name}`,
-    type: 'BORROW_REQUEST', priority: 'HIGH', auditContext: auditContext(req),
+    type: 'BORROW_REQUEST', priority: 'HIGH', templateKey: 'BORROW_REQUEST_SUBMITTED', auditContext: auditContext(req),
+  })
+  await notifyEmployee(item.employeeId, {
+    title: `รับคำขอยืม ${item.requestNumber} แล้ว`,
+    message: `ระบบได้รับคำขอใช้ ${item.asset.assetTag} — ${item.asset.name} และกำลังรอการพิจารณา`,
+    type: 'BORROW_REQUEST', priority: 'NORMAL', templateKey: 'BORROW_REQUEST_SUBMITTED', auditContext: auditContext(req),
   })
   ok(res, item, 201)
 }))
@@ -250,12 +255,12 @@ router.post('/:id/approve', approveOrReject, asyncHandler(async (req, res) => {
   await notifyEmployee(result.item.employeeId, {
     title: `คำขอยืม ${result.item.requestNumber} ได้รับอนุมัติ`,
     message: `${result.item.asset.assetTag} — ${result.item.asset.name} ได้รับอนุมัติและสร้างการมอบหมายแล้ว`,
-    type: 'APPROVAL', priority: 'NORMAL', auditContext: auditContext(req),
+    type: 'APPROVAL', priority: 'NORMAL', templateKey: 'BORROW_REQUEST_APPROVED', auditContext: auditContext(req),
   })
   await notifyEmployee(result.item.employeeId, {
     title: `ได้รับมอบหมาย ${result.item.asset.assetTag}`,
     message: `คุณเป็นผู้ถือครอง ${result.item.asset.name} จากคำขอ ${result.item.requestNumber}`,
-    type: 'ASSIGNMENT', priority: 'NORMAL', auditContext: auditContext(req),
+    type: 'ASSIGNMENT', priority: 'NORMAL', templateKey: 'ASSET_ASSIGNED', auditContext: auditContext(req),
   })
   ok(res, { ...result.item, assignmentId: result.assignment.id })
 }))
@@ -292,7 +297,7 @@ router.post('/:id/reject', approveOrReject, asyncHandler(async (req, res) => {
   await notifyEmployee(item.employeeId, {
     title: `คำขอยืม ${item.requestNumber} ไม่ได้รับอนุมัติ`,
     message: `เหตุผล: ${item.rejectedReason}`,
-    type: 'APPROVAL', priority: 'HIGH', auditContext: auditContext(req),
+    type: 'APPROVAL', priority: 'HIGH', templateKey: 'BORROW_REQUEST_REJECTED', auditContext: auditContext(req),
   })
   ok(res, item)
 }))

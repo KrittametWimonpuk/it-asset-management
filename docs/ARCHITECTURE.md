@@ -12,8 +12,11 @@ flowchart LR
   S[Scheduler / EventBridge / cron] --> J[runSchedulerTick]
   J --> N[Due reminder generator]
   J --> O[Audit outbox dispatcher]
+  J --> E[Email outbox worker]
+  E --> PVD[Resend provider adapter]
   N --> D
   O --> D
+  E --> D
 ```
 
 ## Identity boundary
@@ -40,6 +43,9 @@ erDiagram
 - Notification reminder ใช้ stable `dedupeKey` + unique index จึงปลอดภัยเมื่อ scheduler ทำซ้ำหรือชนกัน
 - Audit event persist ที่ `AuditOutbox`; dispatcher ใช้ `AuditLog.outboxId` unique เพื่อ idempotency และ backoff retry
 - `npm run scheduler` เป็น provider-neutral one-shot interface สำหรับ cron, Kubernetes CronJob หรือ ECS EventBridge
+- Notification และ EmailOutbox ถูกสร้างใน transaction เดียวกัน; provider failure ไม่ย้อน workflow หลัก
+- `EmailOutbox.dedupeKey` และ provider idempotency key ป้องกันส่งซ้ำ ส่วน FAILED ใช้ exponential backoff
+- Notification email แยกจาก Login email, token ยืนยันเก็บเฉพาะ SHA-256 hash อายุ 20 นาทีและใช้ครั้งเดียว
 
 ## Network boundary
 
